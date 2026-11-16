@@ -345,7 +345,9 @@ class GPT(nn.Module):
         # list of predictions, so fold batch and time together:
         #   logits (B*T, vocab_size), targets (B*T,)
         # A model guessing uniformly at random scores ln(vocab_size) ≈ 10.8.
-        loss = F.cross_entropy(logits.view(B * T, -1), targets.view(B * T))
+        # (.reshape rather than .view: targets may be a slice such as data[:, 1:],
+        # whose memory isn't laid out in order, and .view refuses those.)
+        loss = F.cross_entropy(logits.view(B * T, -1), targets.reshape(B * T))
         return logits, loss
 
     @torch.no_grad()  # no gradients are needed when generating: saves memory and time
