@@ -37,10 +37,23 @@ pip install -r requirements.txt
 
 ## Data
 
+The reading list lives in `engine/data_prep/books.py`: Gutenberg IDs, translators, and per-book cleaning rules.
+
+| Tier | Books |
+| --- | --- |
+| **Core** (classical Mediterranean, most of the voice) | *Odyssey* (Butler, prose) · *Metamorphoses* (Riley, prose, 2 vols) · Theocritus, Bion and Moschus (Lang) · *Eclogues* and *Georgics* (Greenough and Rhoades, verse) · Hesiod and the Homeric Hymns (Evelyn-White) · Aesop (Vernon Jones) |
+| **Dream layer** | Dunsany, *The Gods of Pegana* and *Time and the Gods* · MacDonald, *Phantastes* and *Lilith* · *Poems of Coleridge* · Carroll, both Alice books · *The Arabian Nights* (Lang's selection) |
+| **Seasoning** (capped at 4% each) | *Frankenstein* · *Walden* · Grimms' Fairy Tales · Poe's tales (Raven Edition vol. II) · *Njal's Saga* (Dasent) |
+
 ```bash
-# Fetch Project Gutenberg books as plain text, headers/footers stripped
-python -m engine.data_prep.fetch_gutenberg 1342 84 11 --out data/gutenberg
+# Download, clean, cap seasoning, write data/arcadia.txt + data/train.txt + data/val.txt
+python -m engine.data_prep.build_corpus
+
+# Fetch arbitrary Gutenberg books as plain text, headers/footers stripped
+python -m engine.data_prep.fetch_gutenberg 1727 8395 11 --out data/gutenberg
 
 # DreamBank: placeholder, not yet implemented
 python -m engine.data_prep.fetch_dreambank
 ```
+
+Cleaning removes Gutenberg headers and footers, translator prefaces and introductions, commentary, indexes and footnotes. The val split is made of whole book sections (about 10% of each book), not random lines.

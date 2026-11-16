@@ -1,7 +1,7 @@
 """Download Project Gutenberg books as plain text and strip the Gutenberg boilerplate.
 
 Usage:
-    python -m engine.data_prep.fetch_gutenberg 1342 84 11 --out data/gutenberg
+    python -m engine.data_prep.fetch_gutenberg 1727 8395 11 --out data/gutenberg
     python -m engine.data_prep.fetch_gutenberg --ids-file ids.txt
 """
 
