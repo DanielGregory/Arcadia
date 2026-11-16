@@ -58,3 +58,21 @@ python -m engine.data_prep.fetch_dreambank
 ```
 
 Cleaning removes Gutenberg headers and footers, translator prefaces and introductions, commentary, indexes and footnotes. The val split is made of whole book sections (about 10% of each book) and about 10% of the sampled dream reports, not random lines.
+
+## Training
+
+Character-level training with settings from `configs/`:
+
+```bash
+# CPU smoke test (about a minute)
+python -m engine.train_char --config configs/smoke.py --out_dir checkpoints/smoke
+
+# Full run on a GPU (configs/full.py: 6 layers, 6 heads, 384 wide, context 256, 5000 steps)
+python -m engine.train_char --config configs/full.py --out_dir checkpoints/full
+
+# Sample from a checkpoint
+python -m engine.sample --ckpt checkpoints/full/best.pt --chars 2000 --temperature 0.7 0.9 1.1
+```
+
+Each run writes `ckpt.pt` (latest), `best.pt` (lowest val loss), `loss_log.csv` and `sample.txt` to its `--out_dir`.
+To train on Kaggle's free T4 GPU, upload `notebooks/kaggle_train.ipynb` to Kaggle, turn on GPU and Internet, and run all cells.
