@@ -1,13 +1,69 @@
-"""Placeholder for downloading DreamBank (https://www.dreambank.net) dream reports.
+"""Download DreamBank dream reports from the Hugging Face dataset "DReAMy-lib/DreamBank-dreams-en".
 
-Not implemented yet. DreamBank has no bulk download, so this will need a
-scraper or a pre-packaged export, and its terms of use should be checked first.
-Output is intended to go to data/dreambank/.
+Keeps reports of 50-400 words (whitespace-split), with whitespace normalised and
+no content filtering. The kept reports are cached as JSON lines in
+data/raw/dreambank/reports.jsonl, so later builds need neither the network nor
+the `datasets` library.
+
+Usage:
+    python -m engine.data_prep.fetch_dreambank            # fetch and cache
+    python -m engine.data_prep.fetch_dreambank --refresh  # re-download
+
+If the network blocks Hugging Face's xet storage host, set HF_HUB_DISABLE_XET=1
+to download through the plain CDN instead.
 """
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from pathlib import Path
+
+DATASET = "DReAMy-lib/DreamBank-dreams-en"
+MIN_WORDS = 50
+MAX_WORDS = 400
+
+# A few reports are Mac Roman text mis-decoded as Latin-1 ("ÒIÕll fix thisÓ").
+# Repair the punctuation and accents; this is an encoding fix, not content filtering.
+MOJIBAKE = str.maketrans({"Ò": "“", "Ó": "”", "Ô": "‘", "Õ": "’", "Ð": "–", "Ñ": "—",
+                          "\x8e": "é", "\xad": "-"})
+
+
+def download(hf_cache: Path) -> list[dict]:
+    from datasets import load_dataset  # imported lazily: only needed on a cache miss
+
+    ds = load_dataset(DATASET, split="train", cache_dir=str(hf_cache))
+    kept = []
+    for row in ds:
+        text = re.sub(r"\s+", " ", (row["dreams"] or "").translate(MOJIBAKE)).strip()
+        if MIN_WORDS <= len(text.split()) <= MAX_WORDS:
+            kept.append({"series": row["series"], "text": text})
+    return kept
+
+
+def load_reports(data_dir: Path = Path("data"), refresh: bool = False) -> list[dict]:
+    """Return the filtered reports as dicts with "series" and "text", in dataset order."""
+    cache = data_dir / "raw" / "dreambank" / "reports.jsonl"
+    if cache.exists() and not refresh:
+        with cache.open(encoding="utf-8") as f:
+            return [json.loads(line) for line in f]
+    reports = download(data_dir / "raw" / "hf")
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    with cache.open("w", encoding="utf-8") as f:
+        for r in reports:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    return reports
 
 
 def main() -> None:
-    raise NotImplementedError("DreamBank download is not implemented yet.")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    parser.add_argument("--refresh", action="store_true")
+    args = parser.parse_args()
+    reports = load_reports(args.data_dir, args.refresh)
+    chars = sum(len(r["text"]) for r in reports)
+    print(f"{len(reports):,} reports with {MIN_WORDS}-{MAX_WORDS} words, {chars:,} characters")
 
 
 if __name__ == "__main__":

@@ -1,15 +1,18 @@
-"""Build the Arcadia training corpus from the reading list in `books.py`.
+"""Build the Arcadia training corpus from the reading list in `books.py` plus DreamBank.
 
 Steps:
-  1. Download each Gutenberg text (cached in data/raw/gutenberg/).
+  1. Download each Gutenberg text (cached in data/raw/gutenberg/) and the
+     DreamBank reports (cached in data/raw/dreambank/, see fetch_dreambank.py).
   2. Strip Gutenberg headers/footers, translator prefaces, introductions,
      notes, indexes and footnotes, using the per-book rules in books.py.
   3. Cap each SEASONING book at 4% of the final corpus by randomly sampling
      whole paragraphs to keep.
-  4. Write data/arcadia.txt, then a 90/10 train/val split by book section
-     (data/train.txt, data/val.txt). Every book contributes ~10% of its own
-     sections to val, so val covers the whole reading list.
-  5. Print a per-book table plus total and unique character counts.
+  4. Randomly sample whole DreamBank reports, each wrapped in <dream>...</dream>,
+     until the "dreambank" tier is 25% of the final corpus.
+  5. Write data/arcadia.txt, then a 90/10 train/val split (data/train.txt,
+     data/val.txt): ~10% of each book's sections, and ~10% of the sampled
+     dream reports, go to val.
+  6. Print a per-source table, the tier split, and total and unique character counts.
 
 Usage:
     python -m engine.data_prep.build_corpus
@@ -30,9 +33,12 @@ import requests
 from tqdm import tqdm
 
 from engine.data_prep.books import BOOKS, SEASONING, Book
+from engine.data_prep.fetch_dreambank import load_reports
 from engine.data_prep.fetch_gutenberg import HEADERS, fetch_raw, strip_gutenberg
 
 SEASONING_CAP = 0.04
+DREAMBANK = "dreambank"
+DREAMBANK_SHARE = 0.25
 VAL_FRACTION = 0.10
 # Sections longer than this share of their book are cut into paragraph-aligned
 # chunks, so books with few long sections can still be split ~90/10.
@@ -256,17 +262,41 @@ def subdivide(sections: list[Section]) -> list[Section]:
 
 
 # ----------------------------------------------------------------- seasoning
-def seasoning_cap(sizes: dict[int, int], seasoning_ids: set[int]) -> int:
-    """Solve cap = 4% of a total that itself depends on the capped sizes."""
+def final_total(sizes: dict[int, int], seasoning_ids: set[int]) -> int:
+    """Solve for the final corpus size T, where each seasoning book is capped at
+    4% of T and DreamBank adds 25% of T:  T = fixed + sum(min(s_i, 0.04 T)) + 0.25 T."""
     fixed = sum(n for i, n in sizes.items() if i not in seasoning_ids)
-    total = sum(sizes.values())
-    for _ in range(100):
+    total = sum(sizes.values()) / (1 - DREAMBANK_SHARE)
+    for _ in range(200):
         cap = SEASONING_CAP * total
-        new_total = fixed + sum(min(sizes[i], cap) for i in seasoning_ids)
+        new_total = (fixed + sum(min(sizes[i], cap) for i in seasoning_ids)) / (1 - DREAMBANK_SHARE)
         if abs(new_total - total) < 1:
             break
         total = new_total
-    return int(SEASONING_CAP * total)
+    return int(total)
+
+
+def wrap_dream(text: str) -> str:
+    return f"<dream>\n{text}\n</dream>"
+
+
+def sample_dreams(reports: list[dict], budget: int, rng: random.Random) -> list[str]:
+    """Randomly pick whole reports (wrapped) until adding another would exceed `budget` chars."""
+    order = list(range(len(reports)))
+    rng.shuffle(order)
+    picked, used = [], 0
+    for i in order:
+        w = wrap_dream(reports[i]["text"])
+        n = len(w) + len(PARA_SEP)
+        if used + n > budget:
+            if used >= budget - 2000:  # close enough: stop
+                break
+            continue                   # a shorter report may still fit
+        picked.append(w)
+        used += n
+    if used + 2000 < budget:
+        raise ValueError(f"DreamBank has only {used:,} chars of reports; {budget:,} needed")
+    return picked
 
 
 def trim(sections: list[Section], budget: int, rng: random.Random) -> list[Section]:
@@ -322,13 +352,21 @@ def main() -> None:
     for book in tqdm(BOOKS, desc="clean"):
         books[book.gutenberg_id] = clean_book(load_raw(book, cache, session, args.refresh), book)
 
+    reports = load_reports(args.data_dir, args.refresh)
+
     rng = random.Random(args.seed)
     raw_sizes = {i: book_len(s) for i, s in books.items()}
     seasoning_ids = {b.gutenberg_id for b in BOOKS if b.tier == SEASONING}
-    cap = seasoning_cap(raw_sizes, seasoning_ids)
+    target_total = final_total(raw_sizes, seasoning_ids)
+    cap = int(SEASONING_CAP * target_total)
     for i in sorted(seasoning_ids):
         if raw_sizes[i] > cap:
             books[i] = trim(books[i], cap, rng)
+
+    # DreamBank gets its own RNG so its sample doesn't shift when the book list changes.
+    dream_rng = random.Random(f"{args.seed}-{DREAMBANK}")
+    dreams = sample_dreams(reports, int(DREAMBANK_SHARE * target_total), dream_rng)
+    dream_val = set(dream_rng.sample(range(len(dreams)), round(VAL_FRACTION * len(dreams))))
 
     full, train, val = [], [], []
     rows = []
@@ -338,7 +376,15 @@ def main() -> None:
         full.append(join(sections))
         train.append(join([s for k, s in enumerate(sections) if k not in val_idx]))
         val.append(join([s for k, s in enumerate(sections) if k in val_idx]))
-        rows.append((book, len(full[-1]), raw_sizes[book.gutenberg_id], len(val_idx), len(sections)))
+        rows.append((book.gutenberg_id, book.tier, f"{book.title} ({book.author})", len(full[-1]),
+                     raw_sizes[book.gutenberg_id], len(val_idx), len(sections)))
+
+    full.append(PARA_SEP.join(dreams))
+    train.append(PARA_SEP.join(d for k, d in enumerate(dreams) if k not in dream_val))
+    val.append(PARA_SEP.join(d for k, d in enumerate(dreams) if k in dream_val))
+    dream_pool = sum(len(wrap_dream(r["text"])) + len(PARA_SEP) for r in reports)
+    rows.append(("HF", DREAMBANK, f"DreamBank ({len(dreams):,} of {len(reports):,} reports)",
+                 len(full[-1]), dream_pool, len(dream_val), len(dreams)))
 
     corpus = BOOK_SEP.join(full)
     args.data_dir.mkdir(parents=True, exist_ok=True)
@@ -348,16 +394,15 @@ def main() -> None:
 
     total = len(corpus)
     print()
-    print(f"{'id':>6}  {'tier':<9} {'book':<50} {'chars':>10} {'%':>6}  {'val sec':>9}")
-    print("-" * 98)
+    print(f"{'id':>6}  {'tier':<9} {'source':<50} {'chars':>10} {'%':>6}  {'val/units':>11}")
+    print("-" * 100)
     tiers: dict[str, int] = {}
-    for book, n, raw_n, n_val, n_sec in rows:
-        tiers[book.tier] = tiers.get(book.tier, 0) + n
-        trimmed = f"  (trimmed from {raw_n:,})" if n < raw_n else ""
-        title = f"{book.title} ({book.author})"[:50]
-        print(f"{book.gutenberg_id:>6}  {book.tier:<9} {title:<50} {n:>10,} {100 * n / total:>5.2f}%"
-              f"  {n_val:>3}/{n_sec:<5}{trimmed}")
-    print("-" * 98)
+    for sid, tier, title, n, raw_n, n_val, n_units in rows:
+        tiers[tier] = tiers.get(tier, 0) + n
+        trimmed = f"  (sampled from {raw_n:,})" if n < raw_n else ""
+        print(f"{sid:>6}  {tier:<9} {title[:50]:<50} {n:>10,} {100 * n / total:>5.2f}%"
+              f"  {n_val:>5}/{n_units:<5}{trimmed}")
+    print("-" * 100)
     for tier, n in tiers.items():
         print(f"{'':>6}  {tier:<9} {'(tier total)':<50} {n:>10,} {100 * n / total:>5.2f}%")
     print()
