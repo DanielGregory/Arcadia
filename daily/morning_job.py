@@ -9,12 +9,15 @@ and publishes what it makes.
 
 The five steps, all in this one file:
 
-  1. DREAM     run 4 dreams several candidates (half with no opening, half with
+  1. DREAM     run 4 dreams 24 candidates (half with no opening, half with
                an opening from the pool below). The day's date is the random
                seed, so a morning can always be re-made exactly.
-  2. SELECT    every candidate is scored: it should end itself, be a sensible
-               length, not repeat itself, and not copy its training text
-               (12+ words in a row found in train.txt rules it out).
+  2. SELECT    every candidate is checked and scored: it should end itself, be
+               a sensible length, not repeat itself, and not copy its training
+               text (12+ words in a row found in train.txt rules it out). Then
+               the editor model JUDGES each survivor: does it hold together,
+               following one thread from sentence to sentence? That rating
+               decides the pick; the checks above mostly just rule things out.
   3. REMEMBER  the editor model (Qwen2.5-1.5B-Instruct) tidies the best
                candidates into the "as remembered" version. The first one whose
                edit passes the retention checks (engine/remember.py) wins; if
@@ -49,7 +52,7 @@ import torch
 
 from engine.copy_check import FLAG_WORDS, longest_copied_run
 from engine.remember import Rememberer, is_flagged, length_ratio, retention
-from engine.sample import generate_dream, load
+from engine.sample import cut_to_last_sentence, generate_dream, load
 
 ROOT = Path(__file__).resolve().parents[1]
 GENESIS = dt.date(2026, 11, 17)  # morning 1: the first day of Phase 1.5
@@ -91,6 +94,28 @@ Rules:
 - If the dream has no clear place, set it on a Mediterranean shore or in an ancient hillside town by the sea.
 - One line of plain words, at most 35 words, no full stop at the end.
 Reply with the description only."""
+
+# --- 2b. the coherence judge -------------------------------------------------
+# Tested on Morning 1's candidates: Qwen's plain fluency (how likely it finds
+# the text) preferred flat modern DreamBank prose, but asking it to RATE
+# coherence picked the dreams a reader would pick. We read the rating from the
+# model's probabilities over the answers "1".."10" (the expected value), which
+# is smoother and more repeatable than taking the single number it would say.
+JUDGE_SYSTEM = """You judge short dream journal entries. Score how well the dream HOLDS TOGETHER: does it follow one thread (a place, a situation, a person) from sentence to sentence, so a reader can picture what happens? Strange events are fine; dreams are strange. Jumbled grammar, sentences that don't connect, and nonsense words score low.
+Reply with one number from 1 (incoherent word salad) to 10 (one clear, vivid thread)."""
+
+
+def judge(editor: Rememberer, text: str) -> float:
+    """Expected 1-10 coherence rating of a dream, from the editor model."""
+    tok, model = editor.tok, editor.model
+    messages = [{"role": "system", "content": JUDGE_SYSTEM}, {"role": "user", "content": text}]
+    prompt = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    with torch.no_grad():
+        logits = model(**tok(prompt, return_tensors="pt").to(editor.device)).logits[0, -1].float()
+    answers = [tok.encode(str(n))[0] for n in range(1, 11)]  # "10" starts with the "1" token; fine for an estimate
+    probs = torch.softmax(logits[answers], dim=0)
+    return sum(n * probs[n - 1].item() for n in range(1, 11))
+
 
 # SDXL has two text encoders, each reading at most 77 tokens. The scene goes
 # into both (the v2 lesson: a scene only in the first encoder gets ignored);
@@ -177,6 +202,8 @@ def dream(ckpt: str, train: str, n: int, seed: int, device: str) -> list[dict]:
     for i, opening in enumerate(openings):
         torch.manual_seed(seed * 100 + i)  # one fixed seed per candidate: reproducible
         text, closed = generate_dream(model, tok, opening, MAX_TOKENS, device, **SETTINGS)
+        # A dream the model closed itself can still end mid-thought ("...the prophets said:").
+        text = cut_to_last_sentence(text)
         c = score({"i": i, "seed": seed * 100 + i, "opening": opening, "closed": closed, "text": text}, train)
         out.append(c)
         print(f"  candidate {i:2d}: {c['words']:3d} words, {'closed' if closed else 'cut   '}, "
@@ -246,7 +273,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=Path("out/morning"))
     parser.add_argument("--date", help="YYYY-MM-DD (default: today, UTC)")
     parser.add_argument("--run", default="run4", help="model name recorded with the dream")
-    parser.add_argument("--candidates", type=int, default=12)
+    parser.add_argument("--candidates", type=int, default=24)
     parser.add_argument("--steps", type=int, default=30)
     parser.add_argument("--ip_scale", type=float, default=0.7, help="style strength of the Corva reference")
     parser.add_argument("--no_paint", action="store_true", help="skip SDXL (CPU tests): canonical Corva as the painting")
@@ -272,9 +299,17 @@ def main() -> None:
     del train
     timings["dream"] = round(time.time() - t0, 1)
 
-    print("3. remembering", flush=True)
+    print("2b-3. judging and remembering", flush=True)
     t = time.time()
     editor = Rememberer(device=args.device)
+    # 2b. Judge every survivor; the rating joins its score and decides the order.
+    for c in ranked:
+        if c["score"] is not None:
+            c["coherence"] = round(judge(editor, c["text"]), 2)
+            c["score"] = round(c["score"] + c["coherence"], 3)
+    ranked.sort(key=lambda c: (c["score"] is not None, c["score"] or 0), reverse=True)
+    for c in ranked[:5]:
+        print(f"  top: candidate {c['i']:2d} score {c['score']} (coherence {c.get('coherence')})", flush=True)
     chosen, remembered, edit_log = remember_best(editor, ranked)
     # The painting prompt is written from the remembered text when there is one (it reads better).
     scene = editor.chat(PAINT_SYSTEM, remembered or chosen["text"], max_new_tokens=80).strip()
@@ -329,11 +364,11 @@ def markdown(r: dict) -> str:
     else:
         lines += ["*(No edit passed the retention checks; the dream is shown as dreamed.)*", ""]
     lines += ["## As dreamed", "", r["raw"], "", "## Painting", "", f"> {r['painting_prompt']}", "",
-              "## Candidates", "", "| # | words | closed | trigrams | copied | modern | score |", "|---|---|---|---|---|---|---|"]
+              "## Candidates", "", "| # | words | closed | trigrams | copied | modern | coherence | score |", "|---|---|---|---|---|---|---|---|"]
     for c in r["candidates"]:
         s = c["score"] if c["score"] is not None else f"rejected: {c['rejected']}"
         lines.append(f"| {c['i']} | {c['words']} | {'yes' if c['closed'] else 'no'} | {c['distinct_trigrams']} "
-                     f"| {c['copied_words']} | {', '.join(c.get('modern', []))} | {s} |")
+                     f"| {c['copied_words']} | {', '.join(c.get('modern', []))} | {c.get('coherence', '')} | {s} |")
     lines += ["", f"Timings (s): {r['timings_s']}", ""]
     return "\n".join(lines)
 
