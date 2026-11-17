@@ -23,10 +23,11 @@ The five steps, all in this one file:
                edit passes the retention checks (engine/remember.py) wins; if
                none pass, the best dream is used raw and the edit is dropped.
   4. PAINT     the editor condenses the dream into one painting's worth of
-               visible things; SDXL paints it twice (landscape for the desktop,
+               strangest images, combined literally into one impossible scene
+               (dreams are crazy; the calm brushstroke beauty belongs to the
+               world itself). SDXL paints it twice (landscape for the desktop,
                portrait for the phone), with the canonical Corva painting as a
-               STYLE-ONLY reference (InstantStyle) so every morning looks like
-               Arcadia without copying Corva's buildings.
+               light STYLE-ONLY reference (InstantStyle) for brushwork and palette.
   5. WALLPAPER render/wallpaper.py sets the text over each painting.
 
 Output, in --out/<date>/:
@@ -85,14 +86,14 @@ OPENINGS = [
 ]
 
 # --- 3. the painting prompt -------------------------------------------------
-PAINT_SYSTEM = """You turn a dream into the description of ONE painting.
-Read the dream and describe a single scene from it that a painter could paint: the place, the main figures or objects, the light and the weather.
+PAINT_SYSTEM = """You turn a dream into the description of ONE surreal painting.
+Dreams are strange, and the painting must be just as strange. Pick the 2 to 4 strangest, most visual things in the dream and put them together in one impossible scene, taken literally: wrong scale, wrong place, things that cannot be together. Do not make it sensible and do not explain it.
 
 Rules:
-- Only things you can SEE. No names, no thoughts, no story, no dialogue, no explanation.
-- Take the images from the dream. You may choose which moment to paint, but do not invent new objects.
-- If the dream has no clear place, set it on a Mediterranean shore or in an ancient hillside town by the sea.
+- Only things you can SEE. No names, no thoughts, no dialogue, no explanation.
+- Take the images from the dream; do not invent new ones. Turn a strange word into a strange object (a "skeleton key" can be a key made of bones).
 - One line of plain words, at most 35 words, no full stop at the end.
+
 Reply with the description only."""
 
 # --- 2b. the coherence judge -------------------------------------------------
@@ -117,10 +118,15 @@ def judge(editor: Rememberer, text: str) -> float:
     return sum(n * probs[n - 1].item() for n in range(1, 11))
 
 
+# The 1.5B editor is good at faithful, careful work (remembering, judging) but
+# too literal for this: it tidied every dream back into a plain scene. The 3B
+# model, loaded only for this step, keeps the strangeness (tested on Morning 1).
+PAINT_MODEL = "Qwen/Qwen2.5-3B-Instruct"
+
 # SDXL has two text encoders, each reading at most 77 tokens. The scene goes
 # into both (the v2 lesson: a scene only in the first encoder gets ignored);
 # the second one also carries the style, FIRST, so it is never cut off.
-STYLE = "dreamlike oil painting in the manner of Claude Lorrain, warm golden haze, soft light"
+STYLE = "surreal dreamlike oil painting, impossible scene, visible brushstrokes, glowing light"
 NEGATIVE = ("text, letters, watermark, signature, frame, border, photograph, modern buildings, cars, "
             "grey, washed out, blurry, deformed hands, extra limbs")
 
@@ -275,7 +281,8 @@ def main() -> None:
     parser.add_argument("--run", default="run4", help="model name recorded with the dream")
     parser.add_argument("--candidates", type=int, default=24)
     parser.add_argument("--steps", type=int, default=30)
-    parser.add_argument("--ip_scale", type=float, default=0.7, help="style strength of the Corva reference")
+    parser.add_argument("--ip_scale", type=float, default=0.4,
+                        help="style strength of the Corva reference (brushwork and palette; higher pulls toward a calm coast)")
     parser.add_argument("--no_paint", action="store_true", help="skip SDXL (CPU tests): canonical Corva as the painting")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
@@ -311,14 +318,19 @@ def main() -> None:
     for c in ranked[:5]:
         print(f"  top: candidate {c['i']:2d} score {c['score']} (coherence {c.get('coherence')})", flush=True)
     chosen, remembered, edit_log = remember_best(editor, ranked)
+    del editor
+    gc.collect()
+    if args.device == "cuda":
+        torch.cuda.empty_cache()
     # The painting prompt is written from the remembered text when there is one (it reads better).
-    scene = editor.chat(PAINT_SYSTEM, remembered or chosen["text"], max_new_tokens=80).strip()
+    painter = Rememberer(model_id=PAINT_MODEL, device=args.device)
+    scene = painter.chat(PAINT_SYSTEM, remembered or chosen["text"], max_new_tokens=80).strip()
     # The small editor sometimes ignores "one line" and goes on to retell the story (Morning 1 did).
     # The first sentence is the scene; the rest is narrative. Then cap it inside the 77-token window.
     scene = re.split(r"(?<=[.!?])\s", scene, maxsplit=1)[0].strip().rstrip(".")
     scene = " ".join(scene.split()[:45])
     print(f"  painting prompt: {scene}", flush=True)
-    del editor
+    del painter
     gc.collect()
     if args.device == "cuda":
         torch.cuda.empty_cache()  # give the GPU back before SDXL arrives
@@ -345,7 +357,7 @@ def main() -> None:
     record = {
         "day": day.isoformat(), "number": number, "run": args.run, "seed": seed, "device": args.device,
         "raw": chosen["text"], "as_remembered": remembered, "opening": chosen["opening"],
-        "chosen": chosen["i"], "painting_prompt": scene, "painting_prompt_2": f"{STYLE}: {scene}",
+        "chosen": chosen["i"], "painting_prompt": scene, "paint_model": PAINT_MODEL, "painting_prompt_2": f"{STYLE}: {scene}",
         "negative_prompt": NEGATIVE, "steps": args.steps, "ip_scale": args.ip_scale,
         "style_reference": STYLE_REFERENCE, "painted": not args.no_paint, "settings": SETTINGS,
         "edit": edit_log, "candidates": ranked, "timings_s": timings,

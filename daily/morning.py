@@ -141,6 +141,7 @@ def main() -> None:
     parser.add_argument("--date", help="with --local: which day (default: the newest)")
     parser.add_argument("--no_commit", action="store_true")
     parser.add_argument("--dry_run", action="store_true", help="show what would be uploaded; no commit")
+    parser.add_argument("--no_publish", action="store_true", help="just run and download (a test): no upload, no commit")
     args = parser.parse_args()
 
     if args.local:
@@ -156,6 +157,9 @@ def main() -> None:
         record["gpu_minutes"] = round(minutes, 1)
     print(f"Morning {record['number']} ({record['day']}): {record['painting_prompt']}")
 
+    if args.no_publish:
+        print(f"not published; the output is in {day_dir.relative_to(ROOT)}")
+        return
     publish(day_dir, record, args.dry_run)
 
     if not args.dry_run:
