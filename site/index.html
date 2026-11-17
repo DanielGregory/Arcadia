@@ -96,7 +96,7 @@ const SUPABASE_URL = "https://dbrtvwhslxkdpmuawrgd.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NVNYh69hEq2uJKfWOvlAkg_9RCInRey";
 const STORAGE = `${SUPABASE_URL}/storage/v1/object/public/arcadia/`;
 
-const state = { images: [], dreams: [], filter: "all" };
+const state = { images: [], dreams: [], filter: "all", run: null };
 
 async function api(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -166,13 +166,17 @@ function dreamLabel(d) {
 
 function renderDreams() {
   const el = document.getElementById("dreams");
-  const all = state.dreams;
-  if (!all.length) { el.innerHTML = `<p class="empty">No dreams yet.</p>`; return; }
+  if (!state.dreams.length) { el.innerHTML = `<p class="empty">No dreams yet.</p>`; return; }
+  // Newest run first; the run chips switch between runs (default: the newest).
+  const runs = [...new Set(state.dreams.map(d => d.run))].sort((a, b) => parseInt(b.slice(3)) - parseInt(a.slice(3)));
+  if (!state.run) state.run = runs[0];
+  const all = state.run === "all" ? state.dreams : state.dreams.filter(d => d.run === state.run);
   const keeps = all.filter(d => d.mark === "keep").length, skips = all.filter(d => d.mark === "skip").length;
   const shown = all.filter(d => state.filter === "all" || (state.filter === "unmarked" ? !d.mark : d.mark === state.filter));
   const paintings = Object.fromEntries(state.images.filter(i => i.kind === "dream" && i.dream_id).map(i => [i.dream_id, i.id]));
   el.innerHTML = `
     <div class="tally"><span><strong>${keeps}</strong> kept of ${all.length}</span><span class="meta">${skips} skipped · ${all.length - keeps - skips} unmarked</span></div>
+    <div class="filters">${[...runs, "all"].map(r => `<button class="chip ${state.run === r ? "on" : ""}" data-run="${r}">${r === "all" ? "All runs" : r.replace("run", "Run ")}</button>`).join("")}</div>
     <div class="filters">${["all", "unmarked", "keep", "skip"].map(f => `<button class="chip ${state.filter === f ? "on" : ""}" data-filter="${f}">${f[0].toUpperCase() + f.slice(1)}</button>`).join("")}</div>
     ${shown.length ? "" : `<p class="empty">Nothing here.</p>`}` +
     shown.map(d => {
@@ -232,6 +236,7 @@ document.querySelector("main").addEventListener("click", e => {
   if (t.dataset.full) return openViewer(t.dataset.full);
   if (t.dataset.pick) return pick(t.dataset.pick);
   if (t.dataset.filter) { state.filter = t.dataset.filter; return renderDreams(); }
+  if (t.dataset.run) { state.run = t.dataset.run; return renderDreams(); }
   const card = t.closest("[data-id]");
   if (t.dataset.mark && card) return mark(card.dataset.id, t.dataset.mark);
   if (t.hasAttribute("data-more")) { t.previousElementSibling.classList.remove("clamped"); t.remove(); }
@@ -248,7 +253,7 @@ document.querySelector("main").addEventListener("focusout", e => {
   try {
     [state.images, state.dreams] = await Promise.all([
       api("images?select=id,kind,prompt,seed,meta,dream_id,picked&order=id", { headers: { Prefer: "" } }),
-      api("dreams?select=*&order=run,id", { headers: { Prefer: "" } }),
+      api("dreams?select=*&order=id", { headers: { Prefer: "" } }),
     ]);
     renderCorva(); renderDreams(); renderWallpapers();
   } catch (e) {

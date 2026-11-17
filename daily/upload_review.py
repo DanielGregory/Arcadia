@@ -115,8 +115,10 @@ def main() -> None:
         return dream_id
 
     # 1. Read-test dreams.
-    for run in ("run2", "run3"):
-        path = ROOT / f"out/read_test/{run}.json"
+    for path in sorted((ROOT / "out/read_test").glob("run*.json")):
+        run = path.stem
+        if not re.fullmatch(r"run\d+", run):  # skip run2_remembered.json and the like
+            continue
         if path.exists():
             for d in json.loads(path.read_text(encoding="utf-8")):
                 dream_id = f"{run}-read-{d['n']:02d}"
