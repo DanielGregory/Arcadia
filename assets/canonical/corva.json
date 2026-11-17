@@ -1,0 +1,22 @@
+{
+ "id": "corva_v2_02",
+ "kind": "canonical_corva",
+ "prompt": "Corva, an ancient harbor city of white marble temples with columns terraced up a steep hillside, dark cypress trees between them, a curved harbor full of wooden galleys with square sails and oars, rowing boats, mountains fading into haze, sun low over a calm sea, seen across the harbor from a rocky shore",
+ "prompt_2": "ancient harbor city, white columned temples terraced up a hillside, cypresses, galleys with square sails in the harbor, seen across the harbor from a rocky shore, Claude Lorrain oil painting, golden hour, hazy mountains, painterly",
+ "negative_prompt": "empty coastline, wilderness, modern buildings, cars, text, watermark, signature, picture frame, border, photograph, 3d render, cartoon, blurry, deformed",
+ "seed": 1002,
+ "width": 1344,
+ "height": 768,
+ "revision_of": "corva_02",
+ "model": "stabilityai/stable-diffusion-xl-base-1.0",
+ "vae": "madebyollin/sdxl-vae-fp16-fix",
+ "steps": 30,
+ "guidance_scale": 6.5,
+ "seconds": 24.8,
+ "git_commit": "cc84f227c39ace0f812f4f570ccc95ae429565da",
+ "reference": "assets/reference/corva_reference.jpg",
+ "canonical": true,
+ "picked_in": "review gallery (Supabase images.picked)",
+ "picked_from": "generated/corva/corva_v2_02.png",
+ "status": "closest so far; candidate for refinement (warmer light, white temples, cypresses, oared galleys)"
+}
