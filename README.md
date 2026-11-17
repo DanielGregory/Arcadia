@@ -2,6 +2,8 @@
 
 In Poussin's painting, shepherds find an inscription they can't agree on. Arcadia is a world built the same way: it records what happens, never what it means.
 
+See [docs/VISION.md](docs/VISION.md) for the master vision: world engine, storyteller, inhabitants and transformer, with no master narrator.
+
 ## What it is
 
 Arcadia is a creative ML side project: a small transformer, trained from scratch, that generates dreams for an evolving simulated world. Each day the world changes a little, its inhabitants dream about it, and those dreams are rendered, remembered, and folded back into what the world becomes. The project keeps the record and leaves the meaning to whoever reads it.
