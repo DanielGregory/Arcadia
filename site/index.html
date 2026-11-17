@@ -71,6 +71,18 @@
            background: var(--skip-soft); color: var(--skip); border: 1px solid var(--skip); }
   #alert[hidden] { display: none; }
   #alert strong { display: block; margin-bottom: 2px; }
+  /* Sky: always a night sky, whatever the page theme */
+  .sky-wrap { position: relative; border-radius: 14px; overflow: hidden; background: #070a18; box-shadow: var(--shadow); }
+  #skyCanvas { display: block; width: 100%; aspect-ratio: 1 / 1.05; touch-action: manipulation; cursor: pointer; }
+  .sky-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 2px 4px; font-size: 13px; color: var(--muted); }
+  .sky-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+  .star-card { margin-top: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chips span { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: var(--gold-soft); color: var(--gold); }
+  .similar { margin-top: 12px; }
+  .similar button { display: block; width: 100%; text-align: left; font: 14px/1.4 Georgia, serif; color: var(--ink);
+                    background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; margin-top: 6px; }
+  .similar small { color: var(--muted); font-family: -apple-system, sans-serif; }
   .today-head { font: 600 12px/1 Georgia, serif; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); margin: 4px 0 10px; }
   .downloads { display: flex; gap: 8px; margin-top: 12px; }
   .downloads a { flex: 1; text-align: center; text-decoration: none; font-size: 15px; font-weight: 600; padding: 11px 0;
@@ -87,6 +99,7 @@
   <h1>Arcadia · review <a href="/world/" style="float:right;letter-spacing:.15em;color:var(--gold);text-decoration:none">World ↗</a></h1>
   <nav role="tablist">
     <button role="tab" data-tab="today" aria-selected="true">Today</button>
+    <button role="tab" data-tab="sky" aria-selected="false">Sky</button>
     <button role="tab" data-tab="corva" aria-selected="false">Corva</button>
     <button role="tab" data-tab="dreams" aria-selected="false">Dreams</button>
     <button role="tab" data-tab="wallpapers" aria-selected="false">Wallpapers</button>
@@ -96,6 +109,7 @@
 <div id="alert" role="alert" hidden></div>
 <main>
   <section id="today"><p class="empty">Loading…</p></section>
+  <section id="sky" hidden><p class="empty">Loading…</p></section>
   <section id="corva" hidden><p class="empty">Loading…</p></section>
   <section id="dreams" hidden><p class="empty">Loading…</p></section>
   <section id="wallpapers" hidden><p class="empty">Loading…</p></section>
@@ -141,6 +155,7 @@ document.querySelectorAll("nav button").forEach(btn => btn.addEventListener("cli
   document.querySelectorAll("main section").forEach(s => (s.hidden = s.id !== btn.dataset.tab));
   try { localStorage.setItem("arcadia-tab", btn.dataset.tab); } catch (_) {}
   window.scrollTo(0, 0);
+  if (btn.dataset.tab === "sky" && sky.dreams.length) requestAnimationFrame(drawSky);
 }));
 try { const t = localStorage.getItem("arcadia-tab"); if (t) document.querySelector(`nav [data-tab="${t}"]`)?.click(); } catch (_) {}
 
@@ -203,6 +218,144 @@ function checkToday(mornings, runs) {
   }
   el.innerHTML = msg || "";
   el.hidden = !msg;
+}
+
+// ---------------------------------------------------------------- Sky
+// Every dream is a star. Its place comes from the meaning of the dream (an
+// embedding, squeezed to 2D with UMAP, so similar dreams sit together); its
+// colour is the voice it was dreamed in. Groups of nearby stars are the first
+// constellations, named by the images (symbols) they share.
+const TAG_COLORS = { dream: "#f4ead2", myth: "#f0a65a", tale: "#b9a2f2", saga: "#7fd0c4",
+                     poem: "#f28fb0", wisdom: "#9ec9ff", chronicle: "#d9c27a" };
+const sky = { dreams: [], cons: [], syms: {}, selected: null, pts: [], edges: [] };
+
+async function loadSky() {
+  const [dreams, cons, links] = await Promise.all([
+    api("memory_dreams?select=id,run,kind,tag,prompt,text,remembered,day,sky_x,sky_y,constellation&order=id", { headers: { Prefer: "" } }),
+    api("memory_constellations?select=*&order=id", { headers: { Prefer: "" } }),
+    api("memory_dream_symbols?select=dream_id,symbol,mentions", { headers: { Prefer: "" } }),
+  ]);
+  sky.dreams = dreams.filter(d => d.sky_x != null);
+  sky.cons = cons;
+  sky.syms = {};
+  for (const l of links) (sky.syms[l.dream_id] ||= []).push(l);
+  sky.edges = constellationLines(sky.dreams);
+  renderSky();
+}
+
+// Constellation lines: a minimum spanning tree inside each constellation, so
+// every star is joined to its group by the shortest possible set of lines.
+function constellationLines(dreams) {
+  const groups = {};
+  dreams.forEach((d, i) => (groups[d.constellation] ||= []).push(i));
+  const edges = [];
+  for (const idx of Object.values(groups)) {
+    const inTree = new Set([idx[0]]);
+    while (inTree.size < idx.length) {
+      let best = null;
+      for (const a of inTree) for (const b of idx) {
+        if (inTree.has(b)) continue;
+        const dx = dreams[a].sky_x - dreams[b].sky_x, dy = dreams[a].sky_y - dreams[b].sky_y, d2 = dx * dx + dy * dy;
+        if (!best || d2 < best[2]) best = [a, b, d2];
+      }
+      inTree.add(best[1]);
+      if (best[2] < 0.012) edges.push(best);  // skip long jumps: they read as noise, not shape
+    }
+  }
+  return edges;
+}
+
+function renderSky() {
+  const el = document.getElementById("sky");
+  if (!sky.dreams.length) { el.innerHTML = `<p class="empty">The sky is empty. Dreams arrive after the memory sync.</p>`; return; }
+  const tags = [...new Set(sky.dreams.map(d => d.tag))];
+  el.innerHTML = `
+    <p class="today-head">${sky.dreams.length} dreams · ${sky.cons.length} constellations</p>
+    <div class="sky-wrap"><canvas id="skyCanvas" aria-label="A star map of every dream"></canvas></div>
+    <div class="sky-legend">${tags.map(t => `<span><i style="background:${TAG_COLORS[t] || "#fff"}"></i>${esc(t)}</span>`).join("")}
+      <span style="margin-left:auto">tap a star</span></div>
+    <div id="starCard"></div>`;
+  const canvas = document.getElementById("skyCanvas");
+  canvas.addEventListener("click", e => {
+    const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    let best = null;
+    for (const p of sky.pts) { const d = Math.hypot(p.x - x, p.y - y); if (d < 22 && (!best || d < best.d)) best = { d, i: p.i }; }
+    if (best) selectStar(sky.dreams[best.i].id);
+  });
+  drawSky();
+}
+
+function drawSky(t = performance.now()) {
+  const canvas = document.getElementById("skyCanvas");
+  if (!canvas || document.getElementById("sky").hidden) return;  // stop when the tab is closed
+  const dpr = Math.min(devicePixelRatio || 1, 2), w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.round(w * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
+  const g = canvas.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const bg = g.createRadialGradient(w * 0.5, h * 1.1, 0, w * 0.5, h * 0.6, h);
+  bg.addColorStop(0, "#1a1f3d"); bg.addColorStop(1, "#060814");
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  const P = d => ({ x: 14 + d.sky_x * (w - 28), y: 14 + (1 - d.sky_y) * (h - 28) });
+  sky.pts = sky.dreams.map((d, i) => ({ ...P(d), i }));
+  // constellation lines
+  g.lineWidth = 0.7;
+  for (const [a, b] of sky.edges) {
+    const sel = sky.selected && sky.dreams[a].constellation === sky.selected.constellation;
+    g.strokeStyle = sel ? "rgba(244,234,210,.38)" : "rgba(180,190,230,.13)";
+    g.beginPath(); g.moveTo(sky.pts[a].x, sky.pts[a].y); g.lineTo(sky.pts[b].x, sky.pts[b].y); g.stroke();
+  }
+  // stars: brighter for more symbols, a halo for mornings, a slow twinkle
+  sky.dreams.forEach((d, i) => {
+    const p = sky.pts[i], n = (sky.syms[d.id] || []).length;
+    const r = 1.4 + Math.min(n, 12) * 0.22 + (d.kind === "morning" ? 1.4 : 0);
+    const tw = 0.75 + 0.25 * Math.sin(t / 900 + i * 1.7);
+    g.globalAlpha = tw;
+    if (d.kind === "morning" || (sky.selected && sky.selected.id === d.id)) {
+      const halo = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 6);
+      halo.addColorStop(0, "rgba(255,240,200,.45)"); halo.addColorStop(1, "rgba(255,240,200,0)");
+      g.fillStyle = halo; g.beginPath(); g.arc(p.x, p.y, r * 6, 0, 7); g.fill();
+    }
+    g.fillStyle = TAG_COLORS[d.tag] || "#fff";
+    g.beginPath(); g.arc(p.x, p.y, r, 0, 7); g.fill();
+    g.globalAlpha = 1;
+  });
+  // Names sit above their constellation, kept inside the canvas and nudged apart so they never overlap.
+  g.font = "600 10px Georgia, serif"; g.textAlign = "center";
+  const placed = [];
+  for (const c of [...sky.cons].sort((a, b) => b.y - a.y)) {
+    const text = c.label.toUpperCase().split("").join(" "), tw = g.measureText(text).width;
+    const x = Math.min(Math.max(14 + c.x * (w - 28), tw / 2 + 8), w - tw / 2 - 8);
+    let y = Math.min(Math.max(14 + (1 - c.y) * (h - 28) - 16, 14), h - 8);
+    for (let tries = 0; tries < 12 && placed.some(r => Math.abs(r.x - x) < (r.w + tw) / 2 + 6 && Math.abs(r.y - y) < 14); tries++)
+      y += 14;
+    placed.push({ x, y, w: tw });
+    g.fillStyle = sky.selected && sky.selected.constellation === c.id ? "rgba(244,234,210,.95)" : "rgba(200,205,235,.6)";
+    g.fillText(text, x, y);
+  }
+  requestAnimationFrame(drawSky);
+}
+
+async function selectStar(id) {
+  const d = sky.dreams.find(x => x.id === id);
+  sky.selected = d;
+  const syms = (sky.syms[id] || []).sort((a, b) => b.mentions - a.mentions);
+  const con = sky.cons.find(c => c.id === d.constellation);
+  const card = document.getElementById("starCard");
+  card.innerHTML = `
+    <article class="card star-card"><div class="body">
+      <div class="meta">${esc(d.id)} · &lt;${esc(d.tag)}&gt; · ${esc(d.run)}${con ? " · in “" + esc(con.label) + "”" : ""}</div>
+      ${d.prompt ? `<p class="prompt">${esc(d.prompt)}…</p>` : ""}
+      <p class="text">${esc(d.remembered || d.text)}</p>
+      ${syms.length ? `<div class="chips">${syms.map(s => `<span>${esc(s.symbol)}${s.mentions > 1 ? " ×" + s.mentions : ""}</span>`).join("")}</div>` : ""}
+      <div class="similar"><p class="label">Nearest dreams</p><div id="similar"><p class="meta">…</p></div></div>
+    </div></article>`;
+  card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  try {
+    const sim = await api("rpc/similar_dreams", { method: "POST", body: JSON.stringify({ dream_id: id, match_count: 3 }),
+                                                  headers: { Prefer: "" } });
+    document.getElementById("similar").innerHTML = sim.map(m => `
+      <button data-star="${esc(m.id)}"><small>${(m.similarity * 100).toFixed(0)}% · &lt;${esc(m.tag)}&gt; · ${esc(m.id)}</small><br>${esc(m.text.slice(0, 140))}…</button>`).join("");
+  } catch (e) { document.getElementById("similar").innerHTML = `<p class="meta">Couldn't load: ${esc(e.message)}</p>`; }
 }
 
 // ---------------------------------------------------------------- Corva
@@ -310,6 +463,8 @@ function renderWallpapers() {
 // ---------------------------------------------------------------- events
 document.querySelector("main").addEventListener("click", e => {
   const t = e.target;
+  const star = t.closest("[data-star]");
+  if (star) return selectStar(star.dataset.star);
   if (t.dataset.day) { state.day = t.dataset.day; renderToday(); return window.scrollTo(0, 0); }
   if (t.dataset.full) return openViewer(t.dataset.full);
   if (t.dataset.pick) return pick(t.dataset.pick);
@@ -329,6 +484,7 @@ document.querySelector("main").addEventListener("focusout", e => {
 // ---------------------------------------------------------------- load
 (async () => {
   // Mornings load on their own, so a problem there never hides the review tabs (and vice versa).
+  loadSky().catch(e => { document.getElementById("sky").innerHTML = `<p class="empty">Couldn't load: ${esc(e.message)}</p>`; });
   Promise.all([
     api("mornings?select=*&order=day.desc", { headers: { Prefer: "" } }),
     api("morning_runs?select=day,status,error,created_at&order=created_at.desc&limit=20", { headers: { Prefer: "" } })

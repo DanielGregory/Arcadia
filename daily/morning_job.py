@@ -483,7 +483,28 @@ def main() -> None:
     }
     (out / "morning.json").write_text(json.dumps(record, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     (out / "morning.md").write_text(markdown(record), encoding="utf-8")
+    remember_in_memory(record, out, args.device)
     print(f"done in {timings['total']:.0f}s -> {out}", flush=True)
+
+
+def remember_in_memory(record: dict, out: Path, device: str) -> None:
+    """Phase 2: embed this morning's dreams (the chosen one and every candidate) and note their symbols,
+    for the Sky. Runs after the wallpapers and the record exist, and can never fail the morning:
+    any problem is printed and the memory simply waits for the next full sync (daily/memory_sync.py)."""
+    try:
+        from engine.memory.collect import morning_dreams
+        from engine.memory.embed import embed
+        from engine.memory.symbols import extract
+
+        dreams = morning_dreams(record)
+        vecs = embed([d["text"] for d in dreams], device=device)
+        for d, v in zip(dreams, vecs):
+            d["embedding"] = [round(float(x), 6) for x in v]
+            d["symbols"] = extract(d.get("remembered") or d["text"])
+        (out / "memory.json").write_text(json.dumps(dreams) + "\n", encoding="utf-8")
+        print(f"memory: embedded {len(dreams)} dreams", flush=True)
+    except Exception as err:  # noqa: BLE001
+        print(f"memory: skipped ({type(err).__name__}: {err})", flush=True)
 
 
 def markdown(r: dict) -> str:

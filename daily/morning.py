@@ -175,6 +175,7 @@ def main() -> None:
         return
     if report:
         log_run(record["day"], "ok", minutes=record.get("gpu_minutes"))
+        remember(record)
     if not args.dry_run and not args.no_commit:
         try:
             commit(record)
@@ -182,6 +183,21 @@ def main() -> None:
             if report:
                 log_run(record["day"], "failed", f"published, but the record could not be committed: {err}")
             raise
+
+
+def remember(record: dict) -> None:
+    """Phase 2: add this morning's dreams (embedded on Kaggle, in memory.json) to the Sky.
+    Never fails the morning: the wallpaper is already up. A problem shows on the review page's banner."""
+    path = LOCAL / record["day"] / "memory.json"
+    try:
+        if not path.exists():
+            raise FileNotFoundError("the Kaggle job wrote no memory.json")
+        from memory_sync import add_dreams
+
+        add_dreams(json.loads(path.read_text(encoding="utf-8")), supabase())
+    except BaseException as err:  # noqa: BLE001
+        print(f"  memory: not updated ({err})")
+        log_run(record["day"], "failed", f"published, but the Sky was not updated: {err}")
 
 
 def make_and_publish(args) -> tuple[dict | None, float | None]:
