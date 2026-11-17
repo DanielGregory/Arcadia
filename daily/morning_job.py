@@ -139,6 +139,7 @@ def score(c: dict, train: str) -> dict:
       +2.0 * distinct trigram share (1.0 = no repeated phrases)
       +1.0  if the length is in the sweet spot (70-180 words), less outside it
       -0.3  per different modern word (car, school, phone...), at most -1.5
+      +0.3  if it grew from an Arcadian opening (those dreams are set in Corva)
       -0.001 per word away from 120: only matters as a tie-break
     """
     text = c["text"]
@@ -161,7 +162,8 @@ def score(c: dict, train: str) -> dict:
     fit = 1.0 if 70 <= n <= 180 else max(0.0, 1.0 - min(abs(n - 70), abs(n - 180)) / 60)
     c["modern"] = sorted(set(words(text)) & MODERN)
     modern = min(1.5, 0.3 * len(c["modern"]))
-    c["score"] = round(c["closed"] * 1.0 + 2.0 * c["distinct_trigrams"] + fit - modern - abs(n - 120) / 1000, 3)
+    arcadian = 0.3 if c.get("opening") else 0.0
+    c["score"] = round(c["closed"] * 1.0 + 2.0 * c["distinct_trigrams"] + fit - modern + arcadian - abs(n - 120) / 1000, 3)
     return c
 
 
@@ -275,8 +277,11 @@ def main() -> None:
     editor = Rememberer(device=args.device)
     chosen, remembered, edit_log = remember_best(editor, ranked)
     # The painting prompt is written from the remembered text when there is one (it reads better).
-    scene = editor.chat(PAINT_SYSTEM, remembered or chosen["text"], max_new_tokens=80).strip().rstrip(".")
-    scene = " ".join(scene.split()[:45])  # belt and braces: keep it inside the 77-token window
+    scene = editor.chat(PAINT_SYSTEM, remembered or chosen["text"], max_new_tokens=80).strip()
+    # The small editor sometimes ignores "one line" and goes on to retell the story (Morning 1 did).
+    # The first sentence is the scene; the rest is narrative. Then cap it inside the 77-token window.
+    scene = re.split(r"(?<=[.!?])\s", scene, maxsplit=1)[0].strip().rstrip(".")
+    scene = " ".join(scene.split()[:45])
     print(f"  painting prompt: {scene}", flush=True)
     del editor
     gc.collect()
