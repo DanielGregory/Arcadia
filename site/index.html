@@ -1,27 +1,260 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Arcadia</title>
-  <style>
-    :root { --bg: #f4efe6; --ink: #2b2620; --muted: #7a6f60; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #16140f; --ink: #e8e0d0; --muted: #9a8f7d; } }
-    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
-    body { display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;
-           font-family: Georgia, "Times New Roman", serif; }
-    main { max-width: 34rem; }
-    h1 { font-weight: normal; letter-spacing: 0.3em; text-transform: uppercase; font-size: 1.1rem; color: var(--muted); }
-    p { font-size: 1.25rem; line-height: 1.6; }
-    .soon { font-size: 0.95rem; color: var(--muted); font-style: italic; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Arcadia Review</title>
+<style>
+  :root {
+    --bg: #f5f0e6; --card: #fffdf8; --ink: #2a2620; --muted: #776d5f; --line: #e3d9c6;
+    --gold: #b8862b; --gold-soft: #f3e3bd; --keep: #3f7d4f; --keep-soft: #dcefe0;
+    --skip: #9a4a3c; --skip-soft: #f5ddd7; --shadow: 0 1px 2px rgba(60,45,20,.08), 0 4px 14px rgba(60,45,20,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15130f; --card: #1f1c17; --ink: #ece4d4; --muted: #a59a88; --line: #343028;
+      --gold: #d9a94a; --gold-soft: #3a2f18; --keep: #7cc28d; --keep-soft: #1f3324;
+      --skip: #e08a78; --skip-soft: #3b231e; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         padding-bottom: env(safe-area-inset-bottom); -webkit-text-size-adjust: 100%; }
+  header { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 12px 16px 0;
+           padding-top: max(12px, env(safe-area-inset-top)); border-bottom: 1px solid var(--line); }
+  h1 { font: 600 13px/1 Georgia, serif; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); margin: 4px 0 12px; }
+  nav { display: flex; gap: 4px; }
+  nav button { flex: 1; font: inherit; font-size: 15px; padding: 10px 0 12px; background: none; border: 0;
+               border-bottom: 2px solid transparent; color: var(--muted); }
+  nav button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--gold); font-weight: 600; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  section[hidden] { display: none; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+          margin-bottom: 16px; box-shadow: var(--shadow); }
+  .card.picked { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+  .card img { display: block; width: 100%; height: auto; background: var(--line); aspect-ratio: 1344 / 768; object-fit: cover; }
+  .card .wall { aspect-ratio: 16 / 9; }
+  .body { padding: 12px 14px 14px; }
+  .meta { font-size: 13px; color: var(--muted); }
+  .prompt { font: italic 15px/1.45 Georgia, serif; color: var(--muted); margin: 6px 0 0; }
+  .text { font: 17px/1.6 Georgia, serif; margin: 8px 0 0; white-space: pre-line; }
+  .text.clamped { display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden; }
+  .more { font: inherit; font-size: 14px; color: var(--gold); background: none; border: 0; padding: 6px 0 0; }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { flex: 1; font: inherit; font-size: 15px; font-weight: 600; padding: 11px 0; border-radius: 10px;
+         border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-height: 44px; }
+  .btn.keep.on { background: var(--keep-soft); border-color: var(--keep); color: var(--keep); }
+  .btn.skip.on { background: var(--skip-soft); border-color: var(--skip); color: var(--skip); }
+  .btn.pick.on { background: var(--gold-soft); border-color: var(--gold); color: var(--gold); }
+  textarea { width: 100%; margin-top: 10px; font: inherit; font-size: 15px; padding: 9px 10px; border-radius: 10px;
+             border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: vertical; min-height: 42px; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px;
+           background: var(--gold-soft); color: var(--gold); margin-left: 6px; }
+  .tally { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .tally strong { font: 600 22px Georgia, serif; }
+  .filters { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; }
+  .chip { font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--line);
+          background: var(--card); color: var(--muted); white-space: nowrap; }
+  .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .empty { color: var(--muted); text-align: center; padding: 40px 16px; font-style: italic; }
+  .saved { font-size: 12px; color: var(--muted); height: 16px; margin-top: 4px; }
+  #viewer { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.92); display: flex;
+            align-items: center; justify-content: center; }
+  #viewer[hidden] { display: none; }
+  #viewer img { max-width: 100%; max-height: 100%; }
+  #toast { position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 60;
+           background: var(--ink); color: var(--bg); padding: 12px 14px; border-radius: 10px; font-size: 14px; }
+  #toast[hidden] { display: none; }
+</style>
 </head>
 <body>
-  <main>
-    <h1>Arcadia</h1>
-    <p>In Poussin's painting, shepherds find an inscription they can't agree on.
-       Arcadia is a world built the same way: it records what happens, never what it means.</p>
-    <p class="soon">The first dreams are still being trained.</p>
-  </main>
+<header>
+  <h1>Arcadia · review</h1>
+  <nav role="tablist">
+    <button role="tab" data-tab="corva" aria-selected="true">Corva</button>
+    <button role="tab" data-tab="dreams" aria-selected="false">Dreams</button>
+    <button role="tab" data-tab="wallpapers" aria-selected="false">Wallpapers</button>
+  </nav>
+</header>
+
+<main>
+  <section id="corva"><p class="empty">Loading…</p></section>
+  <section id="dreams" hidden><p class="empty">Loading…</p></section>
+  <section id="wallpapers" hidden><p class="empty">Loading…</p></section>
+</main>
+
+<div id="viewer" hidden><img alt=""></div>
+<div id="toast" hidden></div>
+
+<script>
+// Review tool only. Talks to Supabase with the PUBLISHABLE key, which is meant
+// to be public: the database lets this key read everything and change only
+// dreams.mark, dreams.note and images.picked (see the review_gallery migration).
+const SUPABASE_URL = "https://dbrtvwhslxkdpmuawrgd.supabase.co";
+const SUPABASE_KEY = "sb_publishable_NVNYh69hEq2uJKfWOvlAkg_9RCInRey";
+const STORAGE = `${SUPABASE_URL}/storage/v1/object/public/arcadia/`;
+
+const state = { images: [], dreams: [], filter: "all" };
+
+async function api(path, options = {}) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json", Prefer: "return=minimal", ...(options.headers || {}) },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  return res.status === 204 ? null : res.json();
+}
+
+function toast(message) {
+  const el = document.getElementById("toast");
+  el.textContent = message; el.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => (el.hidden = true), 3500);
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+const imgUrl = path => STORAGE + path.split("/").map(encodeURIComponent).join("/");
+
+function openViewer(src) { const v = document.getElementById("viewer"); v.querySelector("img").src = src; v.hidden = false; }
+document.getElementById("viewer").addEventListener("click", e => (e.currentTarget.hidden = true));
+
+// ---------------------------------------------------------------- tabs
+document.querySelectorAll("nav button").forEach(btn => btn.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-selected", b === btn));
+  document.querySelectorAll("main section").forEach(s => (s.hidden = s.id !== btn.dataset.tab));
+  try { localStorage.setItem("arcadia-tab", btn.dataset.tab); } catch (_) {}
+  window.scrollTo(0, 0);
+}));
+try { const t = localStorage.getItem("arcadia-tab"); if (t) document.querySelector(`nav [data-tab="${t}"]`)?.click(); } catch (_) {}
+
+// ---------------------------------------------------------------- Corva
+function renderCorva() {
+  const el = document.getElementById("corva");
+  const items = state.images.filter(i => i.kind === "corva");
+  if (!items.length) { el.innerHTML = `<p class="empty">No Corva candidates yet. They arrive after the image run.</p>`; return; }
+  const picked = items.find(i => i.picked);
+  el.innerHTML = `<p class="meta">${items.length} candidates · ${picked ? "your pick: " + esc(picked.id.split("/").pop().replace(".png", "")) : "tap “Pick this one” on your favourite"}</p>` +
+    items.map(i => `
+      <article class="card ${i.picked ? "picked" : ""}">
+        <img loading="lazy" src="${imgUrl(i.id)}" alt="" data-full="${imgUrl(i.id)}">
+        <div class="body">
+          <div class="meta">${esc(i.id.split("/").pop().replace(".png", ""))} · seed ${esc(i.seed)}${i.picked ? '<span class="badge">★ Your pick</span>' : ""}</div>
+          <p class="prompt">${esc(i.prompt)}</p>
+          <div class="row"><button class="btn pick ${i.picked ? "on" : ""}" data-pick="${esc(i.id)}">${i.picked ? "★ Your pick" : "Pick this one"}</button></div>
+        </div>
+      </article>`).join("");
+}
+
+async function pick(id) {
+  const before = state.images.map(i => ({ ...i }));
+  state.images.forEach(i => { if (i.kind === "corva") i.picked = i.id === id; });
+  renderCorva();
+  try {
+    await api("images?kind=eq.corva&picked=is.true", { method: "PATCH", body: JSON.stringify({ picked: false }) });
+    await api(`images?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ picked: true }) });
+  } catch (e) { state.images = before; renderCorva(); toast("Couldn't save your pick: " + e.message); }
+}
+
+// ---------------------------------------------------------------- Dreams
+function dreamLabel(d) {
+  const m = d.id.match(/^(run\d+)-read-(\d+)$/);
+  if (m) return `${m[1]} · read test #${parseInt(m[2], 10)}`;
+  const p = d.id.match(/^(run\d+)-priming-(.+)$/);
+  return p ? `${p[1]} · priming ${p[2]}` : d.id;
+}
+
+function renderDreams() {
+  const el = document.getElementById("dreams");
+  const all = state.dreams;
+  if (!all.length) { el.innerHTML = `<p class="empty">No dreams yet.</p>`; return; }
+  const keeps = all.filter(d => d.mark === "keep").length, skips = all.filter(d => d.mark === "skip").length;
+  const shown = all.filter(d => state.filter === "all" || (state.filter === "unmarked" ? !d.mark : d.mark === state.filter));
+  const paintings = Object.fromEntries(state.images.filter(i => i.kind === "dream" && i.dream_id).map(i => [i.dream_id, i.id]));
+  el.innerHTML = `
+    <div class="tally"><span><strong>${keeps}</strong> kept of ${all.length}</span><span class="meta">${skips} skipped · ${all.length - keeps - skips} unmarked</span></div>
+    <div class="filters">${["all", "unmarked", "keep", "skip"].map(f => `<button class="chip ${state.filter === f ? "on" : ""}" data-filter="${f}">${f[0].toUpperCase() + f.slice(1)}</button>`).join("")}</div>
+    ${shown.length ? "" : `<p class="empty">Nothing here.</p>`}` +
+    shown.map(d => {
+      const image = d.image || paintings[d.id];
+      const long = d.text.length > 650;
+      return `
+      <article class="card" data-id="${esc(d.id)}">
+        ${image ? `<img loading="lazy" src="${imgUrl(image)}" alt="" data-full="${imgUrl(image)}">` : ""}
+        <div class="body">
+          <div class="meta">${esc(dreamLabel(d))}</div>
+          ${d.prompt ? `<p class="prompt">Opening: “${esc(d.prompt)}”</p>` : ""}
+          <p class="text ${long ? "clamped" : ""}">${esc(d.text)}</p>
+          ${long ? `<button class="more" data-more>Show all</button>` : ""}
+          <div class="row">
+            <button class="btn keep ${d.mark === "keep" ? "on" : ""}" data-mark="keep">Keep</button>
+            <button class="btn skip ${d.mark === "skip" ? "on" : ""}" data-mark="skip">Skip</button>
+          </div>
+          <textarea rows="1" placeholder="Note (optional)" data-note>${esc(d.note || "")}</textarea>
+          <div class="saved" data-saved></div>
+        </div>
+      </article>`;
+    }).join("");
+}
+
+async function mark(id, value) {
+  const d = state.dreams.find(x => x.id === id);
+  const old = d.mark;
+  d.mark = d.mark === value ? null : value;  // tapping the active button again clears it
+  renderDreams();
+  try { await api(`dreams?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ mark: d.mark }) }); }
+  catch (e) { d.mark = old; renderDreams(); toast("Couldn't save: " + e.message); }
+}
+
+async function saveNote(id, value, statusEl) {
+  const d = state.dreams.find(x => x.id === id);
+  if ((d.note || "") === value) return;
+  try {
+    await api(`dreams?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ note: value || null }) });
+    d.note = value; if (statusEl) { statusEl.textContent = "Note saved"; setTimeout(() => (statusEl.textContent = ""), 2000); }
+  } catch (e) { toast("Couldn't save the note: " + e.message); }
+}
+
+// ---------------------------------------------------------------- Wallpapers
+function renderWallpapers() {
+  const el = document.getElementById("wallpapers");
+  const items = state.images.filter(i => i.kind === "wallpaper");
+  el.innerHTML = items.length ? items.map(i => `
+      <article class="card">
+        <img class="wall" loading="lazy" src="${imgUrl(i.id)}" alt="" data-full="${imgUrl(i.id)}">
+        <div class="body"><div class="meta">${esc(i.id.split("/").pop())}${i.meta?.source ? " · " + esc(i.meta.source) : ""}</div></div>
+      </article>`).join("") : `<p class="empty">No wallpapers yet.</p>`;
+}
+
+// ---------------------------------------------------------------- events
+document.querySelector("main").addEventListener("click", e => {
+  const t = e.target;
+  if (t.dataset.full) return openViewer(t.dataset.full);
+  if (t.dataset.pick) return pick(t.dataset.pick);
+  if (t.dataset.filter) { state.filter = t.dataset.filter; return renderDreams(); }
+  const card = t.closest("[data-id]");
+  if (t.dataset.mark && card) return mark(card.dataset.id, t.dataset.mark);
+  if (t.hasAttribute("data-more")) { t.previousElementSibling.classList.remove("clamped"); t.remove(); }
+});
+document.querySelector("main").addEventListener("focusout", e => {
+  if (e.target.hasAttribute("data-note")) {
+    const card = e.target.closest("[data-id]");
+    saveNote(card.dataset.id, e.target.value.trim(), card.querySelector("[data-saved]"));
+  }
+});
+
+// ---------------------------------------------------------------- load
+(async () => {
+  try {
+    [state.images, state.dreams] = await Promise.all([
+      api("images?select=id,kind,prompt,seed,meta,dream_id,picked&order=id", { headers: { Prefer: "" } }),
+      api("dreams?select=*&order=run,id", { headers: { Prefer: "" } }),
+    ]);
+    renderCorva(); renderDreams(); renderWallpapers();
+  } catch (e) {
+    document.querySelectorAll("main section").forEach(s => (s.innerHTML = `<p class="empty">Couldn't load: ${esc(e.message)}</p>`));
+  }
+})();
+</script>
 </body>
 </html>
