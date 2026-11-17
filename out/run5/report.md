@@ -8,13 +8,13 @@ tokenizer bpe8000_run5. Kaggle T4, 62.3 GPU minutes; early stop at step 7500, be
 | bits per character | run 4 | run 5 | change |
 |---|---:|---:|---:|
 | overall | 1.533 | **1.379** | -0.154 (-10%) |
-| dream passages (Dunsany, MacDonald...) | 1.539 | 1.358 | -0.181 |
-| myth passages | 1.538 | 1.408 | -0.130 |
-| tale passages (DreamBank) | 1.538 | 1.382 | -0.156 |
-| saga passages | 1.509 | 1.334 | -0.175 |
+| <dream> passages (DreamBank) | 1.539 | 1.358 | -0.181 |
+| <myth> passages (core: Homer, Ovid, Virgil...) | 1.538 | 1.408 | -0.130 |
+| <tale> passages (dream books: Dunsany, MacDonald...) | 1.538 | 1.382 | -0.156 |
+| <saga> passages (seasoning: Grimm, Poe, Njal...) | 1.509 | 1.334 | -0.175 |
 
-(Run 4's tags were tiers: its "dream" tag meant the dream-books tier and "tale"... see build history;
-the labels above are run 4's own tags.)
+(The rows are run 4's own tags, which were tiers: <myth> core, <tale> dream books, <saga> seasoning,
+<dream> DreamBank.)
 
 ## Run 5 on its own val set (with tags)
 
