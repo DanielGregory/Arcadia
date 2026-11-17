@@ -76,3 +76,15 @@ python -m engine.sample --ckpt checkpoints/full/best.pt --chars 2000 --temperatu
 
 Each run writes `ckpt.pt` (latest), `best.pt` (lowest val loss), `loss_log.csv` and `sample.txt` to its `--out_dir`.
 To train on Kaggle's free T4 GPU, upload `notebooks/kaggle_train.ipynb` to Kaggle, turn on GPU and Internet, and run all cells.
+
+## Hugging Face Hub
+
+Trained runs are stored in a private model repo, one folder per run:
+
+```bash
+export HF_TOKEN=...   # a Hugging Face access token with write access
+python -m engine.hub push --repo <user>/arcadia-dreams --run_dir checkpoints/full
+python -m engine.hub pull --repo <user>/arcadia-dreams --run full
+```
+
+The Kaggle notebook's last cell does the push, using a Kaggle Secret named `HF_TOKEN`.
