@@ -2,6 +2,7 @@
 
     python -m engine.sample --ckpt /kaggle/working/run2/best.pt --temperature 0.7 0.9 1.1
     python -m engine.sample --ckpt ... --dreams 3              # three whole dreams, each ending at </dream>
+    python -m engine.sample --ckpt ... --dreams 5 --start "<dream>\nI was walking by the wine-dark sea"
 
 Each temperature gets its own sample. Lower temperatures give safer, more
 repetitive text; higher ones give stranger, riskier text.
@@ -58,8 +59,10 @@ def main() -> None:
         torch.manual_seed(args.seed)
         print(f"\n===== temperature {t} =====")
         if args.dreams and is_bpe:
-            # Start each dream at <dream> and stop when the model writes </dream>.
-            start = torch.tensor([tok.encode("<dream>\n")], dtype=torch.long, device=args.device)
+            # Start each dream at <dream> (or at --start, if it begins with <dream>, to
+            # prime the dream with an opening) and stop when the model writes </dream>.
+            prime = start_text if start_text.startswith("<dream>") else "<dream>\n"
+            start = torch.tensor([tok.encode(prime)], dtype=torch.long, device=args.device)
             for _ in range(args.dreams):
                 ids = model.generate(start, max_new_tokens=length, temperature=t, top_k=args.top_k,
                                      stop_token=tok.token_id("</dream>"))
