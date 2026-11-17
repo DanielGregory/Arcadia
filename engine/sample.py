@@ -127,7 +127,8 @@ def generate_dream(model, tok, prompt: str, max_tokens: int, device: str, cut_se
     end_id = tok.token_id(close_tag)
     # Stop at ANY source tag, not just our own closing one: a run 3 model sometimes
     # closes a <tale> with </myth> or starts a new passage. Either way the passage is over.
-    tags = [f"<{t}>" for t in ("dream", "myth", "tale", "saga")] + [f"</{t}>" for t in ("dream", "myth", "tale", "saga")]
+    voices = ("dream", "myth", "tale", "saga", "poem", "wisdom", "chronicle")
+    tags = [f"<{t}>" for t in voices] + [f"</{t}>" for t in voices]
     tag_ids = {tok.token_id(t) for t in tags if tok.sp.id_to_piece(tok.token_id(t)) == t}
     ids = sample(model, start, max_tokens, stop_token=end_id, stop_tokens=tag_ids,
                  no_penalty_ids={tok.newline_id} | tag_ids, **kw)[0].tolist()
@@ -149,7 +150,7 @@ def main() -> None:
     parser.add_argument("--top_p", type=float, default=0.9, help="nucleus sampling mass (1.0 = off)")
     parser.add_argument("--repetition_penalty", type=float, default=1.1, help="1.0 = off")
     parser.add_argument("--dreams", type=int, default=0, help="BPE models: generate this many whole dreams")
-    parser.add_argument("--tag", default="dream", choices=["dream", "myth", "tale", "saga"],
+    parser.add_argument("--tag", default="dream", choices=["dream", "myth", "tale", "saga", "poem", "wisdom", "chronicle"],
                         help="with --dreams: which source tag to generate under (run 3 models)")
     parser.add_argument("--prompt", default="", help='opening of each dream, after "<dream>\\n" (with --dreams)')
     parser.add_argument("--start", default="\n", help="raw starting text for free (non --dreams) sampling")

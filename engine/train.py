@@ -32,7 +32,8 @@ import torch
 from engine.model import GPT, GPTConfig
 from engine.tokenizer import BPETokenizer, CharTokenizer
 
-TIERS = ["core", "dream", "seasoning", "dreambank"]
+# Per-source validation files (val_<name>.txt): runs 2-4 used tiers, run 5 uses its tags.
+TIERS = ["core", "dream", "seasoning", "dreambank", "myth", "tale", "poem", "wisdom", "chronicle"]
 
 
 # -----------------------------------------------------------------------------

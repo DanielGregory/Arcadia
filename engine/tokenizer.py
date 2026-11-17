@@ -30,6 +30,8 @@ NEWLINE = "<n>"
 SPECIAL_TOKENS = ["<dream>", "</dream>", NEWLINE]
 # Run 3 source tags (build_corpus --tags): one per tier, reserved the same way.
 SOURCE_TAGS = ["<myth>", "</myth>", "<tale>", "</tale>", "<saga>", "</saga>"]
+# Run 5 tags (books.py): myth and tale again, plus poem, wisdom and chronicle. <dream> is in SPECIAL_TOKENS.
+RUN5_TAGS = [f"<{t}>" if i == 0 else f"</{t}>" for t in ("myth", "tale", "poem", "wisdom", "chronicle") for i in (0, 1)]
 
 
 class CharTokenizer:
@@ -156,11 +158,13 @@ def main() -> None:
     parser.add_argument("--vocab_size", type=int, default=8000)
     parser.add_argument("--tags", action="store_true",
                         help="also reserve the run 3 source tags (<myth>, <tale>, <saga>); writes bpe<N>_tags.model")
+    parser.add_argument("--run5", action="store_true",
+                        help="reserve the run 5 tags (<myth> <tale> <poem> <wisdom> <chronicle>); writes bpe<N>_run5.model")
     args = parser.parse_args()
 
-    name = f"bpe{args.vocab_size}{'_tags' if args.tags else ''}"
+    name = f"bpe{args.vocab_size}{'_run5' if args.run5 else '_tags' if args.tags else ''}"
     out_path = args.data_dir / "tokenizer" / f"{name}.model"
-    specials = SPECIAL_TOKENS + (SOURCE_TAGS if args.tags else [])
+    specials = SPECIAL_TOKENS + (RUN5_TAGS if args.run5 else SOURCE_TAGS if args.tags else [])
     tok = train_bpe(args.data_dir / "train.txt", args.vocab_size, out_path, specials)
     print(f"wrote {out_path} ({tok.vocab_size} tokens)")
 
@@ -171,7 +175,7 @@ def main() -> None:
         ids = tok.encode(text)
         assert tok.decode(ids) == text, f"{path.name} does not round-trip"
         print(f"  {path.name:<18} {len(text):>9,} chars -> {len(ids):>8,} tokens  ({len(text) / len(ids):.2f} chars/token)")
-    sample = ("<myth>\nThe gods of Corva met by the wine-dark sea.\n</myth>" if args.tags
+    sample = ("<myth>\nThe gods of Corva met by the wine-dark sea.\n</myth>" if args.tags or args.run5
               else "<dream>\nI was walking by the wine-dark sea with Telemachus.\n</dream>")
     print("  example:", [tok.sp.id_to_piece(i) for i in tok.encode(sample)])
 

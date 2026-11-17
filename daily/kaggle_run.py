@@ -3,6 +3,7 @@
     python daily/kaggle_run.py images        # notebooks/kaggle_images.ipynb  -> assets/generated/, then upload_review
     python daily/kaggle_run.py run3          # notebooks/kaggle_train_run3.ipynb -> checkpoints/run3/
     python daily/kaggle_run.py run4          # notebooks/kaggle_train_run4.ipynb -> checkpoints/run4/
+    python daily/kaggle_run.py run5          # notebooks/kaggle_train_run5.ipynb -> checkpoints/run5/
     python daily/kaggle_run.py images --no_push   # just wait for / download the current version
     python daily/kaggle_run.py gpu-minutes danieltgregory/arcaida2   # GPU minutes of an existing run
 
@@ -37,6 +38,9 @@ JOBS = {
              "output_subdir": "run3", "dest": "checkpoints/run3", "upload_review": False},
     "run4": {"notebook": "notebooks/kaggle_train_run4.ipynb", "slug": "arcadia-run4", "title": "Arcadia Run4",
              "output_subdir": "run4", "dest": "checkpoints/run4", "upload_review": False},
+    "run5": {"notebook": "notebooks/kaggle_train_run5.ipynb", "slug": "arcadia-run5", "title": "Arcadia Run5",
+             "output_subdir": "run5", "dest": "checkpoints/run5", "upload_review": False,
+             "datasets": ["danieltgregory/arcadia-run5-data", "danieltgregory/arcadia-run4-model"]},
 }
 
 
