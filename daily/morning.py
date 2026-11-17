@@ -45,16 +45,18 @@ from kaggle_run import USER, gpu_minutes, kaggle, push, wait  # noqa: E402
 from upload_review import DEFAULT_URL, Supabase, load_env  # noqa: E402
 
 JOB = {"notebook": "notebooks/kaggle_morning.ipynb", "slug": "arcadia-morning", "title": "Arcadia Morning",
-       "datasets": [f"{USER}/arcadia-run4-model"]}
+       "datasets": [f"{USER}/arcadia-run4-model", f"{USER}/arcadia-run5-model"]}
 LOCAL = ROOT / "out/morning"          # full output, images included (gitignored)
 RECORDS = ROOT / "daily/mornings"     # the permanent record, committed
 
 
-def run_on_kaggle(no_push: bool) -> tuple[Path, float]:
-    """Steps 1-2. Returns (the downloaded day folder, GPU minutes)."""
+def run_on_kaggle(no_push: bool, model: str | None = None, slot: str | None = None) -> tuple[Path, float]:
+    """Steps 1-2. Returns (the downloaded day folder, GPU minutes).
+    model: dream with this model instead of daily/production_model.txt (a test run).
+    slot: save the download as out/morning/<day>_<slot>/, so a test never touches the real day's files."""
     kernel = f"{USER}/{JOB['slug']}"
     if not no_push:
-        push(JOB)
+        push(JOB, {"MODEL_OVERRIDE = None": f"MODEL_OVERRIDE = {model!r}"} if model else None)
         time.sleep(30)  # let Kaggle register the new version before asking its status
     status = wait(kernel)
     with tempfile.TemporaryDirectory() as tmp:
@@ -68,7 +70,7 @@ def run_on_kaggle(no_push: bool) -> tuple[Path, float]:
                 shutil.copy2(log, LOCAL / "failed.kaggle.log")
             sys.exit(f"{kernel}: {status}, no morning made ({minutes:.1f} GPU minutes). Log: out/morning/failed.kaggle.log")
         src = days[-1].parent
-        dest = LOCAL / src.name
+        dest = LOCAL / (f"{src.name}_{slot}" if slot else src.name)
         shutil.copytree(src, dest, dirs_exist_ok=True)
         if log:
             shutil.copy2(log, dest / "kaggle.log")
@@ -158,6 +160,8 @@ def main() -> None:
     parser.add_argument("--no_commit", action="store_true")
     parser.add_argument("--dry_run", action="store_true", help="show what would be uploaded; no commit")
     parser.add_argument("--no_publish", action="store_true", help="just run and download (a test): no upload, no commit")
+    parser.add_argument("--model", help="dream with this model for this run only (e.g. run5), not production_model.txt")
+    parser.add_argument("--slot", help="with --no_publish: save as out/morning/<day>_<slot>/ (e.g. test_run5)")
     args = parser.parse_args()
 
     # Only the real daily run (Kaggle, published) reports its status to the gallery.
@@ -207,7 +211,7 @@ def make_and_publish(args) -> tuple[dict | None, float | None]:
             sys.exit(f"no morning.json under {args.local}")
         day_dir, minutes = days[-1].parent, None
     else:
-        day_dir, minutes = run_on_kaggle(args.no_push)
+        day_dir, minutes = run_on_kaggle(args.no_push, args.model, args.slot)
 
     record = json.loads((day_dir / "morning.json").read_text(encoding="utf-8"))
     if minutes is not None:

@@ -51,10 +51,16 @@ def kaggle(*args: str, check: bool = True) -> str:
     return out.stdout + out.stderr
 
 
-def push(job: dict) -> None:
-    """Upload the notebook as a new version of its Kaggle kernel; Kaggle starts running it straight away."""
+def push(job: dict, replace: dict[str, str] | None = None) -> None:
+    """Upload the notebook as a new version of its Kaggle kernel; Kaggle starts running it straight away.
+    `replace` edits the notebook's text first (e.g. a test run's model override)."""
     with tempfile.TemporaryDirectory() as tmp:
-        shutil.copy(ROOT / job["notebook"], Path(tmp) / Path(job["notebook"]).name)
+        text = (ROOT / job["notebook"]).read_text(encoding="utf-8")
+        for old_text, new_text in (replace or {}).items():
+            if old_text not in text:
+                sys.exit(f"push: {old_text!r} not found in {job['notebook']}")
+            text = text.replace(old_text, new_text)
+        (Path(tmp) / Path(job["notebook"]).name).write_text(text, encoding="utf-8")
         meta = {
             "id": f"{USER}/{job['slug']}", "title": job["title"], "code_file": Path(job["notebook"]).name,
             "language": "python", "kernel_type": "notebook", "is_private": "true",
