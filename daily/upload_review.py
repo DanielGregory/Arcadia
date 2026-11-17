@@ -110,8 +110,8 @@ def main() -> None:
         dream_id = f"run2-priming-{key}"
         row = dreams.setdefault(dream_id, {"id": dream_id, "run": "run2", "prompt": prompts.get(key.split(".")[0], ""),
                                            "text": text or priming_dream_text(key), "image": None})
-        if image and not row["image"]:
-            row["image"] = image
+        if image:
+            row["image"] = image  # files are processed in name order, so the newest version (e.g. dream_v2_*) wins
         return dream_id
 
     # 1. Read-test dreams.
