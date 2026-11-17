@@ -519,8 +519,6 @@ BOOKS: tuple[Book, ...] = (
     Book(8022, "The Song of Songs", "Anonymous", "King James Version", MYTH, ranges=(Range(r"Book 22 +Song of Solomon"),),
          inline_refs=(r"^\d+:\d+:\d+\s*",), drop_paragraphs=(r"Book \d+ ",)),
     # --------------------------------------------- DREAMS AND STRANGE FICTION <tale>
-    Book(7849, "The Trial", "Franz Kafka", "David Wyllie", TALE, ranges=(Range(r"Chapter One"),),
-         section=r"Chapter \w+"),
     Book(174, "The Picture of Dorian Gray", "Oscar Wilde", None, TALE, ranges=(Range(r"CHAPTER I\.", r"THE END", nth=2),),
          section=r"CHAPTER [IVXL]+\."),
     Book(43, "The Strange Case of Dr Jekyll and Mr Hyde", "Robert Louis Stevenson", None, TALE,
@@ -570,6 +568,9 @@ INTERPRETATION = (
 SKIPPED = (
     ("The Castle (Kafka)", "no public-domain English translation available as text: the Muirs' 1930 translation "
      "only entered the US public domain in 2026 and is not on Project Gutenberg"),
+    ("The Trial (Kafka)", "the only English text on Project Gutenberg is David Wyllie's 2003 translation, which "
+     "is copyrighted (Gutenberg distributes it with his permission); the Muirs' 1937 translation is public domain "
+     "in the US only from 2033"),
     ("Letters from a Stoic (Seneca)", "Gummere's translation (1917-25) is public domain but not on Project Gutenberg; "
      "Gutenberg has only other Seneca (On Benefits, Minor Dialogues)"),
     ("The Enneads (Plotinus)", "MacKenna's translation (1917-30) is not on Project Gutenberg; only one short essay is"),
