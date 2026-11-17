@@ -9,8 +9,9 @@ and publishes what it makes.
 
 The five steps, all in this one file:
 
-  1. DREAM     run 4 dreams 24 candidates (half with no opening, half with
-               an opening from the pool below). The day's date is the random
+  1. DREAM     run 4 dreams 24 candidates: half in its <dream> voice, a
+               quarter each as <myth> and <tale> (half with no opening, half
+               with an opening from the pool below). The day's date is the random
                seed, so a morning can always be re-made exactly.
   2. SELECT    every candidate is checked and scored: it should end itself, be
                a sensible length, not repeat itself, and not copy its training
@@ -26,9 +27,15 @@ The five steps, all in this one file:
                strangest images, combined literally into one impossible scene
                (dreams are crazy; the calm brushstroke beauty belongs to the
                world itself). SDXL paints it twice (landscape for the desktop,
-               portrait for the phone), with the canonical Corva painting as a
-               light STYLE-ONLY reference (InstantStyle) for brushwork and palette.
-  5. WALLPAPER render/wallpaper.py sets the text over each painting.
+               portrait for the phone).
+               Dreams change art style; the waking-world Corva never does. The
+               style comes from a pool chosen by the dream's source tag (see
+               STYLES), picked by the day's seed, with a ~10% wildcard drawn
+               from every pool. No Corva style reference for dream paintings.
+  5. WALLPAPER render/wallpaper.py sets ONE sentence over each painting: the
+               editor picks the most vivid sentence of the "as remembered"
+               dream. Label: Arcadia's calendar ("Dream N · Corva"), not the
+               real date; the full dream and the real date live in the gallery.
 
 Output, in --out/<date>/:
     morning.json            everything: candidates, scores, the pick, the edit,
@@ -96,13 +103,101 @@ Rules:
 - Take the images from the dream; do not invent new ones. Turn a strange word into a strange object.
 Reply with the description only."""
 
+# --- 4. art styles ---------------------------------------------------------------
+# Dream paintings vary in style; the waking-world Corva stays one consistent
+# painting. The pool depends on the dream's source tag (which voice the model
+# dreamed in). Styles are described in words, never by naming an artist.
+# Each entry: name -> (description for the prompt, extra negative words).
+STYLES = {
+    "myth": {
+        "fresco": ("ancient fresco on cracked plaster wall, chalky earth pigments, faded ochre and lapis blue, "
+                   "flat solemn figures", ""),
+        "byzantine mosaic": ("Byzantine mosaic of tiny glass tesserae, shimmering gold background, flat solemn figures, "
+                             "dark outlines", ""),
+        "red-figure pottery": ("ancient Greek red-figure vase painting, terracotta orange figures on glossy black, "
+                               "fine black line detail, figures in profile", ""),
+        "stormy romantic oil": ("stormy romantic oil painting, sublime landscape, towering clouds, dramatic light "
+                                "breaking through darkness, thick brushwork", ""),
+    },
+    "tale": {
+        "symbolist": ("symbolist painting, muted jewel colours, mysterious solemn figures, decorative gold patterns, "
+                      "hazy mystical atmosphere", ""),
+        "illuminated manuscript": ("medieval illuminated manuscript miniature, tempera and gold leaf on vellum, flat bright "
+                                   "colours, ornate decorated border", "allow_border"),
+        "woodcut": ("woodcut print, bold black carved lines on cream paper, high contrast, hand-printed texture, "
+                    "black and white", ""),
+    },
+    "dream": {
+        "metaphysical": ("metaphysical painting, empty arcades, long raking shadows, deserted piazza, still green sky, "
+                         "eerie silence, smooth flat colour", ""),
+        "watercolor": ("loose watercolour painting, soft bleeding washes, wet paper texture, pale luminous colours", ""),
+        "charcoal": ("charcoal drawing on rough paper, smudged black and grey, deep shadows, expressive strokes, "
+                     "monochrome", ""),
+        "stained glass": ("stained glass window, glowing jewel-coloured glass, thick black lead lines, light shining "
+                          "through", "allow_border"),
+        "faded photograph": ("faded antique photograph, sepia tones, soft focus, scratched and stained print, "
+                             "early twentieth century", "allow_photo"),
+    },
+}
+# Tags whose pool is not defined yet borrow one (run 4's <saga>; run 5's new tags
+# until they get their own pools).
+STYLE_POOL_FOR_TAG = {"saga": "myth", "poem": "tale", "wisdom": "myth", "chronicle": "myth"}
+WILDCARD = 0.10
+NEGATIVE_BASE = "text, letters, words, watermark, signature, modern buildings, cars, blurry, deformed hands, extra limbs"
+
+
+def choose_style(tag: str, seed: int) -> dict:
+    """The day's art style: from the tag's pool, or (~10%) a wildcard from any pool. Same seed, same style."""
+    rng = random.Random(f"style-{seed}")
+    pool_name = tag if tag in STYLES else STYLE_POOL_FOR_TAG.get(tag, "dream")
+    wildcard = rng.random() < WILDCARD
+    if wildcard:
+        pool_name = rng.choice(sorted(STYLES))
+    name = rng.choice(sorted(STYLES[pool_name]))
+    description, allow = STYLES[pool_name][name]
+    negative = NEGATIVE_BASE
+    if allow != "allow_border":
+        negative += ", picture frame, border"
+    if allow != "allow_photo":
+        negative += ", photograph, 3d render"
+    return {"name": name, "pool": pool_name, "tag": tag, "wildcard": wildcard,
+            "description": description, "negative": negative}
+
+
+# --- 5. the caption: one sentence -------------------------------------------------
+CAPTION_SYSTEM = """You choose the caption for a painting of a dream.
+You get the dream's sentences, numbered. Choose the ONE sentence that is the most vivid and strange and still makes sense read on its own.
+Reply with its number only."""
+
+
+def split_sentences(text: str) -> list[str]:
+    found = re.findall(r".+?[.!?][\"'”’)]*(?=\s|$)|.+$", " ".join(text.split()))
+    return [x.strip() for x in found if x.strip()]
+
+
+def best_sentence(editor: Rememberer, text: str) -> str:
+    """The editor's pick of the dream's best single sentence (read from its answer probabilities)."""
+    sentences = split_sentences(text)
+    usable = [i for i, x in enumerate(sentences[:9]) if 5 <= len(x.split()) <= 40]
+    if len(usable) <= 1:
+        return sentences[usable[0]] if usable else (sentences[0] if sentences else text)
+    listing = "\n".join(f"{n}. {sentences[i]}" for n, i in enumerate(usable, 1))
+    tok, model = editor.tok, editor.model
+    messages = [{"role": "system", "content": CAPTION_SYSTEM}, {"role": "user", "content": listing}]
+    prompt = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    with torch.no_grad():
+        logits = model(**tok(prompt, return_tensors="pt").to(editor.device)).logits[0, -1].float()
+    answers = [tok.encode(str(n))[0] for n in range(1, len(usable) + 1)]
+    return sentences[usable[int(torch.argmax(logits[answers]))]]
+
+
 # --- 2b. the coherence judge -------------------------------------------------
 # Tested on Morning 1's candidates: Qwen's plain fluency (how likely it finds
 # the text) preferred flat modern DreamBank prose, but asking it to RATE
 # coherence picked the dreams a reader would pick. We read the rating from the
 # model's probabilities over the answers "1".."10" (the expected value), which
 # is smoother and more repeatable than taking the single number it would say.
-JUDGE_SYSTEM = """You judge short dream journal entries. Score how well the dream HOLDS TOGETHER: does it follow one thread (a place, a situation, a person) from sentence to sentence, so a reader can picture what happens? Strange events are fine; dreams are strange. Jumbled grammar, sentences that don't connect, and nonsense words score low.
+JUDGE_SYSTEM = """You judge short passages: dreams, myths and tales. Score how well the dream HOLDS TOGETHER: does it follow one thread (a place, a situation, a person) from sentence to sentence, so a reader can picture what happens? Strange events are fine; dreams are strange. Jumbled grammar, sentences that don't connect, and nonsense words score low.
 Reply with one number from 1 (incoherent word salad) to 10 (one clear, vivid thread)."""
 
 
@@ -126,9 +221,6 @@ PAINT_MODEL = "Qwen/Qwen2.5-3B-Instruct"
 # SDXL has two text encoders, each reading at most 77 tokens. The scene goes
 # into both (the v2 lesson: a scene only in the first encoder gets ignored);
 # the second one also carries the style, FIRST, so it is never cut off.
-STYLE = "surreal dreamlike oil painting, impossible scene, visible brushstrokes, glowing light"
-NEGATIVE = ("text, letters, watermark, signature, frame, border, photograph, modern buildings, cars, "
-            "grey, washed out, blurry, deformed hands, extra limbs")
 
 
 # Words from the modern world. The dreamers live in Arcadia, so a morning dream
@@ -200,21 +292,28 @@ def score(c: dict, train: str) -> dict:
     return c
 
 
+# Which voices the candidates are dreamed in: half <dream>, a quarter each <myth> and <tale>.
+TAG_MIX = ("dream", "dream", "myth", "tale")
+
+
 def dream(ckpt: str, train: str, n: int, seed: int, device: str) -> list[dict]:
     """Steps 1 and 2: n candidates, scored, best first."""
     model, tok, _ = load(ckpt, device)
     rng = random.Random(seed)
     openings = rng.sample(OPENINGS, n // 2) + [""] * (n - n // 2)
     rng.shuffle(openings)
+    tags = [TAG_MIX[i % len(TAG_MIX)] for i in range(n)]
+    rng.shuffle(tags)
     out = []
-    for i, opening in enumerate(openings):
+    for i, (opening, tag) in enumerate(zip(openings, tags)):
         torch.manual_seed(seed * 100 + i)  # one fixed seed per candidate: reproducible
-        text, closed = generate_dream(model, tok, opening, MAX_TOKENS, device, **SETTINGS)
+        text, closed = generate_dream(model, tok, opening, MAX_TOKENS, device, tag=tag, **SETTINGS)
         # A dream the model closed itself can still end mid-thought ("...the prophets said:").
         text = cut_to_last_sentence(text)
-        c = score({"i": i, "seed": seed * 100 + i, "opening": opening, "closed": closed, "text": text}, train)
+        c = score({"i": i, "seed": seed * 100 + i, "tag": tag, "opening": opening, "closed": closed, "text": text},
+                  train)
         out.append(c)
-        print(f"  candidate {i:2d}: {c['words']:3d} words, {'closed' if closed else 'cut   '}, "
+        print(f"  candidate {i:2d} <{tag}>: {c['words']:3d} words, {'closed' if closed else 'cut   '}, "
               f"score {c['score'] if c['score'] is not None else 'rejected: ' + c['rejected']}", flush=True)
     del model
     return sorted(out, key=lambda c: (c["score"] is not None, c["score"] or 0), reverse=True)
@@ -238,36 +337,44 @@ def remember_best(editor: Rememberer, ranked: list[dict], tries: int = 3) -> tup
     return usable[0], None, {"attempts": attempts}
 
 
-def paint(scene: str, seed: int, device: str, steps: int, ip_scale: float) -> dict:
-    """Step 4: SDXL, text to image, with the canonical painting as a style-only reference."""
+def paint(scene: str, style: dict, seed: int, device: str, steps: int, ip_scale: float) -> dict:
+    """Step 4: SDXL, text to image, in the day's style. With ip_scale > 0 the canonical Corva
+    painting is added as a style-only reference (off for dreams: they change style; Corva doesn't)."""
     from diffusers import AutoencoderKL, StableDiffusionXLPipeline
     from PIL import Image
-    from transformers import CLIPVisionModelWithProjection
 
     from render.generate_images import IP_ADAPTER
 
     dtype = torch.float16 if device == "cuda" else torch.float32
-    encoder = CLIPVisionModelWithProjection.from_pretrained(IP_ADAPTER["repo"], subfolder=IP_ADAPTER["image_encoder"],
-                                                            torch_dtype=dtype)
+    extra = {}
+    if ip_scale > 0:
+        from transformers import CLIPVisionModelWithProjection
+
+        extra["image_encoder"] = CLIPVisionModelWithProjection.from_pretrained(
+            IP_ADAPTER["repo"], subfolder=IP_ADAPTER["image_encoder"], torch_dtype=dtype)
     pipe = StableDiffusionXLPipeline.from_pretrained(
         "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=dtype, use_safetensors=True,
-        variant="fp16" if device == "cuda" else None, image_encoder=encoder,
-        vae=AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=dtype),
+        variant="fp16" if device == "cuda" else None,
+        vae=AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=dtype), **extra,
     ).to(device)
     pipe.set_progress_bar_config(disable=True)
-    pipe.load_ip_adapter(IP_ADAPTER["repo"], subfolder=IP_ADAPTER["subfolder"], weight_name=IP_ADAPTER["weight_name"])
-    # InstantStyle: the reference feeds only the "style" attention block (up_blocks.0, attention 1),
-    # so the painting borrows Corva's colour and brushwork but not its temples.
-    pipe.set_ip_adapter_scale({"up": {"block_0": [0.0, ip_scale, 0.0]}})
-    reference = Image.open(ROOT / STYLE_REFERENCE).convert("RGB")
+    call = {}
+    if ip_scale > 0:
+        pipe.load_ip_adapter(IP_ADAPTER["repo"], subfolder=IP_ADAPTER["subfolder"], weight_name=IP_ADAPTER["weight_name"])
+        # InstantStyle: the reference feeds only the "style" attention block (up_blocks.0, attention 1).
+        pipe.set_ip_adapter_scale({"up": {"block_0": [0.0, ip_scale, 0.0]}})
+        call["ip_adapter_image"] = Image.open(ROOT / STYLE_REFERENCE).convert("RGB")
 
     images = {}
     for name, (w, h) in {"desktop": (1344, 768), "phone": (768, 1344)}.items():
         t = time.time()
+        # Encoder 1 gets the scene with the style after it; encoder 2 gets the style FIRST, so a long
+        # scene can't push it past the 77-token window. The scene is in both (the v2 lesson).
         images[name] = pipe(
-            prompt=scene, prompt_2=f"{STYLE}: {scene}", negative_prompt=NEGATIVE, negative_prompt_2=NEGATIVE,
-            width=w, height=h, num_inference_steps=steps, guidance_scale=6.5, ip_adapter_image=reference,
-            generator=torch.Generator(device=device).manual_seed(seed),
+            prompt=f"{scene}, {style['description']}", prompt_2=f"{style['description']}: {scene}",
+            negative_prompt=style["negative"], negative_prompt_2=style["negative"],
+            width=w, height=h, num_inference_steps=steps, guidance_scale=6.5,
+            generator=torch.Generator(device=device).manual_seed(seed), **call,
         ).images[0]
         print(f"  painted {name} {w}x{h} in {time.time() - t:.0f}s", flush=True)
     del pipe
@@ -283,8 +390,8 @@ def main() -> None:
     parser.add_argument("--run", default="run4", help="model name recorded with the dream")
     parser.add_argument("--candidates", type=int, default=24)
     parser.add_argument("--steps", type=int, default=30)
-    parser.add_argument("--ip_scale", type=float, default=0.4,
-                        help="style strength of the Corva reference (brushwork and palette; higher pulls toward a calm coast)")
+    parser.add_argument("--ip_scale", type=float, default=0.0,
+                        help="Corva as a style reference (0 = off: dream paintings change style)")
     parser.add_argument("--no_paint", action="store_true", help="skip SDXL (CPU tests): canonical Corva as the painting")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
@@ -320,6 +427,8 @@ def main() -> None:
     for c in ranked[:5]:
         print(f"  top: candidate {c['i']:2d} score {c['score']} (coherence {c.get('coherence')})", flush=True)
     chosen, remembered, edit_log = remember_best(editor, ranked)
+    caption = best_sentence(editor, remembered or chosen["text"])
+    print(f"  caption: {caption}", flush=True)
     del editor
     gc.collect()
     if args.device == "cuda":
@@ -343,13 +452,14 @@ def main() -> None:
         torch.cuda.empty_cache()  # give the GPU back before SDXL arrives
     timings["remember"] = round(time.time() - t, 1)
 
-    print("4. painting", flush=True)
+    style = choose_style(chosen.get("tag", "dream"), seed)
+    print(f"4. painting: {style['name']} ({style['pool']} pool{', wildcard' if style['wildcard'] else ''})", flush=True)
     t = time.time()
     if args.no_paint:
         corva = Image.open(ROOT / STYLE_REFERENCE).convert("RGB")
         paintings = {"desktop": corva, "phone": corva}
     else:
-        paintings = paint(scene, seed, args.device, args.steps, args.ip_scale)
+        paintings = paint(scene, style, seed, args.device, args.steps, args.ip_scale)
     for name, img in paintings.items():
         img.save(out / f"painting_{name}.png")
     timings["paint"] = round(time.time() - t, 1)
@@ -357,15 +467,17 @@ def main() -> None:
     print("5. wallpapers", flush=True)
     sizes = {"desktop": (2560, 1440), "phone": (1290, 2796)}
     for name, size in sizes.items():
-        render(remembered or chosen["text"], chosen["text"], out / f"wallpaper_{name}.png", size=size,
-               number=number, date=day, background=paintings[name])
+        render(caption, chosen["text"], out / f"wallpaper_{name}.png", size=size, background=paintings[name],
+               label=f"Dream {number} · Corva")
     timings["total"] = round(time.time() - t0, 1)
 
     record = {
         "day": day.isoformat(), "number": number, "run": args.run, "seed": seed, "device": args.device,
         "raw": chosen["text"], "as_remembered": remembered, "opening": chosen["opening"],
-        "chosen": chosen["i"], "painting_prompt": scene, "paint_model": PAINT_MODEL, "painting_prompt_2": f"{STYLE}: {scene}",
-        "negative_prompt": NEGATIVE, "steps": args.steps, "ip_scale": args.ip_scale,
+        "chosen": chosen["i"], "tag": chosen.get("tag", "dream"), "caption": caption, "label": f"Dream {number} · Corva",
+        "style": style, "painting_prompt": scene, "paint_model": PAINT_MODEL,
+        "prompt_sent": f"{scene}, {style['description']}", "prompt_2_sent": f"{style['description']}: {scene}",
+        "steps": args.steps, "ip_scale": args.ip_scale,
         "style_reference": STYLE_REFERENCE, "painted": not args.no_paint, "settings": SETTINGS,
         "edit": edit_log, "candidates": ranked, "timings_s": timings,
     }
@@ -375,18 +487,23 @@ def main() -> None:
 
 
 def markdown(r: dict) -> str:
-    lines = [f"# Morning {r['number']}: {r['day']}", "",
-             f"Dreamed by {r['run']} (seed {r['seed']}), candidate {r['chosen']} of {len(r['candidates'])}"
+    lines = [f"# {r.get('label', 'Dream ' + str(r['number']))} ({r['day']})", "",
+             f"Dreamed by {r['run']} in its <{r.get('tag', 'dream')}> voice (seed {r['seed']}), "
+             f"candidate {r['chosen']} of {len(r['candidates'])}"
              + (f", opening: *{r['opening']}*" if r["opening"] else ", no opening") + ".", ""]
     if r["as_remembered"]:
         lines += ["## As remembered", "", r["as_remembered"], ""]
     else:
         lines += ["*(No edit passed the retention checks; the dream is shown as dreamed.)*", ""]
-    lines += ["## As dreamed", "", r["raw"], "", "## Painting", "", f"> {r['painting_prompt']}", "",
-              "## Candidates", "", "| # | words | closed | trigrams | copied | modern | coherence | score |", "|---|---|---|---|---|---|---|---|"]
+    style = r.get("style") or {}
+    lines += ["## As dreamed", "", r["raw"], "", "## Caption", "", r.get("caption", ""), "",
+              "## Painting", "", f"> {r['painting_prompt']}", "",
+              f"Style: **{style.get('name', '?')}** ({style.get('pool', '?')} pool"
+              f"{', wildcard' if style.get('wildcard') else ''})", "",
+              "## Candidates", "", "| # | tag | words | closed | trigrams | copied | modern | coherence | score |", "|---|---|---|---|---|---|---|---|---|"]
     for c in r["candidates"]:
         s = c["score"] if c["score"] is not None else f"rejected: {c['rejected']}"
-        lines.append(f"| {c['i']} | {c['words']} | {'yes' if c['closed'] else 'no'} | {c['distinct_trigrams']} "
+        lines.append(f"| {c['i']} | {c.get('tag', 'dream')} | {c['words']} | {'yes' if c['closed'] else 'no'} | {c['distinct_trigrams']} "
                      f"| {c['copied_words']} | {', '.join(c.get('modern', []))} | {c.get('coherence', '')} | {s} |")
     lines += ["", f"Timings (s): {r['timings_s']}", ""]
     return "\n".join(lines)

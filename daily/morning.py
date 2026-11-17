@@ -26,6 +26,7 @@ downloading SDXL); the minutes are recorded in the day's record.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import io
 import json
 import os
@@ -97,9 +98,9 @@ def publish(day_dir: Path, record: dict, dry_run: bool) -> None:
         paths[name] = remote
         if not dry_run:
             print(f"  uploaded {remote}")
-    meta = {k: record[k] for k in ("number", "seed", "opening", "chosen", "painting_prompt_2", "negative_prompt",
-                                   "steps", "ip_scale", "style_reference", "painted", "settings", "edit",
-                                   "timings_s", "gpu_minutes") if k in record}
+    meta = {k: record[k] for k in ("number", "label", "tag", "caption", "style", "seed", "opening", "chosen",
+                                   "prompt_sent", "prompt_2_sent", "paint_model", "steps", "ip_scale", "painted",
+                                   "settings", "edit", "timings_s", "gpu_minutes") if k in record}
     meta["candidates"] = [{k: v for k, v in c.items() if k != "copied_run"} for c in record["candidates"]]
     sb.upsert("mornings", [{
         "day": day, "run": record["run"], "raw": record["raw"], "remembered": record["as_remembered"],
@@ -134,6 +135,21 @@ def commit(record: dict) -> None:
     sys.exit("could not push the morning record")
 
 
+def supabase() -> Supabase:
+    load_env()
+    return Supabase(os.environ.get("SUPABASE_URL", DEFAULT_URL), os.environ.get("SUPABASE_SECRET_KEY", ""))
+
+
+def log_run(day: str, status: str, error: str | None = None, minutes: float | None = None) -> None:
+    """One row in morning_runs: the gallery shows a banner when today's run failed or never came.
+    Never let the logging itself break the run."""
+    try:
+        supabase().upsert("morning_runs", [{"day": day, "status": status, "error": error and error[:800],
+                                            "gpu_minutes": minutes}])
+    except BaseException as err:  # noqa: BLE001
+        print(f"  (could not log the run status: {err})")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--no_push", action="store_true", help="collect the latest Kaggle run instead of starting one")
@@ -144,6 +160,31 @@ def main() -> None:
     parser.add_argument("--no_publish", action="store_true", help="just run and download (a test): no upload, no commit")
     args = parser.parse_args()
 
+    # Only the real daily run (Kaggle, published) reports its status to the gallery.
+    report = not (args.local or args.no_publish or args.dry_run)
+    today = dt.datetime.now(dt.timezone.utc).date().isoformat()  # the job dates mornings the same way
+    if report:
+        log_run(today, "started")
+    try:
+        record, minutes = make_and_publish(args)
+    except BaseException as err:  # SystemExit from sys.exit(...) included
+        if report:
+            log_run(today, "failed", str(err) or type(err).__name__)
+        raise
+    if record is None:
+        return
+    if report:
+        log_run(record["day"], "ok", minutes=record.get("gpu_minutes"))
+    if not args.dry_run and not args.no_commit:
+        try:
+            commit(record)
+        except BaseException as err:
+            if report:
+                log_run(record["day"], "failed", f"published, but the record could not be committed: {err}")
+            raise
+
+
+def make_and_publish(args) -> tuple[dict | None, float | None]:
     if args.local:
         days = sorted(args.local.glob(f"{args.date or '*'}/morning.json"))
         if not days:
@@ -155,11 +196,11 @@ def main() -> None:
     record = json.loads((day_dir / "morning.json").read_text(encoding="utf-8"))
     if minutes is not None:
         record["gpu_minutes"] = round(minutes, 1)
-    print(f"Morning {record['number']} ({record['day']}): {record['painting_prompt']}")
+    print(f"{record.get('label', 'Morning ' + str(record['number']))} ({record['day']}): {record['painting_prompt']}")
 
     if args.no_publish:
         print(f"not published; the output is in {day_dir.relative_to(ROOT)}")
-        return
+        return None, minutes
     publish(day_dir, record, args.dry_run)
 
     if not args.dry_run:
@@ -170,8 +211,7 @@ def main() -> None:
         if minutes is not None:
             md += f"Kaggle GPU minutes: {minutes:.1f}\n"
         (RECORDS / f"{record['day']}.md").write_text(md, encoding="utf-8")
-        if not args.no_commit:
-            commit(record)
+    return record, minutes
 
 
 if __name__ == "__main__":

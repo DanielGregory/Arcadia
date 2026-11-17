@@ -146,8 +146,15 @@ def caption_text(text: str, limit: int = CAPTION_WORDS) -> str:
 
 
 def render_caption(text: str, out_path: Path, painting: Image.Image, size: tuple[int, int], number: int | None,
-                   date: dt.date | None, font_path: str | None, italic_path: str | None) -> None:
-    """The painting full screen, the dream as a small caption in a corner."""
+                   date: dt.date | None, font_path: str | None, italic_path: str | None,
+                   label: str | None = None) -> None:
+    """The painting full screen, the dream as a small caption in a corner.
+
+    The caption looks the same whatever the painting's art style: same font,
+    sizes, colours and shadow, so the dreams change and the frame doesn't.
+    `label` is Arcadia's own calendar ("Dream 7 · Corva"; later "Year 3 · Spring");
+    without one, the old "ARCADIA · DREAM N · real date" header is used.
+    """
     w, h = size
     text = caption_text(text)
     img = cover(painting, size)
@@ -162,9 +169,12 @@ def render_caption(text: str, out_path: Path, painting: Image.Image, size: tuple
     else:
         left, box_w, bottom, max_h, base_px = 0.045 * w, 0.31 * w, 0.09 * h, 0.40 * h, 29 * w / 2560
 
-    date = date or dt.date.today()
-    header = "  ·  ".join(filter(None, ["ARCADIA", f"DREAM {number}" if number else None,
-                                        date.strftime("%-d %B %Y").upper()]))
+    if label:
+        header = "  ·  ".join(part.strip().upper() for part in label.split("·"))
+    else:
+        date = date or dt.date.today()
+        header = "  ·  ".join(filter(None, ["ARCADIA", f"DREAM {number}" if number else None,
+                                            date.strftime("%-d %B %Y").upper()]))
     spaced = " ".join(header)
     # The largest text size (down to 70% of the base) that fits in max_h.
     for px in range(int(base_px), int(base_px * 0.7) - 1, -1):
@@ -191,10 +201,10 @@ def render_caption(text: str, out_path: Path, painting: Image.Image, size: tuple
 
 def render(remembered: str, raw: str, out_path: Path, size=(2560, 1440), number: int | None = None,
            date: dt.date | None = None, font_path: str | None = None, italic_path: str | None = None,
-           background: Image.Image | None = None) -> str:
+           background: Image.Image | None = None, label: str | None = None) -> str:
     """Draw one wallpaper; returns the palette name used ("painting" with a background picture)."""
     if background is not None:
-        render_caption(remembered, out_path, background, size, number, date, font_path, italic_path)
+        render_caption(remembered, out_path, background, size, number, date, font_path, italic_path, label)
         return "painting"
     w, h = size
     seed = int(hashlib.sha256(remembered.encode()).hexdigest(), 16)

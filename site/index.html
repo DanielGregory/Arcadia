@@ -67,6 +67,10 @@
   #toast { position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 60;
            background: var(--ink); color: var(--bg); padding: 12px 14px; border-radius: 10px; font-size: 14px; }
   #toast[hidden] { display: none; }
+  #alert { margin: 12px 16px 0; padding: 12px 14px; border-radius: 10px; font-size: 15px;
+           background: var(--skip-soft); color: var(--skip); border: 1px solid var(--skip); }
+  #alert[hidden] { display: none; }
+  #alert strong { display: block; margin-bottom: 2px; }
   .today-head { font: 600 12px/1 Georgia, serif; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); margin: 4px 0 10px; }
   .downloads { display: flex; gap: 8px; margin-top: 12px; }
   .downloads a { flex: 1; text-align: center; text-decoration: none; font-size: 15px; font-weight: 600; padding: 11px 0;
@@ -89,6 +93,7 @@
   </nav>
 </header>
 
+<div id="alert" role="alert" hidden></div>
 <main>
   <section id="today"><p class="empty">Loading…</p></section>
   <section id="corva" hidden><p class="empty">Loading…</p></section>
@@ -150,7 +155,7 @@ function renderToday() {
   const m = state.mornings.find(x => x.day === state.day) || state.mornings[0];
   const meta = m.meta || {};
   el.innerHTML = `
-    <p class="today-head">Morning ${esc(meta.number ?? "")} · ${esc(fmtDay(m.day))}</p>
+    <p class="today-head">${esc(meta.label || "Dream " + (meta.number ?? ""))} <span style="letter-spacing:.1em;text-transform:none">· ${esc(fmtDay(m.day))}</span></p>
     <article class="card">
       <img src="${imgUrl(m.painting)}" alt="" data-full="${imgUrl(m.painting)}">
       <div class="body">
@@ -160,7 +165,8 @@ function renderToday() {
         </div>
         ${m.remembered ? `<p class="label">As remembered</p><p class="text">${esc(m.remembered)}</p>` : ""}
         <p class="label">As dreamed</p><p class="${m.remembered ? "raw" : "text"}">${esc(m.raw)}</p>
-        <p class="label">Painting</p><p class="prompt">${esc(m.painting_prompt)}</p>
+        ${meta.caption ? `<p class="label">Caption</p><p class="prompt">${esc(meta.caption)}</p>` : ""}
+        <p class="label">Painting${meta.style ? " · " + esc(meta.style.name) + (meta.style.wildcard ? " (wildcard)" : "") : ""}</p><p class="prompt">${esc(m.painting_prompt)}</p>
         <p class="meta" style="margin-top:12px">${esc(m.run)}${meta.opening ? " · opening: “" + esc(meta.opening) + "”" : " · no opening"}
           · candidate ${esc(meta.chosen)} of ${esc(meta.candidates?.length ?? "?")}${meta.gpu_minutes != null ? " · " + esc(meta.gpu_minutes) + " GPU min" : ""}</p>
       </div>
@@ -169,8 +175,34 @@ function renderToday() {
     <div class="past">${state.mornings.filter(x => x !== m).map(x => `
       <article class="card" data-day="${esc(x.day)}" style="cursor:pointer">
         <img class="wall" loading="lazy" src="${imgUrl(x.painting)}" alt="" data-day="${esc(x.day)}">
-        <div class="body"><div class="meta" data-day="${esc(x.day)}">Morning ${esc(x.meta?.number ?? "")} · ${esc(fmtDay(x.day))}</div></div>
+        <div class="body"><div class="meta" data-day="${esc(x.day)}">${esc(x.meta?.label || "Dream " + (x.meta?.number ?? ""))} · ${esc(fmtDay(x.day))}</div></div>
       </article>`).join("")}</div>` : ""}`;
+}
+
+// ---------------------------------------------------------------- daily-run alert
+// The morning job runs at 7:41 Central and should be done by 9:00. After 9:00
+// Central, if today's dream isn't here (or its run reported a failure), say so
+// at the top of every tab. Mornings are dated in UTC, which is the same day as
+// Central time from 7:41 until 6 pm.
+function checkToday(mornings, runs) {
+  const el = document.getElementById("alert");
+  const now = new Date();
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric",
+    month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false }).formatToParts(now).map(p => [p.type, p.value]));
+  const today = `${parts.year}-${parts.month}-${parts.day}`, hour = parseInt(parts.hour, 10);
+  const have = mornings.some(m => m.day === today);
+  const last = runs.find(r => r.day === today);  // newest first
+  let msg = null;
+  if (last && last.status === "failed") {
+    msg = have ? `<strong>Today's dream is up, but its run reported a problem.</strong>${esc(last.error)}`
+               : `<strong>Today's dream failed.</strong>${esc(last.error)}`;
+  } else if (!have && hour >= 9) {
+    msg = last && last.status === "started"
+      ? `<strong>Today's dream is late.</strong>The run started at ${esc(new Date(last.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))} and hasn't finished; Kaggle may be queueing it.`
+      : `<strong>Today's dream hasn't arrived.</strong>The 7:41 run didn't report in at all, so it may not have started.`;
+  }
+  el.innerHTML = msg || "";
+  el.hidden = !msg;
 }
 
 // ---------------------------------------------------------------- Corva
@@ -297,8 +329,12 @@ document.querySelector("main").addEventListener("focusout", e => {
 // ---------------------------------------------------------------- load
 (async () => {
   // Mornings load on their own, so a problem there never hides the review tabs (and vice versa).
-  api("mornings?select=*&order=day.desc", { headers: { Prefer: "" } })
-    .then(rows => { state.mornings = rows; renderToday(); })
+  Promise.all([
+    api("mornings?select=*&order=day.desc", { headers: { Prefer: "" } }),
+    api("morning_runs?select=day,status,error,created_at&order=created_at.desc&limit=20", { headers: { Prefer: "" } })
+      .catch(() => []),
+  ])
+    .then(([rows, runs]) => { state.mornings = rows; renderToday(); checkToday(rows, runs); })
     .catch(e => { document.getElementById("today").innerHTML = `<p class="empty">Couldn't load: ${esc(e.message)}</p>`; });
   try {
     [state.images, state.dreams] = await Promise.all([
