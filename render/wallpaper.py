@@ -30,6 +30,7 @@ import datetime as dt
 import hashlib
 import json
 import random
+import re
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -120,10 +121,35 @@ def soft_shadow(img: Image.Image, box: tuple[int, int, int, int], blur: float, s
     return Image.composite(Image.new("RGB", img.size, (8, 8, 14)), img, mask)
 
 
+CAPTION_WORDS = 60  # the wallpaper shows the dream's opening; the gallery has all of it
+
+
+def caption_text(text: str, limit: int = CAPTION_WORDS) -> str:
+    """Whole sentences up to `limit` words; a first sentence longer than that is cut with an ellipsis."""
+    # a sentence ends at . ! or ?, plus any closing quote or bracket, before a space
+    sentences = re.findall(r".+?[.!?][\"'”’)]*(?=\s|$)|.+$", " ".join(text.split()))
+    sentences = [x.strip() for x in sentences if x.strip()]
+    out, n = [], 0
+    for sent in sentences:
+        k = len(sent.split())
+        if out and n + k > limit:
+            break
+        out.append(sent)
+        n += k
+    caption = " ".join(out)
+    words = caption.split()
+    if len(words) > limit:
+        caption = " ".join(words[:limit]).rstrip(",;:") + "…"
+    elif len(out) < len(sentences):
+        caption += " …"
+    return caption
+
+
 def render_caption(text: str, out_path: Path, painting: Image.Image, size: tuple[int, int], number: int | None,
                    date: dt.date | None, font_path: str | None, italic_path: str | None) -> None:
     """The painting full screen, the dream as a small caption in a corner."""
     w, h = size
+    text = caption_text(text)
     img = cover(painting, size)
     draw = ImageDraw.Draw(img)
     font_path = font_path or find_font(SERIF)

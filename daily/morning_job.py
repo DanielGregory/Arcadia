@@ -87,13 +87,13 @@ OPENINGS = [
 
 # --- 3. the painting prompt -------------------------------------------------
 PAINT_SYSTEM = """You turn a dream into the description of ONE surreal painting.
-Dreams are strange, and the painting must be just as strange. Pick the 2 to 4 strangest, most visual things in the dream and put them together in one impossible scene, taken literally: wrong scale, wrong place, things that cannot be together. Do not make it sensible and do not explain it.
+Dreams are strange, and the painting must be just as strange. Choose THREE of the strangest, most visual things in the dream and put them together in one impossible scene, taken literally: wrong scale, wrong place, things that cannot be together. Do not make it sensible and do not explain it.
 
 Rules:
-- Only things you can SEE. No names, no thoughts, no dialogue, no explanation.
-- Take the images from the dream; do not invent new ones. Turn a strange word into a strange object (a "skeleton key" can be a key made of bones).
-- One line of plain words, at most 35 words, no full stop at the end.
-
+- Write a phrase that describes a scene, the way a painting's catalogue entry does, NOT a list of keywords: say where each thing is and what it is doing.
+- Exactly three things, at most 30 words in all, one line, no full stop at the end.
+- Only things you can SEE. No names, no thoughts, no dialogue, no story.
+- Take the images from the dream; do not invent new ones. Turn a strange word into a strange object.
 Reply with the description only."""
 
 # --- 2b. the coherence judge -------------------------------------------------
@@ -157,6 +157,8 @@ def junk(text: str) -> str | None:
     """Corpus leftovers that make a dream unusable (the run 5 cleanup list)."""
     if re.search(r"\[\s*BL\s*\]|\[|\]", text):
         return "bracket marker"
+    if re.search(r"\w-{2,}|-{3,}", text):
+        return "redaction mark (DreamBank hides names as 'P---')"
     if re.search(r"(^|\s)\d{2,4}(\s|$)", text):
         return "stray number (line numbers from a poem?)"
     return None
@@ -328,6 +330,11 @@ def main() -> None:
     # The small editor sometimes ignores "one line" and goes on to retell the story (Morning 1 did).
     # The first sentence is the scene; the rest is narrative. Then cap it inside the 77-token window.
     scene = re.split(r"(?<=[.!?])\s", scene, maxsplit=1)[0].strip().rstrip(".")
+    # If it still came out as a long comma list (Morning 1 test: seven items, SDXL used two),
+    # keep the first four: SDXL paints the start of a prompt most faithfully anyway.
+    parts = [x.strip() for x in scene.split(",")]
+    if len(parts) > 4 and all(len(x.split()) <= 4 for x in parts):
+        scene = ", ".join(parts[:4])
     scene = " ".join(scene.split()[:45])
     print(f"  painting prompt: {scene}", flush=True)
     del painter
