@@ -58,6 +58,9 @@ painting read the same inscription and cannot agree.
 
 1. **Dream engine:** train the transformer to generate dreams. *(current)*
 1.5. **Morning wallpaper:** each night's dream, rendered as a daily image.
+   Built: `daily/morning.py` launches `daily/morning_job.py` on Kaggle (dream 12,
+   select, remember, paint with Corva's style, set the text); the Today tab shows
+   it and `daily/mornings/` keeps the record.
 2. **Memory and Sky:** the world remembers past dreams, and the sky reflects them.
 3. **World and beliefs:** the world engine, the storyteller and inhabitants with beliefs.
 4. **Culture and release:** shared stories, rituals and a public release.
