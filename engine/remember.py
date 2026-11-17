@@ -9,9 +9,9 @@ Because a language model can't be trusted to obey, every edit is measured:
 
     content-word retention = share of the raw dream's content words (nouns,
     verbs, names... everything except common function words) that still
-    appear in the remembered version. A corrected spelling counts as kept
-    (close matches are accepted). Under 80% is flagged: the editor dropped
-    or replaced too much.
+    appear in the remembered version, counting every occurrence. A corrected
+    spelling counts as kept (close matches are accepted). Under 80% is
+    flagged: the editor dropped or replaced too much.
 
     added words = share of the remembered version's content words that were
     not in the raw dream: a sign the editor invented something.
@@ -33,7 +33,10 @@ import time
 from pathlib import Path
 
 MODEL_ID = "Qwen/Qwen2.5-1.5B-Instruct"
-FLAG_BELOW = 0.80
+FLAG_BELOW = 0.80         # content-word retention
+LENGTH_FLAG_BELOW = 0.90  # remembered length / dreamed length, in words: catches dropped sentences
+                          # made only of function words ("I will go," I answered.)
+ADDED_FLAG_ABOVE = 0.10   # share of new content words: catches rewording ("cool and death" -> "cool and mysterious")
 
 SYSTEM_PROMPT = """You are a careful copy editor for dream journals.
 You will be given a dream exactly as it was written down. Rewrite it with correct spelling, grammar and punctuation, and nothing else.
@@ -66,21 +69,52 @@ def content_words(text: str) -> list[str]:
             if len(w) > 2 and w not in STOPWORDS]
 
 
-def retention(raw: str, remembered: str) -> tuple[float, float]:
-    """(share of raw content words kept, share of remembered content words that are new).
+def _matched(words: list[str], pool: list[str]) -> int:
+    """How many items of `words` can be paired off with distinct items of `pool`.
 
-    Counted over distinct words. A raw word counts as kept if it appears in the
-    remembered text or a close spelling of it does (similarity >= 0.8), so
-    "dancin" -> "dancing" is a kept word, not a lost one.
+    Exact matches are paired first, then close spellings (similarity >= 0.8), so a
+    corrected misspelling ("dancin" -> "dancing") still counts as the same word.
+    Every occurrence counts: a dropped sentence whose words also appear elsewhere
+    in the dream still lowers the score.
     """
-    raw_set, rem_set = set(content_words(raw)), set(content_words(remembered))
-    if not raw_set:
+    from collections import Counter
+
+    left = Counter(pool)
+    unmatched = []
+    for w in words:
+        if left[w] > 0:
+            left[w] -= 1
+        else:
+            unmatched.append(w)
+    n = len(words) - len(unmatched)
+    for w in unmatched:
+        close = difflib.get_close_matches(w, [x for x, c in left.items() if c > 0], n=1, cutoff=0.8)
+        if close:
+            left[close[0]] -= 1
+            n += 1
+    return n
+
+
+def length_ratio(raw: str, remembered: str) -> float:
+    return len(remembered.split()) / max(1, len(raw.split()))
+
+
+def is_flagged(raw: str, remembered: str) -> bool:
+    kept, added = retention(raw, remembered)
+    return kept < FLAG_BELOW or added > ADDED_FLAG_ABOVE or length_ratio(raw, remembered) < LENGTH_FLAG_BELOW
+
+
+def retention(raw: str, remembered: str) -> tuple[float, float]:
+    """(share of the raw dream's content words kept, share of the remembered version's content words that are new).
+
+    Counted over every occurrence, not distinct words.
+    """
+    raw_w, rem_w = content_words(raw), content_words(remembered)
+    if not raw_w:
         return 1.0, 0.0
-    rem_list = sorted(rem_set)
-    kept = sum(1 for w in raw_set if w in rem_set or difflib.get_close_matches(w, rem_list, n=1, cutoff=0.8))
-    raw_list = sorted(raw_set)
-    added = sum(1 for w in rem_set if w not in raw_set and not difflib.get_close_matches(w, raw_list, n=1, cutoff=0.8))
-    return kept / len(raw_set), (added / len(rem_set) if rem_set else 0.0)
+    kept = _matched(raw_w, rem_w) / len(raw_w)
+    added = (1 - _matched(rem_w, raw_w) / len(rem_w)) if rem_w else 0.0
+    return kept, added
 
 
 class Rememberer:
@@ -118,44 +152,74 @@ def main() -> None:
     parser.add_argument("--out", type=Path, help="output path without extension: writes .json and .md")
     parser.add_argument("--text", help="remember a single dream given on the command line")
     parser.add_argument("--threads", type=int, default=None)
+    parser.add_argument("--rescore", action="store_true",
+                        help="recompute retention for an existing --out .json without running the editor again")
     args = parser.parse_args()
 
+    if args.rescore:
+        rescore(args.out)
+        return
     editor = Rememberer(threads=args.threads)
     if args.text:
         remembered = editor.remember(args.text)
         kept, added = retention(args.text, remembered)
         print(remembered)
-        print(f"\nretention {kept:.0%} | added {added:.0%}{'  FLAG: under 80%' if kept < FLAG_BELOW else ''}")
+        ratio = length_ratio(args.text, remembered)
+        print(f"\nretention {kept:.0%} | added {added:.0%} | length {ratio:.0%}"
+              f"{'  FLAG' if is_flagged(args.text, remembered) else ''}")
         return
 
     dreams = json.loads(args.inp.read_text(encoding="utf-8"))
+    write_results(args.out, _run(editor, dreams))
+
+
+def _run(editor: "Rememberer", dreams: list[dict]) -> list[dict]:
     results = []
     t0 = time.time()
     for d in dreams:
         t = time.time()
         remembered = editor.remember(d["text"])
         kept, added = retention(d["text"], remembered)
+        ratio = length_ratio(d["text"], remembered)
+        flagged = is_flagged(d["text"], remembered)
         results.append({**d, "as_remembered": remembered, "retention": round(kept, 3), "added": round(added, 3),
-                        "flagged": kept < FLAG_BELOW})
-        print(f"{d['n']:2d} retention {kept:4.0%} added {added:4.0%} {'FLAG' if kept < FLAG_BELOW else '    '}"
+                        "length": round(ratio, 3), "flagged": flagged})
+        print(f"{d['n']:2d} retention {kept:4.0%} added {added:4.0%} length {ratio:4.0%} {'FLAG' if flagged else '    '}"
               f" ({time.time() - t:.0f}s)", flush=True)
+    print(f"edited {len(results)} dreams in {time.time() - t0:.0f}s")
+    return results
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.with_suffix(".json").write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+def rescore(out: Path) -> None:
+    results = json.loads(out.with_suffix(".json").read_text(encoding="utf-8"))
+    for r in results:
+        kept, added = retention(r["text"], r["as_remembered"])
+        ratio = length_ratio(r["text"], r["as_remembered"])
+        r.update(retention=round(kept, 3), added=round(added, 3), length=round(ratio, 3),
+                 flagged=is_flagged(r["text"], r["as_remembered"]))
+        print(f"{r['n']:2d} retention {kept:4.0%} added {added:4.0%} length {ratio:4.0%} {'FLAG' if r['flagged'] else ''}")
+    write_results(out, results)
+
+
+def write_results(out: Path, results: list[dict]) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.with_suffix(".json").write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     flagged = [r["n"] for r in results if r["flagged"]]
     lines = [
         "# As dreamed / as remembered", "",
         f"Editor: `{MODEL_ID}` (greedy, strict prompt: spelling and grammar only, keep every image, name and event, add nothing).",
-        f"Retention = share of the raw dream's content words kept (close spellings count). Flagged under {FLAG_BELOW:.0%}.", "",
+        f"Retention = share of the raw dream's content words kept, every occurrence counted (close spellings count). "
+        f"Length = remembered words / dreamed words. Flagged if retention < {FLAG_BELOW:.0%}, added > {ADDED_FLAG_ABOVE:.0%} "
+        f"or length < {LENGTH_FLAG_BELOW:.0%}. The flags catch large changes only: read before keeping.", "",
         f"Mean retention {sum(r['retention'] for r in results) / len(results):.0%}; "
         f"flagged: {', '.join(map(str, flagged)) if flagged else 'none'}.", "",
     ]
     for r in results:
-        flag = " · **FLAG: under 80%**" if r["flagged"] else ""
-        lines += [f"## {r['n']}. retention {r['retention']:.0%} · added {r['added']:.0%}{flag}", "",
+        flag = " · **FLAG**" if r["flagged"] else ""
+        lines += [f"## {r['n']}. retention {r['retention']:.0%} · added {r['added']:.0%} · length {r.get('length', 1):.0%}{flag}", "",
                   "**As dreamed**", "", r["text"], "", "**As remembered**", "", r["as_remembered"], ""]
-    args.out.with_suffix(".md").write_text("\n".join(lines), encoding="utf-8")
-    print(f"wrote {args.out.with_suffix('.md')} and .json in {time.time() - t0:.0f}s")
+    out.with_suffix(".md").write_text("\n".join(lines), encoding="utf-8")
+    print(f"wrote {out.with_suffix('.md')} and .json")
 
 
 if __name__ == "__main__":
