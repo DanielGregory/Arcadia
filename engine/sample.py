@@ -55,6 +55,7 @@ def sample(
     repetition_penalty: float = 1.1,
     stop_token: int | None = None,
     no_penalty_ids: set[int] = frozenset(),
+    stop_tokens: set[int] = frozenset(),
 ) -> torch.Tensor:
     """Continue idx (1, T) by up to max_new_tokens tokens; return the full sequence."""
     prompt_len = idx.shape[1]
@@ -97,7 +98,7 @@ def sample(
         # 6. Sample one token and append it.
         next_token = torch.multinomial(probs, num_samples=1)     # (1,)
         idx = torch.cat((idx, next_token.view(1, 1)), dim=1)
-        if stop_token is not None and next_token.item() == stop_token:
+        if next_token.item() == stop_token or next_token.item() in stop_tokens:
             break
     return idx
 
@@ -124,9 +125,13 @@ def generate_dream(model, tok, prompt: str, max_tokens: int, device: str, cut_se
     start_text = f"{open_tag}\n" + prompt
     start = torch.tensor([tok.encode(start_text)], dtype=torch.long, device=device)
     end_id = tok.token_id(close_tag)
-    ids = sample(model, start, max_tokens, stop_token=end_id,
-                 no_penalty_ids={tok.newline_id, end_id}, **kw)[0].tolist()
-    closed = ids[-1] == end_id
+    # Stop at ANY source tag, not just our own closing one: a run 3 model sometimes
+    # closes a <tale> with </myth> or starts a new passage. Either way the passage is over.
+    tags = [f"<{t}>" for t in ("dream", "myth", "tale", "saga")] + [f"</{t}>" for t in ("dream", "myth", "tale", "saga")]
+    tag_ids = {tok.token_id(t) for t in tags if tok.sp.id_to_piece(tok.token_id(t)) == t}
+    ids = sample(model, start, max_tokens, stop_token=end_id, stop_tokens=tag_ids,
+                 no_penalty_ids={tok.newline_id} | tag_ids, **kw)[0].tolist()
+    closed = ids[-1] in tag_ids
     text = tok.decode(ids[:-1] if closed else ids)
     text = text.removeprefix(f"{open_tag}\n").strip()
     if not closed and cut_sentence:
