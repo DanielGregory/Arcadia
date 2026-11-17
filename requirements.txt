@@ -7,3 +7,5 @@ tqdm
 datasets
 huggingface_hub
 sentencepiece
+transformers
+accelerate
