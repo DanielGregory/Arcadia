@@ -16,9 +16,11 @@ The five steps, all in this one file:
   2. SELECT    every candidate is checked and scored: it should end itself, be
                a sensible length, not repeat itself, and not copy its training
                text (12+ words in a row found in train.txt rules it out). Then
-               the editor model JUDGES each survivor: does it hold together,
-               following one thread from sentence to sentence? That rating
-               decides the pick; the checks above mostly just rule things out.
+               the editor model JUDGES each survivor: does it hold together?
+               That rating is only a floor (engine/memory/novelty.py). Among the
+               dreams that clear it, the most NOVEL (far from recent mornings,
+               with new or rare images) are favoured, and the winner is drawn
+               at random weighted by novelty, so strange dreams win often.
   3. REMEMBER  the editor model (Qwen2.5-1.5B-Instruct) tidies the best
                candidates into the "as remembered" version. The first one whose
                edit passes the retention checks (engine/remember.py) wins; if
@@ -59,6 +61,7 @@ from pathlib import Path
 import torch
 
 from engine.copy_check import FLAG_WORDS, longest_copied_run
+from engine.memory import novelty
 from engine.remember import Rememberer, is_flagged, length_ratio, retention
 from engine.sample import cut_to_last_sentence, generate_dream, load
 
@@ -418,15 +421,27 @@ def main() -> None:
     print("2b-3. judging and remembering", flush=True)
     t = time.time()
     editor = Rememberer(device=args.device)
-    # 2b. Judge every survivor; the rating joins its score and decides the order.
+    # 2b. Coherence is a FLOOR, not the decider (engine/memory/novelty.py): every survivor is rated,
+    #     those that clear the floor are scored for novelty, and the winner is drawn at random,
+    #     weighted towards the most novel. All of it is logged in the record.
     for c in ranked:
         if c["score"] is not None:
             c["coherence"] = round(judge(editor, c["text"]), 2)
-            c["score"] = round(c["score"] + c["coherence"], 3)
-    ranked.sort(key=lambda c: (c["score"] is not None, c["score"] or 0), reverse=True)
-    for c in ranked[:5]:
-        print(f"  top: candidate {c['i']:2d} score {c['score']} (coherence {c.get('coherence')})", flush=True)
-    chosen, remembered, edit_log = remember_best(editor, ranked)
+    judged = sorted((c for c in ranked if c["score"] is not None), key=lambda c: -c["coherence"])
+    eligible = [c for c in judged if c["coherence"] >= novelty.COHERENCE_FLOOR]
+    if len(eligible) < novelty.MIN_ELIGIBLE:
+        eligible = judged[:novelty.MIN_ELIGIBLE] or ranked[:1]
+    for c in ranked:
+        c["eligible"] = c in eligible
+    selection = novelty.score_novelty(eligible, day.isoformat(), args.device)
+    winner, order = novelty.pick(eligible, seed)
+    selection.update({"floor": novelty.COHERENCE_FLOOR, "temperature": novelty.TEMPERATURE,
+                      "eligible": [c["i"] for c in eligible], "winner": winner["i"]})
+    for c in order:
+        print(f"  {'WIN ' if c is winner else '    '}candidate {c['i']:2d} <{c['tag']}> coherence {c['coherence']} "
+              f"novelty {c['novelty']} (embedding {c['emb_novelty']} + symbols {c['symbol_bonus']}) "
+              f"chance {c['chance']:.0%}", flush=True)
+    chosen, remembered, edit_log = remember_best(editor, order)
     caption = best_sentence(editor, remembered or chosen["text"])
     print(f"  caption: {caption}", flush=True)
     del editor
@@ -479,7 +494,7 @@ def main() -> None:
         "prompt_sent": f"{scene}, {style['description']}", "prompt_2_sent": f"{style['description']}: {scene}",
         "steps": args.steps, "ip_scale": args.ip_scale,
         "style_reference": STYLE_REFERENCE, "painted": not args.no_paint, "settings": SETTINGS,
-        "edit": edit_log, "candidates": ranked, "timings_s": timings,
+        "edit": edit_log, "selection": selection, "candidates": ranked, "timings_s": timings,
     }
     (out / "morning.json").write_text(json.dumps(record, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     (out / "morning.md").write_text(markdown(record), encoding="utf-8")
@@ -521,11 +536,20 @@ def markdown(r: dict) -> str:
               "## Painting", "", f"> {r['painting_prompt']}", "",
               f"Style: **{style.get('name', '?')}** ({style.get('pool', '?')} pool"
               f"{', wildcard' if style.get('wildcard') else ''})", "",
-              "## Candidates", "", "| # | tag | words | closed | trigrams | copied | modern | coherence | score |", "|---|---|---|---|---|---|---|---|---|"]
-    for c in r["candidates"]:
-        s = c["score"] if c["score"] is not None else f"rejected: {c['rejected']}"
-        lines.append(f"| {c['i']} | {c.get('tag', 'dream')} | {c['words']} | {'yes' if c['closed'] else 'no'} | {c['distinct_trigrams']} "
-                     f"| {c['copied_words']} | {', '.join(c.get('modern', []))} | {c.get('coherence', '')} | {s} |")
+              "## Candidates", "", "| # | tag | words | closed | trigrams | copied | coherence | eligible | novelty (emb + symbols) | new / rare images | chance | rejected |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for c in sorted(r["candidates"], key=lambda c: (-c.get("chance", -1), -(c.get("coherence") or 0))):
+        nov = f"{c['novelty']} ({c['emb_novelty']} + {c['symbol_bonus']})" if "novelty" in c else ""
+        images = " / ".join(", ".join(c.get(k, [])) or "–" for k in ("new_symbols", "rare_symbols")) if "novelty" in c else ""
+        chance = f"{c['chance']:.0%}" if "chance" in c else ""
+        lines.append(f"| {c['i']}{' ★' if c['i'] == r['chosen'] else ''} | {c.get('tag', 'dream')} | {c['words']} "
+                     f"| {'yes' if c['closed'] else 'no'} | {c['distinct_trigrams']} | {c['copied_words']} "
+                     f"| {c.get('coherence', '')} | {'yes' if c.get('eligible') else ''} | {nov} | {images} | {chance} "
+                     f"| {c.get('rejected', '')} |")
+    sel = r.get("selection")
+    if sel:
+        lines += ["", f"Selection: coherence floor {sel['floor']}, temperature {sel['temperature']}; novelty measured "
+                      f"against {sel['reference_size']} {sel['reference']}; embeddings {sel['embeddings']}."]
     lines += ["", f"Timings (s): {r['timings_s']}", ""]
     return "\n".join(lines)
 
