@@ -16,6 +16,10 @@ Refinement (image_prompts_v3.json onwards): an image entry may also have
   "strength": how much of it to repaint (0 = keep it, 1 = ignore it), and
   "ip_adapter_image" + "ip_adapter_scale": a reference picture used as a
       *visual* prompt (IP-Adapter), to borrow its light, palette and forms.
+  "ip_adapter_mode": "full" (default: the reference steers content AND style)
+      or "style" (InstantStyle: the reference is applied only to the one
+      attention block that carries colour, light and brushwork, so it can't
+      copy the reference's objects, e.g. its repeated temples).
 If the IP-Adapter can't be loaded, those images are made with img2img alone
 and their metadata says so ("ip_adapter_used": false).
 """
@@ -135,7 +139,11 @@ def main() -> None:
             init = Image.open(root / img["init_image"]).convert("RGB").resize((width, height))
             extra = {}
             if ip_ok and img.get("ip_adapter_image") and img.get("ip_adapter_scale", 0) > 0:
-                img2img.set_ip_adapter_scale(img["ip_adapter_scale"])
+                scale = img["ip_adapter_scale"]
+                if img.get("ip_adapter_mode") == "style":
+                    # InstantStyle: only up_blocks.0, attention 1 (style) gets the reference.
+                    scale = {"up": {"block_0": [0.0, scale, 0.0]}}
+                img2img.set_ip_adapter_scale(scale)
                 extra["ip_adapter_image"] = Image.open(root / img["ip_adapter_image"]).convert("RGB")
                 ip_used = True
             elif ip_ok:
