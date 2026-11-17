@@ -10,6 +10,14 @@ long it took.
 
 Model: SDXL base 1.0 in float16, with the "fp16-fix" VAE (the stock SDXL VAE
 produces black or noisy images in float16). Fits a 16 GB T4.
+
+Refinement (image_prompts_v3.json onwards): an image entry may also have
+  "init_image": a picture to start from instead of pure noise (img2img), and
+  "strength": how much of it to repaint (0 = keep it, 1 = ignore it), and
+  "ip_adapter_image" + "ip_adapter_scale": a reference picture used as a
+      *visual* prompt (IP-Adapter), to borrow its light, palette and forms.
+If the IP-Adapter can't be loaded, those images are made with img2img alone
+and their metadata says so ("ip_adapter_used": false).
 """
 
 from __future__ import annotations
@@ -46,6 +54,35 @@ def load_pipeline(model: str, vae: str | None, device: str, safetensors: bool = 
     return pipe
 
 
+IP_ADAPTER = {"repo": "h94/IP-Adapter", "subfolder": "sdxl_models",
+              "weight_name": "ip-adapter_sdxl_vit-h.safetensors", "image_encoder": "models/image_encoder"}
+
+
+def load_img2img(pipe, device: str, want_ip_adapter: bool):
+    """An img2img pipeline sharing the text-to-image pipeline's weights, plus the IP-Adapter if wanted."""
+    from diffusers import StableDiffusionXLImg2ImgPipeline
+
+    image_encoder = None
+    if want_ip_adapter:
+        try:
+            from transformers import CLIPVisionModelWithProjection
+
+            image_encoder = CLIPVisionModelWithProjection.from_pretrained(
+                IP_ADAPTER["repo"], subfolder=IP_ADAPTER["image_encoder"], torch_dtype=pipe.dtype).to(device)
+        except Exception as err:  # noqa: BLE001
+            print(f"IP-Adapter image encoder unavailable ({err}); using img2img only", flush=True)
+    img2img = StableDiffusionXLImg2ImgPipeline(**{**pipe.components, "image_encoder": image_encoder}).to(device)
+    img2img.set_progress_bar_config(disable=True)
+    if image_encoder is not None:
+        try:
+            img2img.load_ip_adapter(IP_ADAPTER["repo"], subfolder=IP_ADAPTER["subfolder"],
+                                    weight_name=IP_ADAPTER["weight_name"])
+            return img2img, True
+        except Exception as err:  # noqa: BLE001
+            print(f"IP-Adapter failed to load ({err}); using img2img only", flush=True)
+    return img2img, False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--spec", type=Path, default=SPEC)
@@ -70,23 +107,43 @@ def main() -> None:
     print(f"loaded {model} on {args.device} in {time.time() - t0:.0f}s; generating {len(images)} images", flush=True)
 
     commit = git_commit()
+    root = args.spec.resolve().parents[1]  # paths in the spec are relative to the repo root
+    img2img, ip_ok = None, False
+    if any(i.get("init_image") for i in images):
+        img2img, ip_ok = load_img2img(pipe, args.device, any(i.get("ip_adapter_image") for i in images))
+        print(f"img2img ready; IP-Adapter {'loaded' if ip_ok else 'not used'}", flush=True)
+
+    from PIL import Image
+
     for img in images:
         width, height = (int(v) for v in args.size.split("x")) if args.size else (img["width"], img["height"])
         t = time.time()
         # A fixed seed on its own generator makes each image reproducible
         # regardless of which other images are generated in the same run.
         generator = torch.Generator(device=args.device).manual_seed(img["seed"])
-        result = pipe(
+        common = dict(
             prompt=img["prompt"],
             prompt_2=img.get("prompt_2"),
             negative_prompt=img.get("negative_prompt"),
             negative_prompt_2=img.get("negative_prompt"),
-            width=width,
-            height=height,
             num_inference_steps=steps,
             guidance_scale=spec["guidance_scale"],
             generator=generator,
-        ).images[0]
+        )
+        ip_used = False
+        if img.get("init_image"):
+            init = Image.open(root / img["init_image"]).convert("RGB").resize((width, height))
+            extra = {}
+            if ip_ok and img.get("ip_adapter_image") and img.get("ip_adapter_scale", 0) > 0:
+                img2img.set_ip_adapter_scale(img["ip_adapter_scale"])
+                extra["ip_adapter_image"] = Image.open(root / img["ip_adapter_image"]).convert("RGB")
+                ip_used = True
+            elif ip_ok:
+                img2img.set_ip_adapter_scale(0.0)
+                extra["ip_adapter_image"] = Image.open(root / (img.get("ip_adapter_image") or img["init_image"])).convert("RGB")
+            result = img2img(image=init, strength=img["strength"], **common, **extra).images[0]
+        else:
+            result = pipe(width=width, height=height, **common).images[0]
         result.save(args.out / f"{img['id']}.png")
         meta = {
             **img,
@@ -99,6 +156,7 @@ def main() -> None:
             "seconds": round(time.time() - t, 1),
             "git_commit": commit,
             "reference": spec.get("reference"),
+            **({"ip_adapter_used": ip_used, "ip_adapter": IP_ADAPTER if ip_used else None} if img.get("init_image") else {}),
         }
         (args.out / f"{img['id']}.json").write_text(json.dumps(meta, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"{img['id']}: {meta['seconds']}s", flush=True)
