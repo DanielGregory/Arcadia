@@ -1,0 +1,200 @@
+{
+ "model": "stabilityai/stable-diffusion-xl-base-1.0",
+ "vae": "madebyollin/sdxl-vae-fp16-fix",
+ "steps": 30,
+ "guidance_scale": 6.5,
+ "reference": "assets/reference/corva_reference.jpg",
+ "note": "v2: the scene goes to BOTH text encoders (the second, stronger encoder got only the style in v1, so style won and the city disappeared). prompt = full scene; prompt_2 = condensed scene + short style. Same seeds as v1. Each prompt is checked against SDXL's 77-token limit.",
+ "images": [
+  {
+   "id": "corva_v2_01",
+   "kind": "canonical_corva",
+   "prompt": "Corva, an ancient harbor city of white marble temples with columns terraced up a steep hillside, dark cypress trees between them, a curved harbor full of wooden galleys with square sails and oars, rowing boats, mountains fading into haze, sun low over a calm sea",
+   "prompt_2": "ancient harbor city, white columned temples terraced up a hillside, cypresses, galleys with square sails in the harbor, Claude Lorrain oil painting, golden hour, hazy mountains, painterly",
+   "negative_prompt": "empty coastline, wilderness, modern buildings, cars, text, watermark, signature, picture frame, border, photograph, 3d render, cartoon, blurry, deformed",
+   "seed": 1001,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "corva_01"
+  },
+  {
+   "id": "corva_v2_02",
+   "kind": "canonical_corva",
+   "prompt": "Corva, an ancient harbor city of white marble temples with columns terraced up a steep hillside, dark cypress trees between them, a curved harbor full of wooden galleys with square sails and oars, rowing boats, mountains fading into haze, sun low over a calm sea, seen across the harbor from a rocky shore",
+   "prompt_2": "ancient harbor city, white columned temples terraced up a hillside, cypresses, galleys with square sails in the harbor, seen across the harbor from a rocky shore, Claude Lorrain oil painting, golden hour, hazy mountains, painterly",
+   "negative_prompt": "empty coastline, wilderness, modern buildings, cars, text, watermark, signature, picture frame, border, photograph, 3d render, cartoon, blurry, deformed",
+   "seed": 1002,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "corva_02"
+  },
+  {
+   "id": "corva_v2_03",
+   "kind": "canonical_corva",
+   "prompt": "Corva, an ancient harbor city of white marble temples with columns terraced up a steep hillside, dark cypress trees between them, a curved harbor full of wooden galleys with square sails and oars, rowing boats, mountains fading into haze, sun low over a calm sea, seen from a high terrace above the harbor",
+   "prompt_2": "ancient harbor city, white columned temples terraced up a hillside, cypresses, galleys with square sails in the harbor, seen from a high terrace above the harbor, Claude Lorrain oil painting, golden hour, hazy mountains, painterly",
+   "negative_prompt": "empty coastline, wilderness, modern buildings, cars, text, watermark, signature, picture frame, border, photograph, 3d render, cartoon, blurry, deformed",
+   "seed": 1003,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "corva_03"
+  },
+  {
+   "id": "corva_v2_04",
+   "kind": "canonical_corva",
+   "prompt": "Corva, an ancient harbor city of white marble temples with columns terraced up a steep hillside, dark cypress trees between them, a curved harbor full of wooden galleys with square sails and oars, rowing boats, mountains fading into haze, sun low over a calm sea, sun touching the horizon, long shadows on the quays",
+   "prompt_2": "ancient harbor city, white columned temples terraced up a hillside, cypresses, galleys with square sails in the harbor, sun touching the horizon, long shadows on the quays, Claude Lorrain oil painting, golden hour, hazy mountains, painterly",
+   "negative_prompt": "empty coastline, wilderness, modern buildings, cars, text, watermark, signature, picture frame, border, photograph, 3d render, cartoon, blurry, deformed",
+   "seed": 1004,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "corva_04"
+  },
+  {
+   "id": "corva_v2_05",
+   "kind": "canonical_corva",
+   "prompt": "Corva, an ancient harbor city of white marble temples with columns terraced up a steep hillside, dark cypress trees between them, a curved harbor full of wooden galleys with square sails and oars, rowing boats, mountains fading into haze, sun low over a calm sea, early morning, mist on the water",
+   "prompt_2": "ancient harbor city, white columned temples terraced up a hillside, cypresses, galleys with square sails in the harbor, early morning, mist on the water, Claude Lorrain oil painting, golden hour, hazy mountains, painterly",
+   "negative_prompt": "empty coastline, wilderness, modern buildings, cars, text, watermark, signature, picture frame, border, photograph, 3d render, cartoon, blurry, deformed",
+   "seed": 1005,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "corva_05"
+  },
+  {
+   "id": "corva_v2_06",
+   "kind": "canonical_corva",
+   "prompt": "Corva, an ancient harbor city of white marble temples with columns terraced up a steep hillside, dark cypress trees between them, a curved harbor full of wooden galleys with square sails and oars, rowing boats, mountains fading into haze, sun low over a calm sea, figures unloading a galley on the quay",
+   "prompt_2": "ancient harbor city, white columned temples terraced up a hillside, cypresses, galleys with square sails in the harbor, figures unloading a galley on the quay, Claude Lorrain oil painting, golden hour, hazy mountains, painterly",
+   "negative_prompt": "empty coastline, wilderness, modern buildings, cars, text, watermark, signature, picture frame, border, photograph, 3d render, cartoon, blurry, deformed",
+   "seed": 1006,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "corva_06"
+  },
+  {
+   "id": "corva_v2_07",
+   "kind": "canonical_corva",
+   "prompt": "Corva, an ancient harbor city of white marble temples with columns terraced up a steep hillside, dark cypress trees between them, a curved harbor full of wooden galleys with square sails and oars, rowing boats, mountains fading into haze, sun low over a calm sea, wide panorama of the whole city around the bay",
+   "prompt_2": "ancient harbor city, white columned temples terraced up a hillside, cypresses, galleys with square sails in the harbor, wide panorama of the whole city around the bay, Claude Lorrain oil painting, golden hour, hazy mountains, painterly",
+   "negative_prompt": "empty coastline, wilderness, modern buildings, cars, text, watermark, signature, picture frame, border, photograph, 3d render, cartoon, blurry, deformed",
+   "seed": 1007,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "corva_07"
+  },
+  {
+   "id": "corva_v2_08",
+   "kind": "canonical_corva",
+   "prompt": "Corva, an ancient harbor city of white marble temples with columns terraced up a steep hillside, dark cypress trees between them, a curved harbor full of wooden galleys with square sails and oars, rowing boats, mountains fading into haze, sun low over a calm sea, a great temple on the hilltop catching the last light",
+   "prompt_2": "ancient harbor city, white columned temples terraced up a hillside, cypresses, galleys with square sails in the harbor, a great temple on the hilltop catching the last light, Claude Lorrain oil painting, golden hour, hazy mountains, painterly",
+   "negative_prompt": "empty coastline, wilderness, modern buildings, cars, text, watermark, signature, picture frame, border, photograph, 3d render, cartoon, blurry, deformed",
+   "seed": 1008,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "corva_08"
+  },
+  {
+   "id": "dream_v2_01",
+   "kind": "dream",
+   "prompt": "the sea lifted up into the night sky and sleeping there above a harbor city, a stranger seated on top of a forest, his face shining from the edge of a small white cottage",
+   "prompt_2": "the sea asleep in the night sky above a harbor city, a stranger sitting on top of a forest, surreal dreamlike oil painting, impossible architecture, floating objects, glowing golden light",
+   "negative_prompt": "picture frame, gilded frame, border, text, watermark, signature, photograph, 3d render, cartoon, modern clothing, cars, blurry, deformed hands",
+   "seed": 2001,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "dream_01",
+   "source_dream": {
+    "file": "out/priming/run2.md",
+    "dream": "2.2",
+    "model": "run2/best.pt",
+    "text": "In Corva, the city by the sea, I dreamed that the gods were going to a desert, which had no time now been along with labour. At night the sea had come back from the sea and slept in the sky. I found a stranger seated on the top of the forest, which prevented the protectors, the front and then rose up to the shore. I could not see him, nor hear him not from the moon, but his cheeks flashed down from the very edge of the cottage.\n\n“Friend,” I answered: “why, my shadow sank up at the light, till, I am so tired!”\n\n“I will go,” I answered."
+   }
+  },
+  {
+   "id": "dream_v2_02",
+   "kind": "dream",
+   "prompt": "a lone figure on a dark shore turning into a column of black smoke, a wine-dark sea, an ancient ship hurled over the waves, a howling wind made visible",
+   "prompt_2": "a figure on a dark shore turning into black smoke, wine-dark sea, ancient ship hurled over the waves, surreal dreamlike oil painting, impossible architecture, floating objects, glowing golden light",
+   "negative_prompt": "picture frame, gilded frame, border, text, watermark, signature, photograph, 3d render, cartoon, modern clothing, cars, blurry, deformed hands",
+   "seed": 2002,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "dream_02",
+   "source_dream": {
+    "file": "out/priming/run2.md",
+    "dream": "1.2",
+    "model": "run2/best.pt",
+    "text": "I was walking by the wine-dark sea-like sea of the Parkadian shore, having stopped at the shore, where the pastor and the sea had glared into the waters, a wide sea, the people that overwhelmed with a scabbelids. The sea were covered with water. I saw them a loud wind above the shore, and no light, but could not sleep with the ground nor could not reach the ground. When I reached the shore had gone, one which, on the road, or the wind trembled. The rays of the actions were at me. I d forced the current of their ships to cover their oars at once, but soon a trifling strength to lay by the sea and the ravenous heavens."
+   }
+  },
+  {
+   "id": "dream_v2_03",
+   "kind": "dream",
+   "prompt": "an ancient sailing ship lying asleep among olive trees, a tomb in the olive grove, a tree growing through the middle of a cottage, a raft on currents stained with ice",
+   "prompt_2": "an ancient sailing ship asleep among olive trees, a tomb in the olive grove, a tree growing through a cottage, surreal dreamlike oil painting, impossible architecture, floating objects, glowing golden light",
+   "negative_prompt": "picture frame, gilded frame, border, text, watermark, signature, photograph, 3d render, cartoon, modern clothing, cars, blurry, deformed hands",
+   "seed": 2003,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "dream_03",
+   "source_dream": {
+    "file": "out/priming/run2.md",
+    "dream": "3.5",
+    "model": "run2/best.pt",
+    "text": "The old shepherd told me of a tomb in the olive grove where I had left, and that I might dig a dain, I was cleft to the vineyard with the blow that brought me into the neck. When I fly, he saw a noise of light water. Without the thinner, I kept holding myself under the other side, and in my close hand I saw it was falling; but, with the water, as if I could seize hold of the door of the fleeces. I rose, and he said, ‘I will remember my son, for this is only a man which has treated you and that is you will not be said and the thunder rose-coveness of the fire.’"
+   }
+  },
+  {
+   "id": "dream_v2_04",
+   "kind": "dream",
+   "prompt": "giant gods in the sky making signs to the people of a Greek harbor city, the city melting into a northern lakeside town, a crowd weeping on the quay",
+   "prompt_2": "giant gods in the sky making signs above a Greek harbor city, a crowd weeping on the quay, surreal dreamlike oil painting, impossible architecture, floating objects, glowing golden light",
+   "negative_prompt": "picture frame, gilded frame, border, text, watermark, signature, photograph, 3d render, cartoon, modern clothing, cars, blurry, deformed hands",
+   "seed": 2004,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "dream_04",
+   "source_dream": {
+    "file": "out/priming/run2.md",
+    "dream": "2.3",
+    "model": "run2/best.pt",
+    "text": "In Corva, the city by the sea, I dreamed that the gods were making signs for playing for men. But I dreamt that I was in Geneva and at the same moment I arrived to be built a number of people standing there and wept and learned to have began to find my life."
+   }
+  },
+  {
+   "id": "dream_v2_05",
+   "kind": "dream",
+   "prompt": "islands resting high in golden mountains, four houses covered in silver, ships raising their sails into the night sky, a child's kingdom inside a great storm",
+   "prompt_2": "islands resting high in golden mountains, ships sailing up into the night sky, a kingdom inside a storm, surreal dreamlike oil painting, impossible architecture, floating objects, glowing golden light",
+   "negative_prompt": "picture frame, gilded frame, border, text, watermark, signature, photograph, 3d render, cartoon, modern clothing, cars, blurry, deformed hands",
+   "seed": 2005,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "dream_05",
+   "source_dream": {
+    "file": "out/priming/run2.md",
+    "dream": "2.5",
+    "model": "run2/best.pt",
+    "text": "In Corva, the city by the sea, I dreamed that the gods who might hang forward in pieces, and dreaded by coward about the land of old men, whose city nought was men who live upon the ground, and had rested no longer. The gods of these looked up at the land, and in the city of Ziddle, and in the islands came to save rest in the golden mountains; and the man fell against the wave with his grows middle of the mountains in and through the back the the sea and fell at the island. And he had a rule over the waters. Then turned his brow and fell on with the Yozis."
+   }
+  },
+  {
+   "id": "dream_v2_06",
+   "kind": "dream",
+   "prompt": "a colossal calf covered with the whole Earth lying in a desert valley, gods dancing across the sky like flames, priests watching from below",
+   "prompt_2": "a colossal calf covered with the whole Earth lying in a desert valley, gods dancing in the sky like flames, surreal dreamlike oil painting, impossible architecture, floating objects, glowing golden light",
+   "negative_prompt": "picture frame, gilded frame, border, text, watermark, signature, photograph, 3d render, cartoon, modern clothing, cars, blurry, deformed hands",
+   "seed": 2006,
+   "width": 1344,
+   "height": 768,
+   "revision_of": "dream_06",
+   "source_dream": {
+    "file": "out/priming/run2.md",
+    "dream": "2.4",
+    "model": "run2/best.pt",
+    "text": "In Corva, the city by the sea, I dreamed that the gods of the gods had been due to us, and the gods were born of the gods. Then the people were dead in the desert and pleasant world; but return got up all the our valley, and walking in the desert, and sky and there was a long calf covered with the Earth, and behind it was far and more particularly deep there; but when night they heard it he spake by the end of the priests, all the eyes of the wide like dancing of the gods; and there came no more, for all the gods answered: “In the shadows of the morning we be in the leaves to arise amid our life.” And Mung said: “Alas!"
+   }
+  }
+ ]
+}
