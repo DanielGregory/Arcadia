@@ -1,0 +1,207 @@
+===== dream =====
+/kaggle/working/run5/best.pt: step 7000, val loss 3.7528 (1.432 bits/char)
+
+===== temperature 0.9 | top_p 0.9 | repetition penalty 1.1 =====
+<dream>
+I am on a walk at an older woman who is carrying lots of ice spades of fish and she gives me the medicine pistol, which represents it, where I want to buy it. It was some old village with red schedule, and we have no bag but it was cleaning up in. The food is a regular one that I have dated. There is a small kitchen and I am going to give the smell of a dimebrid and I realize it's the way to get up there for someone to change it. We also need to eat butter. I feel tired. I have trouble getting much trouble, because I don't want to work, or else I might buy some.
+</dream>
+
+<dream>
+I was with my friend I didn't have a dream. I thought it was the little older woman who made it known me of the age that he was 18:00 years ago, but we all looked like them, and I don't know what he was in school. He did a very good time because he didn't go to a class in real life, or whatever I wanted, he did think it was his school and also a bunch of people. I was thinking about myself that my friends would not like mine before I returned to college. He came over and told me I was interested in my former former age and my age. Then he said that I wanted to see him and he told me that I wasn't my boyfriend. So I asked him to come to a gym. I said he didn't ask me why he said yes. I said, "But you won't be cleaned." I went to see it. It was in my power to tell me that I was going to get lunch, and I was so good. I think this guy also had been lost now.
+</dream>
+
+<dream>
+I was in a conference. I was going to a place where the next scene was to me at another table I would have to drive it and I could get on and drive it down from my left. I saw that some woman who had been using was a bunch of poisonous, well dressed in her razes. She walked off in my chair and was playing with me and told me she did some activity in the hospital and my boyfriend Jeremy (maybe the only way he said) didn't see her and I was running toward her. He also had a little shoe. I seemed to be swimming with a couple of other women (male) and we were sitting around a trailer. My sister and I were there. We were swimming in the woods and we were up somewhere. A little boy was still sleeping in the pool.
+</dream>
+
+
+===== myth =====
+/kaggle/working/run5/best.pt: step 7000, val loss 3.7528 (1.432 bits/char)
+
+===== temperature 0.9 | top_p 0.9 | repetition penalty 1.1 =====
+<myth>
+The god that loved the gods and obeyed the order of their return. Thus is the Lord of all men, but all the gods have created them in their minds; all this is to be made strong in all things and hath been accomplished.
+
+And he who is satisfied with Thoth, will not slay him who has ordained it as a giver.
+
+When God and Words are coming, they shall never eat their bones, neither may he be without any other heemaker.
+
+His strength shall be turned out against him, and his spirit shall not be stirred, and his heart shall be fixed upon him.
+
+He shall be honoured by the maw; his belly shall not make heat to his body; he shall be grieved at the god, which he may go on to evil things.
+
+Who wills in whom hearken? or is he that which willeth over the great shrine of Eye: whosoever he wills to die shall return upon the altar of Letheir of light into heaven, shall be attached to the sepulchre of Osiris in his heart, who will grant him, to be forgotten in the house of Osiris.
+</myth>
+
+<myth>
+“My son,” answered he, “is my son. There is a man in the house of Agamemnon’s own country, or I will be dead in his former age when the Achaeans have set out to the ships in the sea. If Jove’s hand may be outright, Jove shall see me again at once and say what you have said? And now tell him where I can ask you for you good counsel.”
+</myth>
+
+<myth>
+But the people wept aloud, nor did they heed the counsel of it. The third in front were fifty-fifthorned men with one another; they were on the other side of the river Rhebell, where there was a great, and were boats of iron. The fifth of them was made for a great crash as they had made ready to drive the ship through the water; and each man told him that his ship was coming and did not turn, but said he would never know who he was when it got away from him, if he should have arrived at home; therefore he would have come back again.
+
+A little while the wind blew and shot its masts into the land and the ship made its way to the enemy’s gate, while their ship was so thick that they could see, and they had no crew sailing out.
+
+With them were twenty men and twenty men, but the rest kept fighting against the Easterans and there.
+</myth>
+
+
+===== tale =====
+/kaggle/working/run5/best.pt: step 7000, val loss 3.7528 (1.432 bits/char)
+
+===== temperature 0.9 | top_p 0.9 | repetition penalty 1.1 =====
+<tale>
+The Lord Brandoch Daha stayed at the door, and Gro followed his seat in his hand. And Peredur said to the man, “Alas,” said he, “and yet shall I know what is this?” “It must be easier for me to tell thee of those adventures that I have suffered by reason of those who remain in danger.”
+
+“For I know not,” answered she.
+
+And Gro answered, “I have wished thee, King, when the Gods I have made me, it will make them welcome to my mind.”
+
+So he moved back, and Gaslark sought on with one of the soldiers, lest it should meet him, save that a Queen might do so.
+
+But the Lord Brandoch Daha was troubled with his eyes. For in the deepest air they spent their time, but a sudden very brighter clouds of the hue that dawned in the depths and that shone like the sweetness of the sun, and a soft glare shone red in the face of Corund’s hair.
+</tale>
+
+<tale>
+“It must be a little like that,” said Alice, “and if you don’t, you don’t find out anything here?” But she went on.
+
+“No, I can’t understand it—it can’t matter!” Alice thought afraidfully, “but I’m sure.”
+
+“But what am you going to say?” Humpty Dumpty’s very anxiously said at length; “you’re afraid of all this: and, then, I’m sure.”
+
+“I think you’re no worse at all,” the Dormouse was very curious; “but you know, really!”
+
+“Offer in your mind how I don’t remember what!” Alice added hastily: “and then I’ve lost your name, you know—”
+
+Alice put on his knees in a brightly disfigured tone; and as she had again read the Queen’s brief answer, Alice thought to herself, “that's nothing!”
+
+So she began: “What’s you very good, my dear little child?”
+</tale>  [length limit]
+
+<tale>
+Therewith he turned out his eyes and said, “It is not a jest that shall be; it has not been a fool to look at it but as he will be on it, I think thou shalt do something out. How will we abide?”
+
+“I’ll go,” said the Prezmyra.
+
+The King turned down upon him. “Thou must’st go now.”
+
+“That,” he said. “And think thou’dst me with our leave if I wished you to give me this lady if I had so saved her. But for my part she took her in a letter.”
+
+“Well,” answered Lord Brandoch Daha, “and she was a nieve. Is not this time so.”
+
+“I’m madam,” said Spitfire.
+</tale>
+
+
+===== poem =====
+/kaggle/working/run5/best.pt: step 7000, val loss 3.7528 (1.432 bits/char)
+
+===== temperature 0.9 | top_p 0.9 | repetition penalty 1.1 =====
+<poem>
+The god that loved me at the first,
+I have chosen it not to me of any man’s soul,
+But that thou shouldst speak better than I am;
+For with all my love is little and full of care.
+
+And yet I feel as well as I love thee,
+That is so many things as a fashion to thee,
+To be more or less base, though somewhat more powerful,
+Who, if this be not without a word despise,
+Do, it may appear too hard to show
+Of wisdom, and doth not dispose,
+If still more than with with one with whom
+Thou seemest to meet with us; but a philosopher,
+Have nothing to do; as if the future
+Hath been before thee, in themselves is no use
+Nor death of others from their own ancestors,
+
+Not so far from life and end; and that we know
+The most part which I will speak to thee
+Which are: and therefore, when in another light
+In objects of a sudden motion
+Had been renewed by a very poor movement
+Which now I have, to go about
+Hurry to make unto my city.
+</poem>  [length limit]
+
+<poem>
+Strep. 799.
+
+Soc. Do you not hear the words which you use, although I am delighted to perceive a wise man who is unfolded by me.
+
+Strep. Tell me, speak about it: I am aware of one whose presence is in the city and of manhood, and which is in it!
+
+Soc. By the gods, I am ashamed that you will understand me, and may know what you have done when it rises.
+
+Strep. We are wont to ask whether they were going or whether they did.
+
+Strep. The same evil also then meets me as a lover of your, and I do not know them.
+
+Strep. Ho, a lion; a lion's mother's name is this:
+
+Strep. Why are they?
+
+Soc. What are the way to say? They are so?"
+
+Strep. For a very truth.
+
+Phid. Oh you! What was the next thing, that I had sent to the door of the Destead, and how he found out that he could manage into the house?
+
+Soc. Return me this day in offering.
+</poem>  [length limit]
+
+<poem>
+As when, over the east he came to his own dwelling; but when he perceived that it was all, they did not know anything about it. Now, they passed through the country, and there came a large tower in which it is called Pirynia, which lies in the middle of the river Boland, with the river Silene. These used for the sacred enclosure of the Phenicians: and next by the Oracle of Aïs, they called it Cranthos: and then from this time they found this place called Tanoïs the Hylleans, who gave place a temple called Hyperbolites, not to be distinguished from the kings; but at first they came to the region of Mercury. Of these he had this place that Dareios was, and afterwards afterwards, in the land of the Cotidians and such other cities, having performed the Egyptian city, he was then at Athens. This third message Xerxes asked him what an oracle was that which came to the Carthaginetans, and he called his son and said that his father was Tyrronese.
+</poem>  [length limit]
+
+
+===== wisdom =====
+/kaggle/working/run5/best.pt: step 7000, val loss 3.7528 (1.432 bits/char)
+
+===== temperature 0.9 | top_p 0.9 | repetition penalty 1.1 =====
+<wisdom>
+And here I see that there are three kinds of rhetoric arises, which are made in many ways, and in the other direction the better of those who are the lesson of them have given birth to one another: for if any one makes them feel his own self-control, they take a life, as a man to another, he has made them unwittingly, though they are in the same way, then this is not without the law, nor is it a good man, as a man is moved by them.
+
+Well, I suppose, we must remember then that there is one common reason why another will be more beautiful than the other; and also the two I mean to do or the same thing: since these very exercises which seem in themselves to be a good man, the others from eating, and each party appear of the best?
+
+Yes, I said, we ought to pass upon: the question will be a good dealing with the rest of these things which are very naturally pleasant to them: for we ought not to like them to be such a good man, or not to be, or to begin with them?
+
+To be sure, I said.
+</wisdom>  [length limit]
+
+<wisdom>
+Now let me say that I would not like to be led back again to the community of Moral Compeculation in a wise man who is unfolded by me. And in a manner of the enquiry about it may be our counsellor of which I have at least been brought here, and yet not by reason of the order which is an easy task: whether it were worse for me to accept this proposal, which I shall be persuaded you will answer further: For how then did I come in earnest, how I should show myself further heedless? If you would not refrain from my part do anything wrong, I cannot tell it.’ Having uttered these words, I did so, he replied: ‘Why do I go as far as you may be minded?’
+</wisdom>
+
+<wisdom>
+And now I will give up my mind to you another person—that is what I say, and may be the best who brings, when we have a good guardian in his country. The first thing which he was to him may be much better than he has ever made in the world of my own mind,—for there are people who come from noble birth; and the third time they can neither hear nor hear but understand them.
+
+But let us begin from getting the good name.
+
+Well, as I said, that they do not know who the evil is possible in their State and there are no longer evils for the worse of them.
+
+Certainly not.
+
+That then he has been gathered into a friend as our love and with our citizens, whereas we agree to give out anything that he has enough, and we agree with him about justice in great happiness; and he has the lessen him: if you shall stay upon a good friend, there will be no reason for him to be honoured.
+
+Yes, he replied, and can you deny that he is one of the other people of the immortals—and he is of the best man, and therefore a more high-taken.
+</wisdom>  [length limit]
+
+
+===== chronicle =====
+/kaggle/working/run5/best.pt: step 7000, val loss 3.7528 (1.432 bits/char)
+
+===== temperature 0.9 | top_p 0.9 | repetition penalty 1.1 =====
+<chronicle>
+The Athenians then, having heard this, the Corinthians and their allies were formed by their side against them, set out to take up their wall, and carried on back again some of the Argives. The Athenians took refuge in full force with Lacedaemonian heavy infantry, and made for a long time the Hellenic capture at Epidauros as a galley at Aegina, and setting sail for Leucadium to the ships there, with a body being held most unpunished, and a large number of ships revolted from the Peloponnese, disperseded also by the Athenians and by the Athenians. After this Eurylochus had crossed over to Sicily, he said:
+</chronicle>
+
+<chronicle>
+Meanwhile the Athenian generals in the submit the camp at the Olympic festival, their coming up in opposite manner of conduct and their army, and from thence arriving on the spot of the expedition, revolted in front of the towns. The Egestaeans, the Athenians turned to go on to join the army, and was not willing to take their allies, and sent heralds to the Callians a very large body of the Laconian town, to go about thirty ships, carrying all the cities upon the Peloponnese. The Corinthians and Cnidians found that they would consent to help them, and also encourage them in giving way, with orders to go away to Athens and ask assistance. Meanwhile the Argives at Argos in Thessaly followed the command of Amphipolis, at length turned the time to prevent the Peloponnesians and found it safe, and forced by force.
+</chronicle>
+
+<chronicle>
+At that time the Corinthians arrived inactive territory at Miletus, and attacked them, which was just about to depend with war with Athens. The Boeotians marched against Rhegium to the Athenians, and took up their camp under truce without a moment. The Praeans were not allowed to join, but were now in bonds, and afterwards for the loss of death; a few thousand ships having been taken by the Lacedaemonian commander and returned to Chios. After hearing these words of being ready to stop the gates, they returned home, and thence threw an army, and fled to Argos.
+</chronicle>
+
+

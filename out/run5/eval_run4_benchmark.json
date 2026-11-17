@@ -1,0 +1,20 @@
+{
+ "/kaggle/input/datasets/danieltgregory/arcadia-run4-model/run4_best.pt": {
+  "dream": 1.5388,
+  "myth": 1.5377,
+  "saga": 1.5091,
+  "tale": 1.538,
+  "overall": 1.5325,
+  "chars": 1455058,
+  "params_m": 13.8
+ },
+ "/kaggle/working/run5/best.pt": {
+  "dream": 1.3579,
+  "myth": 1.408,
+  "saga": 1.3338,
+  "tale": 1.382,
+  "overall": 1.3792,
+  "chars": 1453767,
+  "params_m": 29.4
+ }
+}

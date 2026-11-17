@@ -1,0 +1,13 @@
+{
+ "/kaggle/working/run5/best.pt": {
+  "chronicle": 1.3048,
+  "dream": 1.3968,
+  "myth": 1.3711,
+  "poem": 1.7558,
+  "tale": 1.4238,
+  "wisdom": 1.4298,
+  "overall": 1.4328,
+  "chars": 3655220,
+  "params_m": 29.4
+ }
+}
