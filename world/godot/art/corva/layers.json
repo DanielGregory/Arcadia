@@ -1,0 +1,47 @@
+{
+ "source": "assets/canonical/corva.png",
+ "size": [
+  1344,
+  768
+ ],
+ "cuts": [
+  0.03,
+  0.13,
+  0.4
+ ],
+ "horizon_y": 417,
+ "layers": [
+  {
+   "index": 0,
+   "name": "sky_sea",
+   "file": "layer_0_sky_sea.png",
+   "parallax": 0.02,
+   "coverage": 0.402
+  },
+  {
+   "index": 1,
+   "name": "far",
+   "file": "layer_1_far.png",
+   "parallax": 0.08,
+   "coverage": 0.131
+  },
+  {
+   "index": 2,
+   "name": "mid",
+   "file": "layer_2_mid.png",
+   "parallax": 0.25,
+   "coverage": 0.272
+  },
+  {
+   "index": 3,
+   "name": "near",
+   "file": "layer_3_near.png",
+   "parallax": 0.6,
+   "coverage": 0.196
+  }
+ ],
+ "sun": [
+  220,
+  334
+ ]
+}

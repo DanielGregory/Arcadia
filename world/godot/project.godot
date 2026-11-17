@@ -1,0 +1,26 @@
+; Arcadia: the living painting of Corva (Godot 4.4).
+; Open this folder in the Godot editor, or export headlessly:
+;   godot --headless --path world/godot --export-release "Web" ../../site/world/index.html
+
+config_version=5
+
+[application]
+
+config/name="Arcadia: Corva"
+config/description="Corva as a living painting: depth layers, drifting light, shimmering water."
+run/main_scene="res://scenes/corva.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1344
+window/size/viewport_height=768
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=6
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.08, 0.07, 0.06, 1)

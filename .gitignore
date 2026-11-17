@@ -29,3 +29,7 @@ checkpoints/
 
 # Generated images (downloaded from Kaggle runs)
 assets/generated/
+
+# Godot editor cache (regenerated on import)
+world/godot/.godot/
+*.import
