@@ -4,15 +4,16 @@
  "run": "run4",
  "seed": 20261117,
  "device": "cuda",
- "raw": "I am in a wheelchair. We are waiting for a playball game. I go down and ask the guy to come in. I need to use my skele with him. He says it's a good picture and he thinks it's so bad that I get rid of the keys so we are going to keep me mad at the point. He then asks me if he hadn't seen me anymore than he does. I say, \"Did you know the 'mar?\" He laughs very friendly and flips out. He says, \"This, that's what you do do like?\" Then I ask, \"Go home.\"",
- "as_remembered": "I am in a wheelchair. We are waiting for a playball game. I go down and ask the guy to come in. I need to use my skeleton with him. He says it's a good picture and he thinks it's so bad that I get rid of the keys so we are going to keep me mad at the point. He then asks me if he hadn't seen me anymore than he does. I say, \"Did you know the 'mar?\" He laughs very friendly and flips out. He says, \"This, that's what you do do like?\" Then I ask, \"Go home.\"",
- "opening": "",
- "chosen": 1,
- "painting_prompt": "A wheelchair-bound figure waits for a playball game, the sun setting over a Mediterranean shore, casting long shadows on ancient stone walls. Inside, a man offers to use his skeleton, but the wheelchair-bound person refuses, saying it's a good picture. He then asks if the",
- "painting_prompt_2": "dreamlike oil painting in the manner of Claude Lorrain, warm golden haze, soft light: A wheelchair-bound figure waits for a playball game, the sun setting over a Mediterranean shore, casting long shadows on ancient stone walls. Inside, a man offers to use his skeleton, but the wheelchair-bound person refuses, saying it's a good picture. He then asks if the",
+ "raw": "Last night I dreamed of the stairway up to the temple, and I was chasing the cloud. And then I woke up because I would touch it, and I woke up and I heard the lights coming down and were coming up to me, and we were down from the street. And I remember, and there was a desert named Lanese on my shoulders and they were going to sleep. And we were standing on an unknown street in the town, and were walking all around there. And there we were all swimming on one of them. And I think there were like in the city that my house, and there were my dreams like Aunt P---Elender-in-Captown, my mother was with the only one with the two different boys; this dream was very good.",
+ "as_remembered": "Last night I dreamed of the stairway up to the temple, and I was chasing the cloud. And then I woke up because I would touch it, and I woke up and I heard the lights coming down and were coming up to me, and we were down from the street. And I remember, and there was a desert named Lanese on my shoulders and they were going to sleep. And we were standing on an unknown street in the town, and were walking all around there. And there we were all swimming on one of them. And I think there were like in the city that my house, and there were my dreams like Aunt P---Elender-in-Captown, my mother was with the only one with the two different boys; this dream was very good.",
+ "opening": "Last night I dreamed of the stairway up to the temple, and",
+ "chosen": 4,
+ "painting_prompt": "Stairway temple, cloud chaser, desert Lanese, lights swim, city house, dreams float, mother twins boys",
+ "paint_model": "Qwen/Qwen2.5-3B-Instruct",
+ "painting_prompt_2": "surreal dreamlike oil painting, impossible scene, visible brushstrokes, glowing light: Stairway temple, cloud chaser, desert Lanese, lights swim, city house, dreams float, mother twins boys",
  "negative_prompt": "text, letters, watermark, signature, frame, border, photograph, modern buildings, cars, grey, washed out, blurry, deformed hands, extra limbs",
  "steps": 30,
- "ip_scale": 0.7,
+ "ip_scale": 0.4,
  "style_reference": "assets/canonical/corva.png",
  "painted": true,
  "settings": {
@@ -23,110 +24,227 @@
  "edit": {
   "attempts": [
    {
-    "candidate": 1,
-    "retention": 0.969,
-    "added": 0.031,
+    "candidate": 4,
+    "retention": 1.0,
+    "added": 0.0,
     "length_ratio": 1.0,
     "flagged": false,
-    "as_remembered": "I am in a wheelchair. We are waiting for a playball game. I go down and ask the guy to come in. I need to use my skeleton with him. He says it's a good picture and he thinks it's so bad that I get rid of the keys so we are going to keep me mad at the point. He then asks me if he hadn't seen me anymore than he does. I say, \"Did you know the 'mar?\" He laughs very friendly and flips out. He says, \"This, that's what you do do like?\" Then I ask, \"Go home.\""
+    "as_remembered": "Last night I dreamed of the stairway up to the temple, and I was chasing the cloud. And then I woke up because I would touch it, and I woke up and I heard the lights coming down and were coming up to me, and we were down from the street. And I remember, and there was a desert named Lanese on my shoulders and they were going to sleep. And we were standing on an unknown street in the town, and were walking all around there. And there we were all swimming on one of them. And I think there were like in the city that my house, and there were my dreams like Aunt P---Elender-in-Captown, my mother was with the only one with the two different boys; this dream was very good."
    }
   ]
  },
  "candidates": [
   {
-   "i": 1,
-   "seed": 2026111701,
-   "opening": "",
+   "i": 4,
+   "seed": 2026111704,
+   "opening": "Last night I dreamed of the stairway up to the temple, and",
    "closed": true,
-   "text": "I am in a wheelchair. We are waiting for a playball game. I go down and ask the guy to come in. I need to use my skele with him. He says it's a good picture and he thinks it's so bad that I get rid of the keys so we are going to keep me mad at the point. He then asks me if he hadn't seen me anymore than he does. I say, \"Did you know the 'mar?\" He laughs very friendly and flips out. He says, \"This, that's what you do do like?\" Then I ask, \"Go home.\"",
-   "words": 101,
-   "distinct_trigrams": 1.0,
+   "text": "Last night I dreamed of the stairway up to the temple, and I was chasing the cloud. And then I woke up because I would touch it, and I woke up and I heard the lights coming down and were coming up to me, and we were down from the street. And I remember, and there was a desert named Lanese on my shoulders and they were going to sleep. And we were standing on an unknown street in the town, and were walking all around there. And there we were all swimming on one of them. And I think there were like in the city that my house, and there were my dreams like Aunt P---Elender-in-Captown, my mother was with the only one with the two different boys; this dream was very good.",
+   "words": 134,
+   "distinct_trigrams": 0.985,
    "copied_words": 5,
-   "copied_run": "I am in a wheelchair.",
-   "modern": [],
-   "score": 3.981
-  },
-  {
-   "i": 11,
-   "seed": 2026111711,
-   "opening": "When the gods came down to the market at Corva,",
-   "closed": true,
-   "text": "When the gods came down to the market at Corva, there he met his name and left the rest of the gods, who at once did not appear. I walked through the highest marshes for a long while when men had come down from the city, where they would not go to the rest of cities, and every man knew of them but came back to me to Barnithpidwath. And then I saw strange tales that the people had done with all their houses in one of the marble, and from far away in the city we remembered as the gods that so called the birds, playing all forgotten gods and might be heard before all cities.\n\nAnd I read, because the prophets said:",
-   "words": 124,
-   "distinct_trigrams": 0.992,
-   "copied_words": 5,
-   "copied_run": "had come down from the",
-   "modern": [],
-   "score": 3.98
-  },
-  {
-   "i": 10,
-   "seed": 2026111710,
-   "opening": "In the dream the gods of Corva were sleeping, and",
-   "closed": true,
-   "text": "In the dream the gods of Corva were sleeping, and my mother got out and I went into the building and she did the place. We kept listening to the cave, and we were just happy. There was a child in that chamber next to me and when we saw that it was raining, I felt but there was no noise, and it was like a girl's eyebird hair. She was coming down and I looked over her face and went inside me. I said she had sex and I was dumb.",
-   "words": 92,
-   "distinct_trigrams": 1.0,
-   "copied_words": 5,
-   "copied_run": "and it was like a",
-   "modern": [],
-   "score": 3.972
+   "copied_run": "one of them. And I",
+   "modern": [
+    "street"
+   ],
+   "score": 9.186,
+   "coherence": 5.23
   },
   {
    "i": 2,
    "seed": 2026111702,
-   "opening": "The old shepherd told me of a tomb in the olive grove where",
+   "opening": "The gods met on the mountain above the city and",
    "closed": true,
-   "text": "The old shepherd told me of a tomb in the olive grove where the leaves are famed for; but when I was aware that they must take to your own country, I would have thought of it. To whom a present looks came in, and will give a tender-stained waters, or to the voice of a son-in-law, that there is a mother born to the one who has a wife to a royal kingdom? And who had always been she one of her young son, now he has said for her mother’s only son, was so greatly delighted with his presence, as soon as he has taken possession of the winds, when the sun comes over and he may be born to heaven, and a full woman, and at last he has done everything but marrying no more, and even now he will know who is and come back again.”",
-   "words": 150,
+   "text": "The gods met on the mountain above the city and the throne, and took his orders to go up to their city. The people were left behind it, but they knew they had been old in the great desert, but when they saw that the poet fell asleep. They said:\n\n\"We were three,\" I answered.\n\nAnd then the smoke came out to one of the Sea of the river, where the grey land had fallen in the plains, and there was no long caring.",
+   "words": 84,
+   "distinct_trigrams": 1.0,
+   "copied_words": 6,
+   "copied_run": "but when they saw that the",
+   "modern": [],
+   "score": 8.714,
+   "coherence": 4.45
+  },
+  {
+   "i": 21,
+   "seed": 2026111721,
+   "opening": "In Corva, the city by the sea, I dreamed that the gods",
+   "closed": true,
+   "text": "In Corva, the city by the sea, I dreamed that the gods had been no more a certain miracle, and had taught me the Sea, because it was that all my city was, as well as the gods and mist. I heard the voices of Yahn, and none of Azungnees laughed on him and saw no one or revealed the top as he could see him. All my sails came to the South and entered the gate of Sidono, with drifting through the desert of the mountain; and now the River camelining across the street and across the streets, for there stood others with other princes, but still I knew not how to do with Their hills. And they listened to the people and there was no longer a city, and when he came towards the portent temple of the carved of men, we had often seen him through the plains, and would have found his mind, and have so shaken the sailors that the gods feared by him the game of the sun.",
+   "words": 174,
+   "distinct_trigrams": 0.994,
+   "copied_words": 6,
+   "copied_run": "and there was no longer a",
+   "modern": [
+    "street"
+   ],
+   "score": 8.684,
+   "coherence": 4.75
+  },
+  {
+   "i": 12,
+   "seed": 2026111712,
+   "opening": "When the gods came down to the market at Corva,",
+   "closed": true,
+   "text": "When the gods came down to the market at Corva, they told the new tale of the Sea, and the Prophet of the gods said:\n\n“It is that is the gods have put peace together, and I may keep me fast asleep till I shall see you asleep in my sleep. In spite of this honour they will never come to know how many years are done by night and nights and nights, there lie the people that have gone far away.”",
+   "words": 82,
    "distinct_trigrams": 1.0,
    "copied_words": 5,
-   "copied_run": "to the voice of a",
+   "copied_run": "they will never come to",
    "modern": [],
-   "score": 3.97
+   "score": 8.672,
+   "coherence": 4.41
+  },
+  {
+   "i": 3,
+   "seed": 2026111703,
+   "opening": "In the days before the city, the people of the shore believed that",
+   "closed": true,
+   "text": "In the days before the city, the people of the shore believed that it was Ogo said that they were at some time and when one of the people had a ship in a considerable coal I had to fight on them, but all the others wanted to kill them.",
+   "words": 50,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "when one of the people",
+   "modern": [],
+   "score": 8.537,
+   "coherence": 4.64
+  },
+  {
+   "i": 9,
+   "seed": 2026111709,
+   "opening": "Before there were men in Corva, the gods",
+   "closed": true,
+   "text": "Before there were men in Corva, the gods of Paradium, and I had to enter the city in which they have been crowned with flowers. They called me there and saw them there before they had said. They were red-colored with red threads on silver sandals. Two men were laid in many rows that we could not stir the city into the streets and that knew the monumption of Mr. Sladden was his fancy. He was an old man who gave a most important notice.",
+   "words": 85,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "was an old man who",
+   "modern": [],
+   "score": 8.505,
+   "coherence": 4.24
+  },
+  {
+   "i": 1,
+   "seed": 2026111701,
+   "opening": "The herdsman sat by the fire and spoke of the night the river",
+   "closed": true,
+   "text": "The herdsman sat by the fire and spoke of the night the river and looked up and I was going to play a parking blocks. I told him that his wife would take care of the water, and he told me that it was an inconsociation and gave me one of my son, and I was so trying to try with him to kill him, but in my own earnation I knew he had had just been dead when I woke up for a while before he said something about me. Setting: Me, Jewy, my friend Cara, Sandy, Nu-law, a girl, when we got home from home, my mom, and we were sitting by him with my dad. Feelings and Thoughts: Happy. We were like another one, because we were playing cards.",
+   "words": 132,
+   "distinct_trigrams": 0.992,
+   "copied_words": 6,
+   "copied_run": "he told me that it was",
+   "modern": [],
+   "score": 8.472,
+   "coherence": 4.2
+  },
+  {
+   "i": 14,
+   "seed": 2026111714,
+   "opening": "An old woman by the harbour told the children how the first ship",
+   "closed": true,
+   "text": "An old woman by the harbour told the children how the first shipmen saw, and was swimming in the streets and there were some other people playing on a deck. Then I went to sleep because they did so. One said she had gone by, and I turned out of the people that were just in this town, but I didn't look out. Then I went to see me and I woke up.",
+   "words": 73,
+   "distinct_trigrams": 0.972,
+   "copied_words": 5,
+   "copied_run": "I turned out of the",
+   "modern": [],
+   "score": 8.387,
+   "coherence": 4.19
+  },
+  {
+   "i": 22,
+   "seed": 2026111722,
+   "opening": "My grandmother said that when she was a girl the stars over Corva",
+   "closed": true,
+   "text": "My grandmother said that when she was a girl the stars over Corva, and I didn't think I was trying to get care of him. She said, \"It's now you to be back in the world.\" She said this was my name.",
+   "words": 42,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "I was trying to get",
+   "modern": [],
+   "score": 8.335,
+   "coherence": 4.58
   },
   {
    "i": 6,
    "seed": 2026111706,
    "opening": "",
    "closed": true,
-   "text": "I had a pis and had to go downstairs and the woman, which was gone. She had just come over and I went into a hospital. Then I remember that she was with me and we were standing there for her. I got up and saw something like being or not really interested in her arms, but this one of my other family weren't going to show her is all the Romosy R. I don't know who S. So we were sitting on a couch talking about the other members of them. Interpretation None",
-   "words": 94,
+   "text": "I had a pis and had to go downstairs and the woman, which was gone. She had just come over and I went into a hospital. Then I remember that she was with me and we were standing there for her. I got up and saw something like being or not really interested in her arms, but this one of my other family weren't going to show her is all the Romosy R. I don't know who S. So we were sitting on a couch talking about the other members of them.",
+   "words": 92,
    "distinct_trigrams": 1.0,
    "copied_words": 5,
    "copied_run": "we were sitting on a",
    "modern": [
     "hospital"
    ],
-   "score": 3.674
+   "score": 8.022,
+   "coherence": 4.35
   },
   {
-   "i": 4,
-   "seed": 2026111704,
-   "opening": "An old woman by the harbour told the children how the first ship",
+   "i": 13,
+   "seed": 2026111713,
+   "opening": "",
    "closed": true,
-   "text": "An old woman by the harbour told the children how the first ship had been chasing the Trojans. They said, “Son of Peleus, you will not be left behind my ships, and I will tell them to your own way to me, and we will not draw the city into Ilius for ever, or there is a desert named Minerva. If Jove should have brought a ransom upon you. If you were so far off from Ithaca, you shall throw the fatroom with all sorts of pigs in the gate you will give you another child out of your sheep to your house.”\n\nSo saying the maids who held them a council for them, and the house was wrought by the gates and were filled with torches, whereon Ulysses left the place where it lay the fire. When they had reached their home they sat down in the outer wall of the cloister with great abundance, they laid their hands on the cups of wine and took the body of wine-offerings and set their seats in the fire. When the suitors saw that they had done this, and threw their clothes on their hold of their armour and cables.",
-   "words": 199,
-   "distinct_trigrams": 0.995,
-   "copied_words": 6,
-   "copied_run": "they laid their hands on the",
-   "modern": [],
-   "score": 3.594
+   "text": "I am in the area. It is a Terence (like of mine). My neighbor Jeremy, I have trouble sitting on a table with a bed underground, but a managerickety-T. He seems in my bedroom, like the back door and he's supposed to get a price for me. I ask him why he can just get there, so I know it would be a friend named Chineson or some foreigners. The first one person has sewn cards with books, and also has other various trivests because they had gone home. There is an office building for. I tell him the privacy BJarianoanie Louy Aventureson, my brother Hephen Stephen Redding Nomasan and Doughery Cubba are going to buy a potter with good dealings.",
+   "words": 121,
+   "distinct_trigrams": 1.0,
+   "copied_words": 4,
+   "copied_run": "going to buy a",
+   "modern": [
+    "office"
+   ],
+   "score": 7.959,
+   "coherence": 4.26
   },
   {
-   "i": 9,
-   "seed": 2026111709,
-   "opening": "In the days before the city, the people of the shore believed that",
+   "i": 17,
+   "seed": 2026111717,
+   "opening": "",
    "closed": true,
-   "text": "In the days before the city, the people of the shore believed that I was doing. A man and me were still living, about the house of Mainl, but my dad was there. We walked around a building, which is being the others on the snowing floor next to us. I walked in a very large piece of many doors that we could see them all over the bedroom and they were making smaller. I yelled with his hands, \"Grease'.\" He said he didn't hear the mother and she started trying to get married. We were walking up the road, so we walked out the road. It was going like different people. A woman came through a huge pile of oil. A girl gave her a crowdet and asked her a girl who looked like 'Jen\" (how she had some or 200). The boy tried to take it up the so I took it back to the kitchen and shut it out. I picked it on my coat and was in the pittleness. Then we got stuck in the sling bowl to get away. He was lying behind me and then he started breaking the window to go away.",
-   "words": 199,
+   "text": "I was on a hospital watching a party and everyone appeared in my father's house. One of us came back to me, but he was surprised at him that he had gone with me. I started looking over the steps. It seemed really deep. It was the light next morning. He had a male-looking lady. I thought it was the only one's wife-law and sister were doing so angry because she didn't want her he was thinking she said she would go and bring herself on.",
+   "words": 86,
+   "distinct_trigrams": 0.988,
+   "copied_words": 5,
+   "copied_run": "I thought it was the",
+   "modern": [
+    "hospital"
+   ],
+   "score": 7.862,
+   "coherence": 4.22
+  },
+  {
+   "i": 23,
+   "seed": 2026111723,
+   "opening": "",
+   "closed": true,
+   "text": "I'm in my wheelchair. It's this hotel room, where I get going to swim. I see a long rope that's wrapped on the top of the surface. I look at it and go back into a mountain area which is really dark. I see my cat and I am unroused by it again. He's so much young and bloody. Now I do go there and can't find him and I try to pick him up. I ask him if he has gone away from his right hand. He, \"Did I want him all?\" The man walks on me and says, \"That is a big fellow like you.\" He holds over the paint water. I feel disappointed because the pilotator has a couple of money in the closet. It's going to eat it and grow hard for it.",
+   "words": 137,
    "distinct_trigrams": 1.0,
    "copied_words": 5,
-   "copied_run": "to the kitchen and shut",
+   "copied_run": "I ask him if he",
    "modern": [
-    "kitchen"
+    "hotel",
+    "money"
    ],
-   "score": 3.304
+   "score": 7.673,
+   "coherence": 4.29
+  },
+  {
+   "i": 11,
+   "seed": 2026111711,
+   "opening": "I dreamed I was walking on the shore below Corva and",
+   "closed": true,
+   "text": "I dreamed I was walking on the shore below Corva and there were no curtains. I left the rest of the crowd, but at first I did not know what I was going to do for a while and when I found that I was on a circle where people would stay. All the rest was confused. There was a long time in a room where there were two boys. One girl was throwing a pair of paper into which I couldn't make her. They all held the floor one of the doors, and then she said she would do something on the floor. Then I called the woman, who was sitting next to me. She said she had a big bon. After we got the midel to makeup about 3rd figure out to see each other. I wanted to clean it so I went right into the water, so I could get up. The basin was also stooled around and looked like looking at me. Suddenly I saw a huge car coming over the street and the other people looking out. Then I don't understand what it was.",
+   "words": 189,
+   "distinct_trigrams": 0.995,
+   "copied_words": 6,
+   "copied_run": "for a while and when I",
+   "modern": [
+    "car",
+    "street"
+   ],
+   "score": 7.671,
+   "coherence": 4.2
   },
   {
    "i": 8,
@@ -143,7 +261,92 @@
     "money",
     "school"
    ],
-   "score": 3.059
+   "score": 7.329,
+   "coherence": 4.27
+  },
+  {
+   "i": 18,
+   "seed": 2026111718,
+   "opening": "In the dream the gods of Corva were sleeping, and",
+   "closed": false,
+   "text": "In the dream the gods of Corva were sleeping, and the inhabitants of the city were high and dead. Then I entered a city. It was high, all of them, but I knew, that they were sitting there. I saw a strange city which had been in the city. I was aware that no one was engaged. Suddenly I was about to find a house, but just I said \"Melen's Heed.\" He shook me saying that I did not know, for I felt as though I thought the physician had taken it. I knew I could tell him that he is dead in the night. He thought that I had the same name as before, and I told him that I did not know. And then I walked back to my room and found myself crying bitterly, and it was just OKEPER AND THE LOFIGHT\n\nA Labab Fridge went up to the old house and asked the woman whether she were doing things like. She answered something to her own; and said yes, yet she wanted to go to a place where she was going. There seemed as if she wanted to find out her room that was reading.",
+   "words": 199,
+   "distinct_trigrams": 0.98,
+   "copied_words": 5,
+   "copied_run": "wanted to go to a",
+   "modern": [],
+   "score": 7.164,
+   "coherence": 4.3
+  },
+  {
+   "i": 7,
+   "seed": 2026111707,
+   "opening": "",
+   "closed": true,
+   "text": "I was talking to the bicycle. There were kids in a street where I wanted my book on my desk, but he didn't get my husband. The guy was just saying that all of us would go around, and he could cut out my shirt and said it wasn't working any more. But I went outside, so we got a shower and looked like a big tambane and narrowing majestry. We were going to rotch me and said, \"We don't want.\" We stood by an alien woman with very wading me with a police officer who had accumulated my dreams.",
+   "words": 100,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "I was talking to the",
+   "modern": [
+    "police",
+    "shirt",
+    "shower",
+    "street"
+   ],
+   "score": 7.16,
+   "coherence": 4.38
+  },
+  {
+   "i": 15,
+   "seed": 2026111715,
+   "opening": "",
+   "closed": false,
+   "text": "There were a little nude about the bridge. I had a curb on it and then saw two men come to the other side. Then I was really anxious to remember where I realized I should know the game was sitting there too much more than before. They had a good deal and just then there were many kind of different viles of things like that. I got them in an open one. One of these girls came and he fell down from him. He looked out at me and tried to pick up a budy hair like the glasses were all covered with pictures. My mother wanted to figure out of the ball. I said, \"You didn't have no needies?\" We went around and they were coming into the car and they started walking around and were running around, so the stuff were sort of people. This was probably the only part of the book, but it wasn't there, but the time because it was 92:0-450, and I couldn't see it. And then I realized we wouldn't find it, though it's so we didn't think about that; so it would get something like that, and I still remember my dream myself.",
+   "words": 202,
+   "distinct_trigrams": 0.995,
+   "copied_words": 6,
+   "copied_run": "to the other side. Then I",
+   "modern": [
+    "car"
+   ],
+   "score": 6.681,
+   "coherence": 4.44
+  },
+  {
+   "i": 10,
+   "seed": 2026111710,
+   "opening": "",
+   "closed": false,
+   "text": "I am going to take a piece of copper-stones. I wonder if I can't see it, but the lane can start to get away. I see my cat and my classmate Threams. We don't know how much we could make it? He asks me, \"We are going home here?\" Then he says, \"Well, no, I want you for the same time.\" I said, \"Is the muddle. We used to do this?\" But he turned back into the kitchen and went outside. He was in the morning, and I think it's so bad that I had a big store store which lives on it, and I would buy my cup and I were with my right arm for the second but I saw myself, or see Mrs.S is there to be a clerk or something like. She says, \"You really might have to take us.\" I laugh and say, \"It's a good deal so can be good, maybe you'll want to get to work this cape.\" He suggests, but I am very frustrated. We decide to use our hallway and get up to the bathroom in someplace and take away.",
+   "words": 189,
+   "distinct_trigrams": 1.0,
+   "copied_words": 6,
+   "copied_run": "I am going to take a",
+   "modern": [
+    "bathroom",
+    "kitchen",
+    "store"
+   ],
+   "score": 6.061,
+   "coherence": 4.18
+  },
+  {
+   "i": 19,
+   "seed": 2026111719,
+   "opening": "",
+   "closed": false,
+   "text": "I have a large store and look out. I decide to go up to the room, that she might be alive or not moving out in her alarm. It's almost extremely important, but I can't seem so big I can't see her if she looks at me, because it doesn't seem to be more vigor. I feel very frustrated at her for taking some of my job, either after anyone else, or someone else is boring to take my duty. So I try to do something in what she had been interested in. I thought I was afraid of love with any other people. But then it seemed to have something to happen with me because I wanted to be happy about it. So I went into the house and found it again. I heard two boys and were playing on the tables, one of them and there were a others talking. I said \"It's something tomorrow, you know I should all stay here.\" The place next day I was walking outside the houses, but when I saw the people so they were waiting and I was walking around with them. I turned towards the game and when the room was like one of the animals were left and they started chasing us.",
+   "words": 213,
+   "distinct_trigrams": 0.995,
+   "copied_words": 6,
+   "copied_run": "with me because I wanted to",
+   "modern": [
+    "job",
+    "store"
+   ],
+   "score": 6.027,
+   "coherence": 4.28
   },
   {
    "i": 0,
@@ -159,50 +362,51 @@
    "score": null
   },
   {
-   "i": 3,
-   "seed": 2026111703,
-   "opening": "",
-   "closed": true,
-   "text": "I am going to a building but we were at the booths and there are things I know the way in a bathroom. I tell myself that I know about how it might happen. It is also. We go over a pillow with a man in his face. I see Dwight and his head is loose. He looks at me. He agrees. I feel afraid he can do something for him. He says no. I say he'll really give me my name.\" We are walking around a bench where our men want to get up. They are in the streets, including a small one. There are lots of men, and some people and women. I don't think they would be married. I open the corner and see them I thought I was standing down. Then my mother (E2) had been running for me. [BL]",
-   "words": 144,
-   "distinct_trigrams": 1.0,
-   "copied_words": 5,
-   "copied_run": "He says no. I say",
-   "rejected": "bracket marker",
-   "score": null
-  },
-  {
    "i": 5,
    "seed": 2026111705,
-   "opening": "",
+   "opening": "The old shepherd told me of a tomb in the olive grove where",
    "closed": true,
-   "text": "I was in a big bed, very high-looking and most of shiny years old. I had my attention to another lady who I had roommates. As I went back the door, I knocked at her knees and yelled.",
-   "words": 38,
+   "text": "The old shepherd told me of a tomb in the olive grove where the green fields are thick and painted with diamonds and gold and silver.",
+   "words": 26,
    "distinct_trigrams": 1.0,
-   "copied_words": 5,
-   "copied_run": "I was in a big",
+   "copied_words": 3,
+   "copied_run": "gold and silver.",
    "rejected": "too short",
    "score": null
   },
   {
-   "i": 7,
-   "seed": 2026111707,
-   "opening": "The herdsman sat by the fire and spoke of the night the river",
+   "i": 16,
+   "seed": 2026111716,
+   "opening": "",
    "closed": true,
-   "text": "The herdsman sat by the fire and spoke of the night the river. I stopped and stood there with a raft of kids in the street where I had been alive when my friends, he was dead.",
-   "words": 37,
+   "text": "Massan Biger's house. I go out to the room and look at me. I say, \"No,\" I say, \"I'm rather interested in a bibbel. You can just hear that our old book.\" Then I am annoyed.",
+   "words": 36,
    "distinct_trigrams": 1.0,
-   "copied_words": 4,
-   "copied_run": "I had been alive",
+   "copied_words": 5,
+   "copied_run": "I go out to the",
+   "rejected": "too short",
+   "score": null
+  },
+  {
+   "i": 20,
+   "seed": 2026111720,
+   "opening": "",
+   "closed": true,
+   "text": "It was a New Yater, I can't see things. As it was early, I knew this has been to be my age if I did not know how to sleep.",
+   "words": 30,
+   "distinct_trigrams": 1.0,
+   "copied_words": 6,
+   "copied_run": "I did not know how to",
    "rejected": "too short",
    "score": null
   }
  ],
  "timings_s": {
-  "dream": 18.9,
-  "remember": 66.1,
-  "paint": 139.5,
-  "total": 241.9
+  "dream": 35.9,
+  "remember": 101.9,
+  "paint": 136.9,
+  "total": 299.4
  },
- "gpu_minutes": 4.7
+ "gpu_minutes": 5.6,
+ "note": "Replaced the first Morning 1 (the wheelchair dream) at the dreamer's request: first run with the coherence judge and surreal paintings."
 }
