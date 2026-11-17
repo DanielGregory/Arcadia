@@ -1,0 +1,208 @@
+{
+ "day": "2026-11-17",
+ "number": 1,
+ "run": "run4",
+ "seed": 20261117,
+ "device": "cuda",
+ "raw": "I am in a wheelchair. We are waiting for a playball game. I go down and ask the guy to come in. I need to use my skele with him. He says it's a good picture and he thinks it's so bad that I get rid of the keys so we are going to keep me mad at the point. He then asks me if he hadn't seen me anymore than he does. I say, \"Did you know the 'mar?\" He laughs very friendly and flips out. He says, \"This, that's what you do do like?\" Then I ask, \"Go home.\"",
+ "as_remembered": "I am in a wheelchair. We are waiting for a playball game. I go down and ask the guy to come in. I need to use my skeleton with him. He says it's a good picture and he thinks it's so bad that I get rid of the keys so we are going to keep me mad at the point. He then asks me if he hadn't seen me anymore than he does. I say, \"Did you know the 'mar?\" He laughs very friendly and flips out. He says, \"This, that's what you do do like?\" Then I ask, \"Go home.\"",
+ "opening": "",
+ "chosen": 1,
+ "painting_prompt": "A wheelchair-bound figure waits for a playball game, the sun setting over a Mediterranean shore, casting long shadows on ancient stone walls. Inside, a man offers to use his skeleton, but the wheelchair-bound person refuses, saying it's a good picture. He then asks if the",
+ "painting_prompt_2": "dreamlike oil painting in the manner of Claude Lorrain, warm golden haze, soft light: A wheelchair-bound figure waits for a playball game, the sun setting over a Mediterranean shore, casting long shadows on ancient stone walls. Inside, a man offers to use his skeleton, but the wheelchair-bound person refuses, saying it's a good picture. He then asks if the",
+ "negative_prompt": "text, letters, watermark, signature, frame, border, photograph, modern buildings, cars, grey, washed out, blurry, deformed hands, extra limbs",
+ "steps": 30,
+ "ip_scale": 0.7,
+ "style_reference": "assets/canonical/corva.png",
+ "painted": true,
+ "settings": {
+  "temperature": 0.9,
+  "top_p": 0.9,
+  "repetition_penalty": 1.1
+ },
+ "edit": {
+  "attempts": [
+   {
+    "candidate": 1,
+    "retention": 0.969,
+    "added": 0.031,
+    "length_ratio": 1.0,
+    "flagged": false,
+    "as_remembered": "I am in a wheelchair. We are waiting for a playball game. I go down and ask the guy to come in. I need to use my skeleton with him. He says it's a good picture and he thinks it's so bad that I get rid of the keys so we are going to keep me mad at the point. He then asks me if he hadn't seen me anymore than he does. I say, \"Did you know the 'mar?\" He laughs very friendly and flips out. He says, \"This, that's what you do do like?\" Then I ask, \"Go home.\""
+   }
+  ]
+ },
+ "candidates": [
+  {
+   "i": 1,
+   "seed": 2026111701,
+   "opening": "",
+   "closed": true,
+   "text": "I am in a wheelchair. We are waiting for a playball game. I go down and ask the guy to come in. I need to use my skele with him. He says it's a good picture and he thinks it's so bad that I get rid of the keys so we are going to keep me mad at the point. He then asks me if he hadn't seen me anymore than he does. I say, \"Did you know the 'mar?\" He laughs very friendly and flips out. He says, \"This, that's what you do do like?\" Then I ask, \"Go home.\"",
+   "words": 101,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "I am in a wheelchair.",
+   "modern": [],
+   "score": 3.981
+  },
+  {
+   "i": 11,
+   "seed": 2026111711,
+   "opening": "When the gods came down to the market at Corva,",
+   "closed": true,
+   "text": "When the gods came down to the market at Corva, there he met his name and left the rest of the gods, who at once did not appear. I walked through the highest marshes for a long while when men had come down from the city, where they would not go to the rest of cities, and every man knew of them but came back to me to Barnithpidwath. And then I saw strange tales that the people had done with all their houses in one of the marble, and from far away in the city we remembered as the gods that so called the birds, playing all forgotten gods and might be heard before all cities.\n\nAnd I read, because the prophets said:",
+   "words": 124,
+   "distinct_trigrams": 0.992,
+   "copied_words": 5,
+   "copied_run": "had come down from the",
+   "modern": [],
+   "score": 3.98
+  },
+  {
+   "i": 10,
+   "seed": 2026111710,
+   "opening": "In the dream the gods of Corva were sleeping, and",
+   "closed": true,
+   "text": "In the dream the gods of Corva were sleeping, and my mother got out and I went into the building and she did the place. We kept listening to the cave, and we were just happy. There was a child in that chamber next to me and when we saw that it was raining, I felt but there was no noise, and it was like a girl's eyebird hair. She was coming down and I looked over her face and went inside me. I said she had sex and I was dumb.",
+   "words": 92,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "and it was like a",
+   "modern": [],
+   "score": 3.972
+  },
+  {
+   "i": 2,
+   "seed": 2026111702,
+   "opening": "The old shepherd told me of a tomb in the olive grove where",
+   "closed": true,
+   "text": "The old shepherd told me of a tomb in the olive grove where the leaves are famed for; but when I was aware that they must take to your own country, I would have thought of it. To whom a present looks came in, and will give a tender-stained waters, or to the voice of a son-in-law, that there is a mother born to the one who has a wife to a royal kingdom? And who had always been she one of her young son, now he has said for her mother’s only son, was so greatly delighted with his presence, as soon as he has taken possession of the winds, when the sun comes over and he may be born to heaven, and a full woman, and at last he has done everything but marrying no more, and even now he will know who is and come back again.”",
+   "words": 150,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "to the voice of a",
+   "modern": [],
+   "score": 3.97
+  },
+  {
+   "i": 6,
+   "seed": 2026111706,
+   "opening": "",
+   "closed": true,
+   "text": "I had a pis and had to go downstairs and the woman, which was gone. She had just come over and I went into a hospital. Then I remember that she was with me and we were standing there for her. I got up and saw something like being or not really interested in her arms, but this one of my other family weren't going to show her is all the Romosy R. I don't know who S. So we were sitting on a couch talking about the other members of them. Interpretation None",
+   "words": 94,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "we were sitting on a",
+   "modern": [
+    "hospital"
+   ],
+   "score": 3.674
+  },
+  {
+   "i": 4,
+   "seed": 2026111704,
+   "opening": "An old woman by the harbour told the children how the first ship",
+   "closed": true,
+   "text": "An old woman by the harbour told the children how the first ship had been chasing the Trojans. They said, “Son of Peleus, you will not be left behind my ships, and I will tell them to your own way to me, and we will not draw the city into Ilius for ever, or there is a desert named Minerva. If Jove should have brought a ransom upon you. If you were so far off from Ithaca, you shall throw the fatroom with all sorts of pigs in the gate you will give you another child out of your sheep to your house.”\n\nSo saying the maids who held them a council for them, and the house was wrought by the gates and were filled with torches, whereon Ulysses left the place where it lay the fire. When they had reached their home they sat down in the outer wall of the cloister with great abundance, they laid their hands on the cups of wine and took the body of wine-offerings and set their seats in the fire. When the suitors saw that they had done this, and threw their clothes on their hold of their armour and cables.",
+   "words": 199,
+   "distinct_trigrams": 0.995,
+   "copied_words": 6,
+   "copied_run": "they laid their hands on the",
+   "modern": [],
+   "score": 3.594
+  },
+  {
+   "i": 9,
+   "seed": 2026111709,
+   "opening": "In the days before the city, the people of the shore believed that",
+   "closed": true,
+   "text": "In the days before the city, the people of the shore believed that I was doing. A man and me were still living, about the house of Mainl, but my dad was there. We walked around a building, which is being the others on the snowing floor next to us. I walked in a very large piece of many doors that we could see them all over the bedroom and they were making smaller. I yelled with his hands, \"Grease'.\" He said he didn't hear the mother and she started trying to get married. We were walking up the road, so we walked out the road. It was going like different people. A woman came through a huge pile of oil. A girl gave her a crowdet and asked her a girl who looked like 'Jen\" (how she had some or 200). The boy tried to take it up the so I took it back to the kitchen and shut it out. I picked it on my coat and was in the pittleness. Then we got stuck in the sling bowl to get away. He was lying behind me and then he started breaking the window to go away.",
+   "words": 199,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "to the kitchen and shut",
+   "modern": [
+    "kitchen"
+   ],
+   "score": 3.304
+  },
+  {
+   "i": 8,
+   "seed": 2026111708,
+   "opening": "",
+   "closed": true,
+   "text": "There is a long time sitting in the school. I am aware I'm not the dream. She is smiling and Thoughts: Happy. Then I get to bed, only it's my old dress. In this I notice that we have gone to put over my computer - A \"well.\" I say, \"I'll use this glass of money.\" I say \"How do you want?\" I see a blue woman already with an old grandfathers son. I make love to kiss her.",
+   "words": 79,
+   "distinct_trigrams": 1.0,
+   "copied_words": 4,
+   "copied_run": "I see a blue",
+   "modern": [
+    "computer",
+    "money",
+    "school"
+   ],
+   "score": 3.059
+  },
+  {
+   "i": 0,
+   "seed": 2026111700,
+   "opening": "",
+   "closed": true,
+   "text": "I am in a house, having my class. I hear a a small boat coming up to the bottom of the mud, which is open and I have found it has no lights on it.",
+   "words": 35,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "to the bottom of the",
+   "rejected": "too short",
+   "score": null
+  },
+  {
+   "i": 3,
+   "seed": 2026111703,
+   "opening": "",
+   "closed": true,
+   "text": "I am going to a building but we were at the booths and there are things I know the way in a bathroom. I tell myself that I know about how it might happen. It is also. We go over a pillow with a man in his face. I see Dwight and his head is loose. He looks at me. He agrees. I feel afraid he can do something for him. He says no. I say he'll really give me my name.\" We are walking around a bench where our men want to get up. They are in the streets, including a small one. There are lots of men, and some people and women. I don't think they would be married. I open the corner and see them I thought I was standing down. Then my mother (E2) had been running for me. [BL]",
+   "words": 144,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "He says no. I say",
+   "rejected": "bracket marker",
+   "score": null
+  },
+  {
+   "i": 5,
+   "seed": 2026111705,
+   "opening": "",
+   "closed": true,
+   "text": "I was in a big bed, very high-looking and most of shiny years old. I had my attention to another lady who I had roommates. As I went back the door, I knocked at her knees and yelled.",
+   "words": 38,
+   "distinct_trigrams": 1.0,
+   "copied_words": 5,
+   "copied_run": "I was in a big",
+   "rejected": "too short",
+   "score": null
+  },
+  {
+   "i": 7,
+   "seed": 2026111707,
+   "opening": "The herdsman sat by the fire and spoke of the night the river",
+   "closed": true,
+   "text": "The herdsman sat by the fire and spoke of the night the river. I stopped and stood there with a raft of kids in the street where I had been alive when my friends, he was dead.",
+   "words": 37,
+   "distinct_trigrams": 1.0,
+   "copied_words": 4,
+   "copied_run": "I had been alive",
+   "rejected": "too short",
+   "score": null
+  }
+ ],
+ "timings_s": {
+  "dream": 18.9,
+  "remember": 66.1,
+  "paint": 139.5,
+  "total": 241.9
+ },
+ "gpu_minutes": 4.7
+}
