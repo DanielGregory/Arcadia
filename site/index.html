@@ -67,20 +67,31 @@
   #toast { position: fixed; left: 16px; right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 60;
            background: var(--ink); color: var(--bg); padding: 12px 14px; border-radius: 10px; font-size: 14px; }
   #toast[hidden] { display: none; }
+  .today-head { font: 600 12px/1 Georgia, serif; letter-spacing: .25em; text-transform: uppercase; color: var(--muted); margin: 4px 0 10px; }
+  .downloads { display: flex; gap: 8px; margin-top: 12px; }
+  .downloads a { flex: 1; text-align: center; text-decoration: none; font-size: 15px; font-weight: 600; padding: 11px 0;
+                 border-radius: 10px; border: 1px solid var(--gold); color: var(--gold); background: var(--gold-soft); }
+  .label { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 14px 0 0; }
+  .raw { font: italic 15px/1.55 Georgia, serif; color: var(--muted); margin: 4px 0 0; }
+  .past { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .past .card { margin: 0; }
+  .past .body { padding: 8px 10px 10px; }
 </style>
 </head>
 <body>
 <header>
   <h1>Arcadia · review <a href="/world/" style="float:right;letter-spacing:.15em;color:var(--gold);text-decoration:none">World ↗</a></h1>
   <nav role="tablist">
-    <button role="tab" data-tab="corva" aria-selected="true">Corva</button>
+    <button role="tab" data-tab="today" aria-selected="true">Today</button>
+    <button role="tab" data-tab="corva" aria-selected="false">Corva</button>
     <button role="tab" data-tab="dreams" aria-selected="false">Dreams</button>
     <button role="tab" data-tab="wallpapers" aria-selected="false">Wallpapers</button>
   </nav>
 </header>
 
 <main>
-  <section id="corva"><p class="empty">Loading…</p></section>
+  <section id="today"><p class="empty">Loading…</p></section>
+  <section id="corva" hidden><p class="empty">Loading…</p></section>
   <section id="dreams" hidden><p class="empty">Loading…</p></section>
   <section id="wallpapers" hidden><p class="empty">Loading…</p></section>
 </main>
@@ -96,7 +107,7 @@ const SUPABASE_URL = "https://dbrtvwhslxkdpmuawrgd.supabase.co";
 const SUPABASE_KEY = "sb_publishable_NVNYh69hEq2uJKfWOvlAkg_9RCInRey";
 const STORAGE = `${SUPABASE_URL}/storage/v1/object/public/arcadia/`;
 
-const state = { images: [], dreams: [], filter: "all", run: null };
+const state = { images: [], dreams: [], mornings: [], filter: "all", run: null, day: null };
 
 async function api(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -127,6 +138,41 @@ document.querySelectorAll("nav button").forEach(btn => btn.addEventListener("cli
   window.scrollTo(0, 0);
 }));
 try { const t = localStorage.getItem("arcadia-tab"); if (t) document.querySelector(`nav [data-tab="${t}"]`)?.click(); } catch (_) {}
+
+// ---------------------------------------------------------------- Today
+// One morning wallpaper a day (daily/morning.py). The newest is shown large;
+// tapping an earlier one below brings it up top.
+const fmtDay = d => new Date(d + "T12:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+
+function renderToday() {
+  const el = document.getElementById("today");
+  if (!state.mornings.length) { el.innerHTML = `<p class="empty">No mornings yet. The first arrives after the morning run.</p>`; return; }
+  const m = state.mornings.find(x => x.day === state.day) || state.mornings[0];
+  const meta = m.meta || {};
+  el.innerHTML = `
+    <p class="today-head">Morning ${esc(meta.number ?? "")} · ${esc(fmtDay(m.day))}</p>
+    <article class="card">
+      <img class="wall" src="${imgUrl(m.wallpaper_desktop)}" alt="" data-full="${imgUrl(m.wallpaper_desktop)}">
+      <div class="body">
+        <div class="downloads">
+          <a href="${imgUrl(m.wallpaper_desktop)}" download>Desktop</a>
+          <a href="${imgUrl(m.wallpaper_phone)}" download>Phone</a>
+          <a href="${imgUrl(m.painting)}" download>Painting</a>
+        </div>
+        ${m.remembered ? `<p class="label">As remembered</p><p class="text">${esc(m.remembered)}</p>` : ""}
+        <p class="label">As dreamed</p><p class="${m.remembered ? "raw" : "text"}">${esc(m.raw)}</p>
+        <p class="label">Painting</p><p class="prompt">${esc(m.painting_prompt)}</p>
+        <p class="meta" style="margin-top:12px">${esc(m.run)}${meta.opening ? " · opening: “" + esc(meta.opening) + "”" : " · no opening"}
+          · candidate ${esc(meta.chosen)} of ${esc(meta.candidates?.length ?? "?")}${meta.gpu_minutes != null ? " · " + esc(meta.gpu_minutes) + " GPU min" : ""}</p>
+      </div>
+    </article>
+    ${state.mornings.length > 1 ? `<p class="today-head" style="margin-top:22px">Earlier mornings</p>
+    <div class="past">${state.mornings.filter(x => x !== m).map(x => `
+      <article class="card" data-day="${esc(x.day)}" style="cursor:pointer">
+        <img class="wall" loading="lazy" src="${imgUrl(x.painting)}" alt="" data-day="${esc(x.day)}">
+        <div class="body"><div class="meta" data-day="${esc(x.day)}">Morning ${esc(x.meta?.number ?? "")} · ${esc(fmtDay(x.day))}</div></div>
+      </article>`).join("")}</div>` : ""}`;
+}
 
 // ---------------------------------------------------------------- Corva
 function renderCorva() {
@@ -233,6 +279,7 @@ function renderWallpapers() {
 // ---------------------------------------------------------------- events
 document.querySelector("main").addEventListener("click", e => {
   const t = e.target;
+  if (t.dataset.day) { state.day = t.dataset.day; renderToday(); return window.scrollTo(0, 0); }
   if (t.dataset.full) return openViewer(t.dataset.full);
   if (t.dataset.pick) return pick(t.dataset.pick);
   if (t.dataset.filter) { state.filter = t.dataset.filter; return renderDreams(); }
@@ -250,6 +297,10 @@ document.querySelector("main").addEventListener("focusout", e => {
 
 // ---------------------------------------------------------------- load
 (async () => {
+  // Mornings load on their own, so a problem there never hides the review tabs (and vice versa).
+  api("mornings?select=*&order=day.desc", { headers: { Prefer: "" } })
+    .then(rows => { state.mornings = rows; renderToday(); })
+    .catch(e => { document.getElementById("today").innerHTML = `<p class="empty">Couldn't load: ${esc(e.message)}</p>`; });
   try {
     [state.images, state.dreams] = await Promise.all([
       api("images?select=id,kind,prompt,seed,meta,dream_id,picked&order=id", { headers: { Prefer: "" } }),
@@ -257,7 +308,7 @@ document.querySelector("main").addEventListener("focusout", e => {
     ]);
     renderCorva(); renderDreams(); renderWallpapers();
   } catch (e) {
-    document.querySelectorAll("main section").forEach(s => (s.innerHTML = `<p class="empty">Couldn't load: ${esc(e.message)}</p>`));
+    document.querySelectorAll("main section:not(#today)").forEach(s => (s.innerHTML = `<p class="empty">Couldn't load: ${esc(e.message)}</p>`));
   }
 })();
 </script>

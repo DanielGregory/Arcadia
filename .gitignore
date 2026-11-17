@@ -33,3 +33,6 @@ assets/generated/
 # Godot editor cache (regenerated on import)
 world/godot/.godot/
 *.import
+
+# Morning wallpapers: full output with images (the record is in daily/mornings/)
+out/morning/

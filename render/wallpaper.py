@@ -6,13 +6,17 @@ Layout (top to bottom):
     ── as dreamed ──
     the raw dream, exactly as the model wrote it small italic, faint
 
-The background is a soft sky gradient. Its palette (dawn, morning, dusk or
-night) is picked from a hash of the dream text, so the same dream always gets
-the same sky, with a little film grain and a vignette. The text sizes shrink
-until everything fits.
+The background is either a painting of the dream (the daily morning
+pipeline, daily/morning_job.py) or, without one, a soft sky gradient. The
+painting is scaled to cover the whole screen and the text sits on a frosted
+panel (the painting blurred and darkened beneath it) so it stays readable on
+any picture. The sky's palette (dawn, morning, dusk or night) is picked from a
+hash of the dream text, so the same dream always gets the same sky, with a
+little film grain and a vignette. The text sizes shrink until everything fits.
 
     python -m render.wallpaper --in out/read_test/run2_remembered.json --ids 3 7 14 --out out/wallpapers
     python -m render.wallpaper --in ... --ids 3 --size 1290x2796        # phone (portrait)
+    python -m render.wallpaper --in ... --ids 3 --background painting.png   # painting behind the text
 """
 
 from __future__ import annotations
@@ -95,14 +99,40 @@ def sky(size: tuple[int, int], top: tuple, bottom: tuple, seed: int) -> Image.Im
     return Image.composite(img, dark, mask)
 
 
+def cover(picture: Image.Image, size: tuple[int, int]) -> Image.Image:
+    """Scale and centre-crop a picture so it fills `size` exactly (like CSS background-size: cover)."""
+    w, h = size
+    s = max(w / picture.width, h / picture.height)
+    scaled = picture.convert("RGB").resize((round(picture.width * s), round(picture.height * s)), Image.LANCZOS)
+    left, top = (scaled.width - w) // 2, (scaled.height - h) // 2
+    return scaled.crop((left, top, left + w, top + h))
+
+
+def frosted_panel(img: Image.Image, box: tuple[int, int, int, int], radius: int) -> Image.Image:
+    """Blur and darken the picture inside a rounded box, so text on it is readable."""
+    w, h = img.size
+    blurred = img.filter(ImageFilter.GaussianBlur(max(w, h) / 90))
+    dark = Image.blend(blurred, Image.new("RGB", img.size, (12, 12, 20)), 0.55)
+    mask = Image.new("L", img.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle(box, radius=radius, fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(radius / 3))  # soft edge
+    return Image.composite(dark, img, mask)
+
+
 def render(remembered: str, raw: str, out_path: Path, size=(2560, 1440), number: int | None = None,
-           date: dt.date | None = None, font_path: str | None = None, italic_path: str | None = None) -> str:
-    """Draw one wallpaper; returns the palette name used."""
+           date: dt.date | None = None, font_path: str | None = None, italic_path: str | None = None,
+           background: Image.Image | None = None) -> str:
+    """Draw one wallpaper; returns the palette name used ("painting" with a background picture)."""
     w, h = size
     seed = int(hashlib.sha256(remembered.encode()).hexdigest(), 16)
-    palette = list(PALETTES)[seed % len(PALETTES)]
-    top, bottom, ink, ink2 = PALETTES[palette]
-    img = sky(size, top, bottom, seed)
+    if background is not None:
+        palette = "painting"
+        ink, ink2 = (250, 244, 234), (226, 218, 206)  # warm off-white on the dark panel
+        img = cover(background, size)
+    else:
+        palette = list(PALETTES)[seed % len(PALETTES)]
+        top, bottom, ink, ink2 = PALETTES[palette]
+        img = sky(size, top, bottom, seed)
     draw = ImageDraw.Draw(img)
     font_path = font_path or find_font(SERIF)
     italic_path = italic_path or find_font(SERIF_ITALIC)
@@ -132,6 +162,14 @@ def render(remembered: str, raw: str, out_path: Path, size=(2560, 1440), number:
             break
 
     y = int((h - block_h) / 2 + h * 0.03)
+    if background is not None:
+        # The panel covers the text block with some padding; the header gets its own small one.
+        pad = int(48 * unit)
+        img = frosted_panel(img, (margin_x - pad, y - pad, w - margin_x + pad, y + block_h + pad), int(28 * unit))
+        hw = draw.textlength(spaced, font=header_font)
+        img = frosted_panel(img, (int(w / 2 - hw / 2 - 30 * unit), int(h * 0.07 - 26 * unit),
+                                  int(w / 2 + hw / 2 + 30 * unit), int(h * 0.07 + 26 * unit)), int(20 * unit))
+        draw = ImageDraw.Draw(img)
     draw.text((w / 2, int(h * 0.07)), spaced, font=header_font, fill=ink2, anchor="mm")
 
     for line in main_lines:
@@ -169,7 +207,9 @@ def main() -> None:
     parser.add_argument("--size", default="2560x1440", help="WIDTHxHEIGHT (default desktop 2560x1440)")
     parser.add_argument("--font", help="serif .ttf for the main text")
     parser.add_argument("--font_italic", help="italic .ttf for the raw dream")
+    parser.add_argument("--background", type=Path, help="a painting to put behind the text (instead of the sky)")
     args = parser.parse_args()
+    background = Image.open(args.background) if args.background else None
 
     size = tuple(int(v) for v in args.size.lower().split("x"))
     dreams = {d["n"]: d for d in json.loads(args.inp.read_text(encoding="utf-8"))}
@@ -177,7 +217,7 @@ def main() -> None:
         d = dreams[n]
         out = args.out / f"dream_{n:02d}_{size[0]}x{size[1]}.png"
         palette = render(d["as_remembered"], d["text"], out, size=size, number=n,
-                         font_path=args.font, italic_path=args.font_italic)
+                         font_path=args.font, italic_path=args.font_italic, background=background)
         print(f"wrote {out} ({palette})")
 
 

@@ -48,13 +48,14 @@ def kaggle(*args: str, check: bool = True) -> str:
 
 
 def push(job: dict) -> None:
+    """Upload the notebook as a new version of its Kaggle kernel; Kaggle starts running it straight away."""
     with tempfile.TemporaryDirectory() as tmp:
         shutil.copy(ROOT / job["notebook"], Path(tmp) / Path(job["notebook"]).name)
         meta = {
             "id": f"{USER}/{job['slug']}", "title": job["title"], "code_file": Path(job["notebook"]).name,
             "language": "python", "kernel_type": "notebook", "is_private": "true",
             "enable_gpu": "true", "enable_tpu": "false", "enable_internet": "true", "machine_shape": "NvidiaTeslaT4",
-            "dataset_sources": [], "competition_sources": [], "kernel_sources": [], "model_sources": [],
+            "dataset_sources": job.get("datasets", []), "competition_sources": [], "kernel_sources": [], "model_sources": [],
         }
         (Path(tmp) / "kernel-metadata.json").write_text(json.dumps(meta, indent=1))
         print(kaggle("kernels", "push", "-p", tmp).strip())

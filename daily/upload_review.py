@@ -59,8 +59,15 @@ class Supabase:
         if self.dry_run:
             print(f"  would upload {local.relative_to(ROOT)} -> {BUCKET}/{remote}")
             return
-        r = self.session.post(f"{self.url}/storage/v1/object/{BUCKET}/{remote}", data=local.read_bytes(),
-                              headers={"content-type": "image/png", "x-upsert": "true",
+        self.upload_bytes(local.read_bytes(), remote, "image/png")
+
+    def upload_bytes(self, data: bytes, remote: str, content_type: str) -> None:
+        """Put a file in the bucket, replacing any file already at that path."""
+        if self.dry_run:
+            print(f"  would upload {len(data) // 1024} KB -> {BUCKET}/{remote}")
+            return
+        r = self.session.post(f"{self.url}/storage/v1/object/{BUCKET}/{remote}", data=data,
+                              headers={"content-type": content_type, "x-upsert": "true",
                                        "cache-control": "max-age=300"}, timeout=120)
         r.raise_for_status()
 

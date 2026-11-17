@@ -1,0 +1,337 @@
+"""Phase 1.5: make one morning's dream wallpaper, end to end.
+
+This is the heavy half of the daily pipeline. It runs on Kaggle's GPU
+(notebooks/kaggle_morning.ipynb); the light half, daily/morning.py, launches it
+and publishes what it makes.
+
+    python -m daily.morning_job --ckpt run4_best.pt --train train.txt --out out/morning
+    python -m daily.morning_job ... --no_paint     # CPU test: skip SDXL, use the canonical Corva as the painting
+
+The five steps, all in this one file:
+
+  1. DREAM     run 4 dreams several candidates (half with no opening, half with
+               an opening from the pool below). The day's date is the random
+               seed, so a morning can always be re-made exactly.
+  2. SELECT    every candidate is scored: it should end itself, be a sensible
+               length, not repeat itself, and not copy its training text
+               (12+ words in a row found in train.txt rules it out).
+  3. REMEMBER  the editor model (Qwen2.5-1.5B-Instruct) tidies the best
+               candidates into the "as remembered" version. The first one whose
+               edit passes the retention checks (engine/remember.py) wins; if
+               none pass, the best dream is used raw and the edit is dropped.
+  4. PAINT     the editor condenses the dream into one painting's worth of
+               visible things; SDXL paints it twice (landscape for the desktop,
+               portrait for the phone), with the canonical Corva painting as a
+               STYLE-ONLY reference (InstantStyle) so every morning looks like
+               Arcadia without copying Corva's buildings.
+  5. WALLPAPER render/wallpaper.py sets the text over each painting.
+
+Output, in --out/<date>/:
+    morning.json            everything: candidates, scores, the pick, the edit,
+                            retention, the painting prompt, seeds, timings
+    morning.md              the same, readable
+    painting_desktop.png    1344x768     painting_phone.png     768x1344
+    wallpaper_desktop.png   2560x1440    wallpaper_phone.png    1290x2796
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import gc
+import json
+import random
+import re
+import time
+from pathlib import Path
+
+import torch
+
+from engine.copy_check import FLAG_WORDS, longest_copied_run
+from engine.remember import Rememberer, is_flagged, length_ratio, retention
+from engine.sample import generate_dream, load
+
+ROOT = Path(__file__).resolve().parents[1]
+GENESIS = dt.date(2026, 11, 17)  # morning 1: the first day of Phase 1.5
+STYLE_REFERENCE = "assets/canonical/corva.png"
+
+# Same sampling settings as the run 4 read test.
+SETTINGS = dict(temperature=0.9, top_p=0.9, repetition_penalty=1.1)
+MAX_TOKENS = 250
+
+# Openings the model can be started from (from the read test: storyteller and
+# "the gods" openings gave the most Arcadian dreams). Half the candidates get
+# one; the other half start from nothing and go wherever the model goes.
+OPENINGS = [
+    "The old shepherd told me of a tomb in the olive grove where",
+    "The fisherman's wife said that long ago, before Corva had walls,",
+    "They say that in the hills above Corva there was a well that",
+    "An old woman by the harbour told the children how the first ship",
+    "The herdsman sat by the fire and spoke of the night the river",
+    "In the days before the city, the people of the shore believed that",
+    "The traveller told us of a country beyond the mountains where",
+    "My grandmother said that when she was a girl the stars over Corva",
+    "In Corva, the city by the sea, I dreamed that the gods",
+    "The gods of the harbour were angry, and the sea",
+    "Before there were men in Corva, the gods",
+    "The gods met on the mountain above the city and",
+    "When the gods came down to the market at Corva,",
+    "In the dream the gods of Corva were sleeping, and",
+    "I dreamed I was walking on the shore below Corva and",
+    "Last night I dreamed of the stairway up to the temple, and",
+]
+
+# --- 3. the painting prompt -------------------------------------------------
+PAINT_SYSTEM = """You turn a dream into the description of ONE painting.
+Read the dream and describe a single scene from it that a painter could paint: the place, the main figures or objects, the light and the weather.
+
+Rules:
+- Only things you can SEE. No names, no thoughts, no story, no dialogue, no explanation.
+- Take the images from the dream. You may choose which moment to paint, but do not invent new objects.
+- If the dream has no clear place, set it on a Mediterranean shore or in an ancient hillside town by the sea.
+- One line of plain words, at most 35 words, no full stop at the end.
+Reply with the description only."""
+
+# SDXL has two text encoders, each reading at most 77 tokens. The scene goes
+# into both (the v2 lesson: a scene only in the first encoder gets ignored);
+# the second one also carries the style, FIRST, so it is never cut off.
+STYLE = "dreamlike oil painting in the manner of Claude Lorrain, warm golden haze, soft light"
+NEGATIVE = ("text, letters, watermark, signature, frame, border, photograph, modern buildings, cars, "
+            "grey, washed out, blurry, deformed hands, extra limbs")
+
+
+# Words from the modern world. The dreamers live in Arcadia, so a morning dream
+# about cars and phones (DreamBank is 20th-century American) fits less well.
+# Not banned, just ranked lower: -0.3 per different modern word, up to -1.5.
+MODERN = set("""
+car cars truck bus buses train trains plane airplane airport phone phones telephone television tv radio computer
+internet email cd movie movies film camera photo school schools teacher class classes college university office
+hospital doctor nurse store stores mall supermarket restaurant elevator apartment highway street cop cops police
+gun guns bomb money dollars job boss coffee pizza hotel bathroom shower kitchen refrigerator jeans shirt
+""".split())
+
+
+def words(text: str) -> list[str]:
+    return re.findall(r"[A-Za-z']+", text.lower())
+
+
+def distinct_trigrams(text: str) -> float:
+    """Share of word trigrams that are unique: 1.0 = no repetition; loops score low."""
+    w = words(text)
+    grams = [tuple(w[i:i + 3]) for i in range(len(w) - 2)]
+    return len(set(grams)) / len(grams) if grams else 0.0
+
+
+def junk(text: str) -> str | None:
+    """Corpus leftovers that make a dream unusable (the run 5 cleanup list)."""
+    if re.search(r"\[\s*BL\s*\]|\[|\]", text):
+        return "bracket marker"
+    if re.search(r"(^|\s)\d{2,4}(\s|$)", text):
+        return "stray number (line numbers from a poem?)"
+    return None
+
+
+def score(c: dict, train: str) -> dict:
+    """Score one candidate; higher is better. Rejected candidates get score None.
+
+    The score is deliberately simple and easy to read:
+      +1.0  if the model ended the dream itself (closed its </dream> tag)
+      +2.0 * distinct trigram share (1.0 = no repeated phrases)
+      +1.0  if the length is in the sweet spot (70-180 words), less outside it
+      -0.3  per different modern word (car, school, phone...), at most -1.5
+      -0.001 per word away from 120: only matters as a tie-break
+    """
+    text = c["text"]
+    n = len(text.split())
+    c["words"] = n
+    c["distinct_trigrams"] = round(distinct_trigrams(text), 3)
+    c["copied_words"], c["copied_run"] = longest_copied_run(text, train)
+    reason = junk(text)
+    if n < 40:
+        reason = "too short"
+    elif n > 240:
+        reason = "too long"
+    elif c["copied_words"] >= FLAG_WORDS:
+        reason = f"copies {c['copied_words']} words of its training text"
+    elif c["distinct_trigrams"] < 0.85:
+        reason = "repeats itself"
+    if reason:
+        c["rejected"], c["score"] = reason, None
+        return c
+    fit = 1.0 if 70 <= n <= 180 else max(0.0, 1.0 - min(abs(n - 70), abs(n - 180)) / 60)
+    c["modern"] = sorted(set(words(text)) & MODERN)
+    modern = min(1.5, 0.3 * len(c["modern"]))
+    c["score"] = round(c["closed"] * 1.0 + 2.0 * c["distinct_trigrams"] + fit - modern - abs(n - 120) / 1000, 3)
+    return c
+
+
+def dream(ckpt: str, train: str, n: int, seed: int, device: str) -> list[dict]:
+    """Steps 1 and 2: n candidates, scored, best first."""
+    model, tok, _ = load(ckpt, device)
+    rng = random.Random(seed)
+    openings = rng.sample(OPENINGS, n // 2) + [""] * (n - n // 2)
+    rng.shuffle(openings)
+    out = []
+    for i, opening in enumerate(openings):
+        torch.manual_seed(seed * 100 + i)  # one fixed seed per candidate: reproducible
+        text, closed = generate_dream(model, tok, opening, MAX_TOKENS, device, **SETTINGS)
+        c = score({"i": i, "seed": seed * 100 + i, "opening": opening, "closed": closed, "text": text}, train)
+        out.append(c)
+        print(f"  candidate {i:2d}: {c['words']:3d} words, {'closed' if closed else 'cut   '}, "
+              f"score {c['score'] if c['score'] is not None else 'rejected: ' + c['rejected']}", flush=True)
+    del model
+    return sorted(out, key=lambda c: (c["score"] is not None, c["score"] or 0), reverse=True)
+
+
+def remember_best(editor: Rememberer, ranked: list[dict], tries: int = 3) -> tuple[dict, str | None, dict]:
+    """Step 3: the first of the top candidates whose edit passes the checks."""
+    usable = [c for c in ranked if c["score"] is not None] or ranked[:1]  # never come back empty-handed
+    attempts = []
+    for c in usable[:tries]:
+        edit = editor.remember(c["text"])
+        kept, added = retention(c["text"], edit)
+        check = {"candidate": c["i"], "retention": round(kept, 3), "added": round(added, 3),
+                 "length_ratio": round(length_ratio(c["text"], edit), 3), "flagged": is_flagged(c["text"], edit)}
+        attempts.append({**check, "as_remembered": edit})
+        print(f"  remembered candidate {c['i']}: retention {kept:.0%}, added {added:.0%}, "
+              f"{'FLAGGED' if check['flagged'] else 'ok'}", flush=True)
+        if not check["flagged"]:
+            return c, edit, {"attempts": attempts}
+    # Nothing passed: show the best dream as dreamed, with no edit.
+    return usable[0], None, {"attempts": attempts}
+
+
+def paint(scene: str, seed: int, device: str, steps: int, ip_scale: float) -> dict:
+    """Step 4: SDXL, text to image, with the canonical painting as a style-only reference."""
+    from diffusers import AutoencoderKL, StableDiffusionXLPipeline
+    from PIL import Image
+    from transformers import CLIPVisionModelWithProjection
+
+    from render.generate_images import IP_ADAPTER
+
+    dtype = torch.float16 if device == "cuda" else torch.float32
+    encoder = CLIPVisionModelWithProjection.from_pretrained(IP_ADAPTER["repo"], subfolder=IP_ADAPTER["image_encoder"],
+                                                            torch_dtype=dtype)
+    pipe = StableDiffusionXLPipeline.from_pretrained(
+        "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=dtype, use_safetensors=True,
+        variant="fp16" if device == "cuda" else None, image_encoder=encoder,
+        vae=AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=dtype),
+    ).to(device)
+    pipe.set_progress_bar_config(disable=True)
+    pipe.load_ip_adapter(IP_ADAPTER["repo"], subfolder=IP_ADAPTER["subfolder"], weight_name=IP_ADAPTER["weight_name"])
+    # InstantStyle: the reference feeds only the "style" attention block (up_blocks.0, attention 1),
+    # so the painting borrows Corva's colour and brushwork but not its temples.
+    pipe.set_ip_adapter_scale({"up": {"block_0": [0.0, ip_scale, 0.0]}})
+    reference = Image.open(ROOT / STYLE_REFERENCE).convert("RGB")
+
+    images = {}
+    for name, (w, h) in {"desktop": (1344, 768), "phone": (768, 1344)}.items():
+        t = time.time()
+        images[name] = pipe(
+            prompt=scene, prompt_2=f"{STYLE}: {scene}", negative_prompt=NEGATIVE, negative_prompt_2=NEGATIVE,
+            width=w, height=h, num_inference_steps=steps, guidance_scale=6.5, ip_adapter_image=reference,
+            generator=torch.Generator(device=device).manual_seed(seed),
+        ).images[0]
+        print(f"  painted {name} {w}x{h} in {time.time() - t:.0f}s", flush=True)
+    del pipe
+    return images
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--ckpt", required=True, help="run 4 checkpoint (best.pt)")
+    parser.add_argument("--train", type=Path, required=True, help="data/train.txt, for the copy check")
+    parser.add_argument("--out", type=Path, default=Path("out/morning"))
+    parser.add_argument("--date", help="YYYY-MM-DD (default: today, UTC)")
+    parser.add_argument("--run", default="run4", help="model name recorded with the dream")
+    parser.add_argument("--candidates", type=int, default=12)
+    parser.add_argument("--steps", type=int, default=30)
+    parser.add_argument("--ip_scale", type=float, default=0.7, help="style strength of the Corva reference")
+    parser.add_argument("--no_paint", action="store_true", help="skip SDXL (CPU tests): canonical Corva as the painting")
+    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    args = parser.parse_args()
+
+    from PIL import Image
+
+    from render.wallpaper import render
+
+    day = dt.date.fromisoformat(args.date) if args.date else dt.datetime.now(dt.timezone.utc).date()
+    number = (day - GENESIS).days + 1
+    seed = int(day.strftime("%Y%m%d"))
+    out = args.out / day.isoformat()
+    out.mkdir(parents=True, exist_ok=True)
+    timings = {}
+    t0 = time.time()
+
+    print(f"Morning {number} ({day}), seed {seed}, on {args.device}", flush=True)
+    print("1-2. dreaming and selecting", flush=True)
+    train = args.train.read_text(encoding="utf-8")
+    ranked = dream(args.ckpt, train, args.candidates, seed, args.device)
+    del train
+    timings["dream"] = round(time.time() - t0, 1)
+
+    print("3. remembering", flush=True)
+    t = time.time()
+    editor = Rememberer(device=args.device)
+    chosen, remembered, edit_log = remember_best(editor, ranked)
+    # The painting prompt is written from the remembered text when there is one (it reads better).
+    scene = editor.chat(PAINT_SYSTEM, remembered or chosen["text"], max_new_tokens=80).strip().rstrip(".")
+    scene = " ".join(scene.split()[:45])  # belt and braces: keep it inside the 77-token window
+    print(f"  painting prompt: {scene}", flush=True)
+    del editor
+    gc.collect()
+    if args.device == "cuda":
+        torch.cuda.empty_cache()  # give the GPU back before SDXL arrives
+    timings["remember"] = round(time.time() - t, 1)
+
+    print("4. painting", flush=True)
+    t = time.time()
+    if args.no_paint:
+        corva = Image.open(ROOT / STYLE_REFERENCE).convert("RGB")
+        paintings = {"desktop": corva, "phone": corva}
+    else:
+        paintings = paint(scene, seed, args.device, args.steps, args.ip_scale)
+    for name, img in paintings.items():
+        img.save(out / f"painting_{name}.png")
+    timings["paint"] = round(time.time() - t, 1)
+
+    print("5. wallpapers", flush=True)
+    sizes = {"desktop": (2560, 1440), "phone": (1290, 2796)}
+    for name, size in sizes.items():
+        render(remembered or chosen["text"], chosen["text"], out / f"wallpaper_{name}.png", size=size,
+               number=number, date=day, background=paintings[name])
+    timings["total"] = round(time.time() - t0, 1)
+
+    record = {
+        "day": day.isoformat(), "number": number, "run": args.run, "seed": seed, "device": args.device,
+        "raw": chosen["text"], "as_remembered": remembered, "opening": chosen["opening"],
+        "chosen": chosen["i"], "painting_prompt": scene, "painting_prompt_2": f"{STYLE}: {scene}",
+        "negative_prompt": NEGATIVE, "steps": args.steps, "ip_scale": args.ip_scale,
+        "style_reference": STYLE_REFERENCE, "painted": not args.no_paint, "settings": SETTINGS,
+        "edit": edit_log, "candidates": ranked, "timings_s": timings,
+    }
+    (out / "morning.json").write_text(json.dumps(record, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    (out / "morning.md").write_text(markdown(record), encoding="utf-8")
+    print(f"done in {timings['total']:.0f}s -> {out}", flush=True)
+
+
+def markdown(r: dict) -> str:
+    lines = [f"# Morning {r['number']}: {r['day']}", "",
+             f"Dreamed by {r['run']} (seed {r['seed']}), candidate {r['chosen']} of {len(r['candidates'])}"
+             + (f", opening: *{r['opening']}*" if r["opening"] else ", no opening") + ".", ""]
+    if r["as_remembered"]:
+        lines += ["## As remembered", "", r["as_remembered"], ""]
+    else:
+        lines += ["*(No edit passed the retention checks; the dream is shown as dreamed.)*", ""]
+    lines += ["## As dreamed", "", r["raw"], "", "## Painting", "", f"> {r['painting_prompt']}", "",
+              "## Candidates", "", "| # | words | closed | trigrams | copied | modern | score |", "|---|---|---|---|---|---|---|"]
+    for c in r["candidates"]:
+        s = c["score"] if c["score"] is not None else f"rejected: {c['rejected']}"
+        lines.append(f"| {c['i']} | {c['words']} | {'yes' if c['closed'] else 'no'} | {c['distinct_trigrams']} "
+                     f"| {c['copied_words']} | {', '.join(c.get('modern', []))} | {s} |")
+    lines += ["", f"Timings (s): {r['timings_s']}", ""]
+    return "\n".join(lines)
+
+
+if __name__ == "__main__":
+    main()

@@ -120,27 +120,35 @@ def retention(raw: str, remembered: str) -> tuple[float, float]:
 class Rememberer:
     """Loads the editor model once; .remember(text) returns the tidied dream."""
 
-    def __init__(self, model_id: str = MODEL_ID, threads: int | None = None):
+    def __init__(self, model_id: str = MODEL_ID, threads: int | None = None, device: str = "cpu"):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         if threads:
             torch.set_num_threads(threads)
         self.torch = torch
+        self.device = device
         self.tok = AutoTokenizer.from_pretrained(model_id)
-        self.model = AutoModelForCausalLM.from_pretrained(model_id, dtype=torch.float32)
+        # float16 on a GPU (half the memory, much faster); float32 on a CPU, where float16 is slow.
+        dtype = torch.float16 if device == "cuda" else torch.float32
+        self.model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype).to(device)
         self.model.eval()
 
     def remember(self, dream: str) -> str:
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": dream}]
-        prompt = self.tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        inputs = self.tok(prompt, return_tensors="pt")
         n_in = len(self.tok(dream)["input_ids"])
+        # room for fixes, not for new material
+        return self.chat(SYSTEM_PROMPT, dream, max_new_tokens=int(n_in * 1.3) + 40)
+
+    def chat(self, system: str, user: str, max_new_tokens: int = 200) -> str:
+        """One instruction -> one reply, greedy (the most faithful, and repeatable)."""
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        prompt = self.tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        inputs = self.tok(prompt, return_tensors="pt").to(self.device)
         with self.torch.no_grad():
             out = self.model.generate(
                 **inputs,
-                max_new_tokens=int(n_in * 1.3) + 40,  # room for fixes, not for new material
-                do_sample=False,                       # greedy: the most faithful, and repeatable
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
                 repetition_penalty=1.0,
             )
         return self.tok.decode(out[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True).strip()
