@@ -15,12 +15,43 @@ from pathlib import Path
 import requests
 from tqdm import tqdm
 
-# Gutenberg mirrors a book's plain text at several URLs; try them in order.
-URL_PATTERNS = [
-    "https://www.gutenberg.org/cache/epub/{id}/pg{id}.txt",
-    "https://www.gutenberg.org/files/{id}/{id}-0.txt",
-    "https://www.gutenberg.org/files/{id}/{id}.txt",
+# Where to look for a book's plain text, in order. The main site is tried
+# first; if it is down (e.g. for maintenance) the official mirrors run by
+# PGLAF, Project Gutenberg's host, are tried with the same book ID.
+MAIN_SITE = "https://www.gutenberg.org"
+MIRRORS = [
+    "https://gutenberg.pglaf.org",   # PGLAF; serves the same cache/epub files as the main site
+    "https://aleph.gutenberg.org",   # PGLAF's main mirror (its HTTPS certificate was broken in Nov 2026)
 ]
+
+
+def mirror_dir(book_id: int) -> str:
+    """Mirror directory for a book: every digit but the last, then the ID.
+
+    84 -> "8/84", 1727 -> "1/7/2/1727", 21765 -> "2/1/7/6/21765", 5 -> "0/5".
+    """
+    digits = str(book_id)
+    parents = "/".join(digits[:-1]) if len(digits) > 1 else "0"
+    return f"{parents}/{digits}"
+
+
+def candidate_urls(book_id: int) -> list[tuple[str, str]]:
+    """(url, encoding) pairs to try for one book, main site first."""
+    urls = [
+        (f"{MAIN_SITE}/cache/epub/{book_id}/pg{book_id}.txt", "utf-8"),
+        (f"{MAIN_SITE}/files/{book_id}/{book_id}-0.txt", "utf-8"),
+        (f"{MAIN_SITE}/files/{book_id}/{book_id}.txt", "utf-8"),
+    ]
+    for base in MIRRORS:
+        d = mirror_dir(book_id)
+        urls += [
+            (f"{base}/cache/epub/{book_id}/pg{book_id}.txt", "utf-8"),  # same file as the main site
+            (f"{base}/{d}/{book_id}-0.txt", "utf-8"),                    # UTF-8 edition
+            (f"{base}/{d}/{book_id}.txt", "utf-8"),                      # plain-ASCII edition
+            (f"{base}/{d}/{book_id}-8.txt", "latin-1"),                  # 8-bit (Latin-1) edition
+        ]
+    return urls
+
 
 START_RE = re.compile(
     r"^\*{3}\s*START OF (?:THE |THIS )?PROJECT GUTENBERG EBOOK.*?\*{3}\s*$",
@@ -38,17 +69,29 @@ HEADERS = {"User-Agent": "arcadia-data-prep/0.1"}
 
 
 def fetch_raw(book_id: int, session: requests.Session, timeout: float = 30.0) -> str:
-    """Return the raw text of a book, trying each known URL pattern."""
-    last_err: Exception | None = None
-    for pattern in URL_PATTERNS:
-        url = pattern.format(id=book_id)
+    """Return the raw text of a book from the main site, or a mirror if it fails."""
+    last_err: Exception | str | None = None
+    dead_hosts: set[str] = set()  # hosts that are down: skip their other URLs
+    for url, encoding in candidate_urls(book_id):
+        host = url.split("/")[2]
+        if host in dead_hosts:
+            continue
         try:
             resp = session.get(url, timeout=timeout)
-            if resp.status_code == 200 and resp.content:
-                return resp.content.decode("utf-8-sig", errors="replace")
-        except requests.RequestException as err:
+        except requests.RequestException as err:  # connection or TLS failure
             last_err = err
-    raise RuntimeError(f"could not download book {book_id}") from last_err
+            dead_hosts.add(host)
+            continue
+        if resp.status_code >= 500:                # e.g. 503 during maintenance
+            last_err = f"HTTP {resp.status_code} from {url}"
+            dead_hosts.add(host)
+            continue
+        if resp.status_code == 200 and resp.content:
+            if not url.startswith(MAIN_SITE):
+                tqdm.write(f"book {book_id}: main site unavailable, using {url}")
+            return resp.content.decode("utf-8-sig" if encoding == "utf-8" else encoding, errors="replace")
+        last_err = f"HTTP {resp.status_code} from {url}"
+    raise RuntimeError(f"could not download book {book_id} from gutenberg.org or its mirrors ({last_err})")
 
 
 def strip_gutenberg(text: str) -> str:
