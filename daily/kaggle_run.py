@@ -75,24 +75,29 @@ def gpu_minutes(log_path: Path) -> float:
     return max(e["time"] for e in entries) / 60 if entries else 0.0
 
 
-def download(kernel: str, job: dict) -> float:
+def download(kernel: str, job: dict) -> tuple[float, int]:
+    """Copy the run's output folder into job['dest']; return (GPU minutes, files copied)."""
     dest = ROOT / job["dest"]
     with tempfile.TemporaryDirectory() as tmp:
         print(kaggle("kernels", "output", kernel, "-p", tmp, "--force").strip().splitlines()[-1])
         out = Path(tmp)
         log = next(out.glob("*.log"), None)
         src = out / job["output_subdir"]
+        copied = 0
         if src.exists():
             dest.mkdir(parents=True, exist_ok=True)
             for f in src.iterdir():
                 shutil.copy2(f, dest / f.name)
-            print(f"copied {len(list(src.iterdir()))} files to {dest.relative_to(ROOT)}")
+                copied += 1
+            print(f"copied {copied} files to {dest.relative_to(ROOT)}")
         else:
-            print(f"warning: the run produced no {job['output_subdir']}/ folder")
+            print(f"warning: the run produced no {job['output_subdir']}/ folder; check its log")
+        minutes = 0.0
         if log:
-            shutil.copy2(log, dest / "kaggle.log") if dest.exists() else None
-            return gpu_minutes(log)
-    return 0.0
+            minutes = gpu_minutes(log)
+            keep = dest if dest.exists() else ROOT / "out"
+            shutil.copy2(log, keep / f"{job['slug']}.kaggle.log")
+    return minutes, copied
 
 
 def main() -> None:
@@ -114,9 +119,10 @@ def main() -> None:
     if not args.no_push:
         push(job)
     status = wait(kernel)
-    minutes = download(kernel, job)
+    minutes, copied = download(kernel, job)
     print(f"{kernel}: {status} | {minutes:.1f} GPU minutes")
-    if "COMPLETE" in status and job["upload_review"]:
+    # "COMPLETE" only means the notebook ran to the end; only upload if it produced files.
+    if "COMPLETE" in status and copied and job["upload_review"]:
         subprocess.run([sys.executable, str(ROOT / "daily/upload_review.py")], check=True)
 
 
