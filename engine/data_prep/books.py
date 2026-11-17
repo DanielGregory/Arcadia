@@ -183,6 +183,122 @@ BOOKS: tuple[Book, ...] = (
         section=r"(The (Story|Adventures|Seven Voyages|Little Hunchback|Enchanted Horse)\b.*"
                 r"|\w+ Voyage|(Seventh and Last) Voyage|Noureddin.*|Aladdin.*)",
     ),
+    # ------------------------------------------------- CORE, added for run 3
+    Book(
+        2199, "The Iliad", "Homer", "Samuel Butler", CORE,
+        ranges=(Range(r"BOOK I\.", nth=2),),  # the first is in the contents
+        section=rf"BOOK {ROMAN}\.",
+    ),
+    Book(
+        22456, "The Aeneid", "Virgil", "J. W. Mackail (prose)", CORE,
+        ranges=(Range(r"BOOK FIRST", r"NOTES"),),  # skips the preface; stops before the Latin textual notes
+        inline_refs=(r"\[\d+-\d+\]",),             # Mackail's line references: "[20-53]Troy"
+        section=r"BOOK [A-Z]+",
+    ),
+    Book(
+        830, "The Argonautica", "Apollonius of Rhodes", "R. C. Seaton (prose)", CORE,
+        ranges=(Range(r"BOOK I", r"ENDNOTES:", nth=2),),  # skips contents, bibliography and introduction
+        section=rf"BOOK {ROMAN}",
+    ),
+    Book(
+        1666, "The Golden Ass", "Apuleius", "William Adlington (1566)", CORE,
+        ranges=(Range(r"THE FIRST BOOKE", nth=2),),  # skips contents, dedication and Adlington's address
+        inline_refs=(r"[\[\]]",),                    # editor's supplied words "[in]": keep the word
+        section=r"THE [A-Z-]+ (BOOKE|CHAPTER)",
+    ),
+    Book(
+        6585, "A True Story (True History)", "Lucian", "H. W. and F. G. Fowler", CORE,
+        ranges=(Range(r"BOOK I", r"THE TYRANNICIDE"),),  # only the True History from this volume
+        section=r"BOOK II?",
+        notes="Starts at Book I, after Lucian's own short preface.",
+    ),
+    Book(
+        1572, "Timaeus (the Atlantis story)", "Plato", "Benjamin Jowett", CORE,
+        # The dialogue only (Jowett's ~3,900-line introduction is skipped), and only
+        # up to where Timaeus begins his cosmology: the Atlantis story is Critias's.
+        ranges=(Range(r"TIMAEUS\.", r"TIMAEUS: All men, Socrates, who have any degree of right feeling,"),),
+    ),
+    Book(
+        1571, "Critias", "Plato", "Benjamin Jowett", CORE,
+        ranges=(Range(r"CRITIAS\."),),  # the dialogue, without Jowett's introduction
+        drop_paragraphs=(r"\* The rest of the Dialogue",),
+    ),
+    Book(
+        1497, "Republic, Book X: the myth of Er", "Plato", "Benjamin Jowett", CORE,
+        ranges=(Range(r"Well, I said, I will tell you a tale; not one of the tales which"),),
+    ),
+    Book(
+        8418, "Hippolytus; The Bacchae", "Euripides", "Gilbert Murray (verse)", CORE,
+        ranges=(Range(r"DRAMATIS PERSONAE"),),  # skips Murray's introductory note
+        verse=True,
+        section=r"(DRAMATIS PERSONAE|THE BACCHAE)",
+    ),
+    Book(
+        35451, "Medea", "Euripides", "Gilbert Murray (verse)", CORE,
+        ranges=(Range(r"CHARACTERS OF THE PLAY", r"NOTES TO MEDEA"),),
+        verse=True,
+        section=r"CHARACTERS OF THE PLAY",
+    ),
+    Book(
+        10096, "The Trojan Women", "Euripides", "Gilbert Murray (verse)", CORE,
+        ranges=(Range(r"CHARACTERS IN THE PLAY", r"NOTES ON THE TROJAN WOMEN"),),
+        verse=True,
+        section=r"CHARACTERS IN THE PLAY",
+    ),
+    Book(
+        31, "Oedipus the King; Oedipus at Colonus; Antigone", "Sophocles", "Francis Storr (verse)", CORE,
+        ranges=(Range(r"DRAMATIS PERSONAE"),),
+        drop_blocks=((r"ARGUMENT", r"DRAMATIS PERSONAE"),),  # Storr's plot summaries before each play
+        verse=True,
+        section=r"(DRAMATIS PERSONAE|OEDIPUS THE KING|OEDIPUS AT COLONUS|ANTIGONE)",
+    ),
+    Book(
+        8604, "The House of Atreus (Agamemnon, Libation-Bearers, Furies)", "Aeschylus", "E. D. A. Morshead (verse)", CORE,
+        ranges=(Range(r"DRAMATIS PERSONAE"),),  # skips the introductory note
+        verse=True,
+        section=r"(DRAMATIS PERSONAE|THE LIBATION-BEARERS|THE FURIES)",
+    ),
+    Book(
+        55406, "Daphnis and Chloe", "Longus", "Rowland Smith", CORE,
+        # Only Longus from this three-novel volume; a pastoral romance set among
+        # the shepherds of Lesbos, the closest thing to Arcadia in the corpus.
+        ranges=(Range(r"THE LOVES OF DAPHNIS AND CHLOE\.", r"THE END\."),),
+        # Each of the four books ends with its footnotes ("[Footnote 1: ..." onwards,
+        # some spanning several paragraphs): cut each block up to the next book.
+        drop_blocks=((r"\[Footnote 1:.*", rf"BOOK {ROMAN}\."),),
+        section=rf"(THE LOVES OF DAPHNIS AND CHLOE\.|BOOK {ROMAN}\.)",
+    ),
+    # ------------------------------------------------ DREAM, added for run 3
+    Book(
+        8129, "A Dreamer's Tales", "Lord Dunsany", None, DREAM,
+        ranges=(Range(r"POLTARNEES, BEHOLDER OF OCEAN", r"FINIS"),),
+    ),
+    Book(
+        7477, "The Book of Wonder", "Lord Dunsany", None, DREAM,
+        ranges=(Range(r"THE BRIDE OF THE MAN-HORSE"),),  # keeps Dunsany's own epilogue
+    ),
+    Book(
+        13821, "Tales of Wonder", "Lord Dunsany", None, DREAM,
+        ranges=(Range(r"A Tale of London", r"THE END", nth=2),),  # skips the 1916 war preface
+    ),
+    Book(
+        10806, "The Sword of Welleran and Other Stories", "Lord Dunsany", None, DREAM,
+        ranges=(Range(r"The Sword of Welleran"),),
+    ),
+    Book(
+        7838, "Fifty-One Tales", "Lord Dunsany", None, DREAM,
+        ranges=(Range(r"THE ASSIGNATION"),),
+    ),
+    Book(
+        3055, "The Wood Beyond the World", "William Morris", None, DREAM,
+        ranges=(Range(r"CHAPTER I: OF GOLDEN WALTER AND HIS FATHER"),),
+        section=r"CHAPTER [IVXL]+:.*",
+    ),
+    Book(
+        67090, "The Worm Ouroboros", "E. R. Eddison", None, DREAM,
+        ranges=(Range(r"THE INDUCTION", r"ARGUMENT: WITH DATES", nth=2),),  # skips contents; stops before the appendix
+        section=r"(THE INDUCTION|[IVXL]+: .*)",
+    ),
     # ----------------------------------------------------------- SEASONING
     Book(
         84, "Frankenstein", "Mary Shelley", None, SEASONING,

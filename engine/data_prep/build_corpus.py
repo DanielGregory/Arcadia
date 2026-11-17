@@ -38,7 +38,16 @@ from engine.data_prep.fetch_gutenberg import HEADERS, fetch_raw, strip_gutenberg
 
 SEASONING_CAP = 0.04
 DREAMBANK = "dreambank"
-DREAMBANK_SHARE = 0.25
+DREAMBANK_SHARE = 0.25  # default; run 3 uses --dreambank_share 0.12
+
+# Source tags (--tags, run 3 on): every passage of a book is wrapped in its
+# tier's tag, the way each DreamBank report is wrapped in <dream>...</dream>.
+# The tag tells the model which voice it is reading, and at sampling time
+# lets us ask for a voice. Passages are runs of whole paragraphs of about
+# PASSAGE_CHARS characters (~one 256-token training window), so almost every
+# training window contains a tag.
+TIER_TAGS = {"core": "myth", "dream": "tale", "seasoning": "saga"}
+PASSAGE_CHARS = 1000
 VAL_FRACTION = 0.10
 # Sections longer than this share of their book are cut into paragraph-aligned
 # chunks, so books with few long sections can still be split ~90/10.
@@ -53,7 +62,7 @@ GENERIC_DROP = (
     r"\[\d+[a-z]?\]",      # footnote body: "[12] ..."
     r"\(\d+\)\s",          # footnote body: "(1)  ..."
     r"[+|][-=+| ]*$",      # ASCII boxes
-    r"[*\s]+$",            # "* * * * *" scene breaks
+    r"[*•\s]+$",           # "* * * * *" and "• • • • •" scene breaks
 )
 GENERIC_INLINE = (
     r"\[Illustration[^\]]*\]",
@@ -262,14 +271,16 @@ def subdivide(sections: list[Section]) -> list[Section]:
 
 
 # ----------------------------------------------------------------- seasoning
-def final_total(sizes: dict[int, int], seasoning_ids: set[int]) -> int:
+def final_total(sizes: dict[int, int], seasoning_ids: set[int], dreambank_share: float = DREAMBANK_SHARE,
+                dreambank_chars: int = 0) -> int:
     """Solve for the final corpus size T, where each seasoning book is capped at
     4% of T and DreamBank adds 25% of T:  T = fixed + sum(min(s_i, 0.04 T)) + 0.25 T."""
     fixed = sum(n for i, n in sizes.items() if i not in seasoning_ids)
-    total = sum(sizes.values()) / (1 - DREAMBANK_SHARE)
+    # dreambank_chars: a fixed amount of DreamBank (--dreambank_reports) instead of a share.
+    total = (sum(sizes.values()) + dreambank_chars) / (1 - dreambank_share)
     for _ in range(200):
         cap = SEASONING_CAP * total
-        new_total = (fixed + sum(min(sizes[i], cap) for i in seasoning_ids)) / (1 - DREAMBANK_SHARE)
+        new_total = (fixed + sum(min(sizes[i], cap) for i in seasoning_ids) + dreambank_chars) / (1 - dreambank_share)
         if abs(new_total - total) < 1:
             break
         total = new_total
@@ -331,6 +342,30 @@ def split_sections(sections: list[Section], rng: random.Random) -> set[int]:
     return val
 
 
+def join_tagged(sections: list[Section], tag: str | None) -> str:
+    """Like join(), but with every ~PASSAGE_CHARS run of paragraphs wrapped in <tag>...</tag>.
+
+    Passages never cross a section boundary, and a heading always stays with
+    the paragraph after it.
+    """
+    if tag is None:
+        return join(sections)
+    passages: list[str] = []
+    for sec in sections:
+        cur: list[Para] = []
+        size = 0
+        for p in sec:
+            # Close the passage once it is full, unless it holds only headings so far.
+            if size + len(p.text) > PASSAGE_CHARS and any(not q.heading for q in cur):
+                passages.append(f"<{tag}>\n" + PARA_SEP.join(q.text for q in cur) + f"\n</{tag}>")
+                cur, size = [], 0
+            cur.append(p)
+            size += len(p.text) + len(PARA_SEP)
+        if cur:
+            passages.append(f"<{tag}>\n" + PARA_SEP.join(q.text for q in cur) + f"\n</{tag}>")
+    return PARA_SEP.join(passages)
+
+
 def join(sections: list[Section]) -> str:
     return PARA_SEP.join(PARA_SEP.join(p.text for p in s) for s in sections)
 
@@ -341,6 +376,12 @@ def main() -> None:
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--seed", type=int, default=1729)
     parser.add_argument("--refresh", action="store_true", help="re-download cached texts")
+    parser.add_argument("--dreambank_share", type=float, default=DREAMBANK_SHARE,
+                        help="DreamBank's share of the final corpus (run 2: 0.25, run 3: 0.12)")
+    parser.add_argument("--dreambank_reports", type=int, default=0,
+                        help="use exactly this many DreamBank reports instead of a share (run 3: 2529, the run 2 count)")
+    parser.add_argument("--tags", action="store_true",
+                        help="wrap book passages in <myth>/<tale>/<saga> source tags (run 3)")
     args = parser.parse_args()
 
     cache = args.data_dir / "raw" / "gutenberg"
@@ -357,15 +398,25 @@ def main() -> None:
     rng = random.Random(args.seed)
     raw_sizes = {i: book_len(s) for i, s in books.items()}
     seasoning_ids = {b.gutenberg_id for b in BOOKS if b.tier == SEASONING}
-    target_total = final_total(raw_sizes, seasoning_ids)
+    # DreamBank either fills a share of the corpus, or (--dreambank_reports N) is a
+    # fixed number of whole reports and its share falls out of the book total.
+    dream_rng = random.Random(f"{args.seed}-{DREAMBANK}")
+    if args.dreambank_reports:
+        order = list(range(len(reports)))
+        dream_rng.shuffle(order)
+        dreams = [wrap_dream(reports[i]["text"]) for i in order[: args.dreambank_reports]]
+        dream_chars = sum(len(d) + len(PARA_SEP) for d in dreams)
+        target_total = final_total(raw_sizes, seasoning_ids, 0.0, dream_chars)
+    else:
+        target_total = final_total(raw_sizes, seasoning_ids, args.dreambank_share)
     cap = int(SEASONING_CAP * target_total)
     for i in sorted(seasoning_ids):
         if raw_sizes[i] > cap:
             books[i] = trim(books[i], cap, rng)
 
     # DreamBank gets its own RNG so its sample doesn't shift when the book list changes.
-    dream_rng = random.Random(f"{args.seed}-{DREAMBANK}")
-    dreams = sample_dreams(reports, int(DREAMBANK_SHARE * target_total), dream_rng)
+    if not args.dreambank_reports:
+        dreams = sample_dreams(reports, int(args.dreambank_share * target_total), dream_rng)
     dream_val = set(dream_rng.sample(range(len(dreams)), round(VAL_FRACTION * len(dreams))))
 
     full, train, val = [], [], []
@@ -374,9 +425,10 @@ def main() -> None:
     for book in BOOKS:
         sections = books[book.gutenberg_id]
         val_idx = split_sections(sections, rng)
-        full.append(join(sections))
-        train.append(join([s for k, s in enumerate(sections) if k not in val_idx]))
-        val.append(join([s for k, s in enumerate(sections) if k in val_idx]))
+        tag = TIER_TAGS[book.tier] if args.tags else None
+        full.append(join_tagged(sections, tag))
+        train.append(join_tagged([s for k, s in enumerate(sections) if k not in val_idx], tag))
+        val.append(join_tagged([s for k, s in enumerate(sections) if k in val_idx], tag))
         val_by_tier.setdefault(book.tier, []).append(val[-1])
         rows.append((book.gutenberg_id, book.tier, f"{book.title} ({book.author})", len(full[-1]),
                      raw_sizes[book.gutenberg_id], len(val_idx), len(sections)))

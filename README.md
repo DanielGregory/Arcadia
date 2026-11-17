@@ -101,3 +101,14 @@ python -m engine.sample --ckpt checkpoints/run2/best.pt --dreams 3 --temperature
 ```
 
 `engine/train.py` reports loss per token and bits per character, overall and for each tier (core, dream, seasoning, dreambank), so runs with different tokenizers can be compared. On Kaggle use `notebooks/kaggle_train_run2.ipynb`. `engine/train_char.py` and `notebooks/kaggle_train.ipynb` are kept unchanged as the run 1 baseline.
+
+## Run 3: source tags and a bigger library
+
+```bash
+python -m engine.data_prep.build_corpus --tags --dreambank_reports 2529   # 43 books + 2,529 dream reports
+python -m engine.tokenizer --vocab_size 8000 --tags                        # <myth>, <tale>, <saga> reserved
+python -m engine.train --config configs/run3.py --out_dir checkpoints/run3
+python -m engine.sample --ckpt checkpoints/run3/best.pt --dreams 3 --tag myth
+```
+
+Book passages are wrapped in their tier's tag (`<myth>` core, `<tale>` dream books, `<saga>` seasoning; DreamBank keeps `<dream>`), so a sample can ask for a voice. On Kaggle use `notebooks/kaggle_train_run3.ipynb`. Without `--tags` and `--dreambank_reports`, `build_corpus` builds the run 2 corpus as before (plus the new books).

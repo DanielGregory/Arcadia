@@ -3,6 +3,7 @@
     python -m engine.sample --ckpt checkpoints/run2/best.pt --dreams 5
     python -m engine.sample --ckpt ... --dreams 5 --prompt "The old shepherd told me of a tomb"
     python -m engine.sample --ckpt ... --temperature 0.7 0.9 1.1          # free text, no <dream> wrapper
+    python -m engine.sample --ckpt checkpoints/run3/best.pt --dreams 3 --tag myth   # run 3: ask for a voice
 
 Sampling controls (all applied at every step, in this order):
   --repetition_penalty  makes tokens already used in this dream a little less likely
@@ -111,19 +112,23 @@ def cut_to_last_sentence(text: str) -> str:
 
 
 def generate_dream(model, tok, prompt: str, max_tokens: int, device: str, cut_sentence: bool = True,
-                   **kw) -> tuple[str, bool]:
-    """One dream: <dream>\\n + prompt, sampled until </dream> or max_tokens.
+                   tag: str = "dream", **kw) -> tuple[str, bool]:
+    """One passage: <tag>\\n + prompt, sampled until </tag> or max_tokens.
 
-    Returns (dream text without the tags, whether the model closed it itself).
+    tag is "dream" for a dream; run 3 models also know "myth", "tale" and "saga".
+    Returns (text without the tags, whether the model closed it itself).
     """
-    start_text = "<dream>\n" + prompt
+    open_tag, close_tag = f"<{tag}>", f"</{tag}>"
+    if tok.sp.id_to_piece(tok.token_id(close_tag)) != close_tag:
+        raise SystemExit(f"this model's tokenizer has no {open_tag} tag (source tags need a run 3 model)")
+    start_text = f"{open_tag}\n" + prompt
     start = torch.tensor([tok.encode(start_text)], dtype=torch.long, device=device)
-    end_id = tok.token_id("</dream>")
+    end_id = tok.token_id(close_tag)
     ids = sample(model, start, max_tokens, stop_token=end_id,
                  no_penalty_ids={tok.newline_id, end_id}, **kw)[0].tolist()
     closed = ids[-1] == end_id
     text = tok.decode(ids[:-1] if closed else ids)
-    text = text.removeprefix("<dream>\n").strip()
+    text = text.removeprefix(f"{open_tag}\n").strip()
     if not closed and cut_sentence:
         text = cut_to_last_sentence(text)
     return text, closed
@@ -139,6 +144,8 @@ def main() -> None:
     parser.add_argument("--top_p", type=float, default=0.9, help="nucleus sampling mass (1.0 = off)")
     parser.add_argument("--repetition_penalty", type=float, default=1.1, help="1.0 = off")
     parser.add_argument("--dreams", type=int, default=0, help="BPE models: generate this many whole dreams")
+    parser.add_argument("--tag", default="dream", choices=["dream", "myth", "tale", "saga"],
+                        help="with --dreams: which source tag to generate under (run 3 models)")
     parser.add_argument("--prompt", default="", help='opening of each dream, after "<dream>\\n" (with --dreams)')
     parser.add_argument("--start", default="\n", help="raw starting text for free (non --dreams) sampling")
     parser.add_argument("--no_cut_sentence", action="store_true", help="keep a dream's unfinished last sentence")
@@ -162,8 +169,9 @@ def main() -> None:
                                      if args.start.startswith("<dream>") else "")
             for _ in range(args.dreams):
                 text, closed = generate_dream(model, tok, prompt, args.tokens, args.device,
-                                              cut_sentence=not args.no_cut_sentence, temperature=t, **knobs)
-                print(f"<dream>\n{text}\n</dream>{'' if closed else '  [length limit]'}\n")
+                                              cut_sentence=not args.no_cut_sentence, tag=args.tag,
+                                              temperature=t, **knobs)
+                print(f"<{args.tag}>\n{text}\n</{args.tag}>{'' if closed else '  [length limit]'}\n")
         else:
             start_text = args.start.encode().decode("unicode_escape") if "\\" in args.start else args.start
             start = torch.tensor([tok.encode(start_text)], dtype=torch.long, device=args.device)

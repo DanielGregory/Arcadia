@@ -45,6 +45,7 @@ class TrainConfig:
     # Tokenizer
     tokenizer: str = "bpe"      # "char" or "bpe"
     bpe_vocab_size: int = 8000  # which data/tokenizer/bpe<N>.model to use
+    bpe_model: str = ""         # or name it directly, e.g. "bpe8000_tags" (run 3)
 
     # Model shape (passed on to GPTConfig)
     n_layer: int = 6
@@ -128,9 +129,11 @@ def main() -> None:
     if cfg.tokenizer == "char":
         tok = CharTokenizer.from_text(train_text + val_texts["val"])
     else:
-        tok_path = data_dir / "tokenizer" / f"bpe{cfg.bpe_vocab_size}.model"
+        name = cfg.bpe_model or f"bpe{cfg.bpe_vocab_size}"
+        tok_path = data_dir / "tokenizer" / f"{name}.model"
         if not tok_path.exists():
-            raise SystemExit(f"{tok_path} not found: run `python -m engine.tokenizer --vocab_size {cfg.bpe_vocab_size}` first")
+            hint = " --tags" if name.endswith("_tags") else ""
+            raise SystemExit(f"{tok_path} not found: run `python -m engine.tokenizer --vocab_size {cfg.bpe_vocab_size}{hint}` first")
         tok = BPETokenizer.load(tok_path)
 
     # Encode everything once. chars_per_token converts a loss per token into

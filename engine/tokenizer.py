@@ -28,6 +28,8 @@ from pathlib import Path
 
 NEWLINE = "<n>"
 SPECIAL_TOKENS = ["<dream>", "</dream>", NEWLINE]
+# Run 3 source tags (build_corpus --tags): one per tier, reserved the same way.
+SOURCE_TAGS = ["<myth>", "</myth>", "<tale>", "</tale>", "<saga>", "</saga>"]
 
 
 class CharTokenizer:
@@ -115,7 +117,7 @@ def tokenizer_from_state(state: dict) -> CharTokenizer | BPETokenizer:
     return BPETokenizer(state["model_proto"])
 
 
-def train_bpe(train_file: Path, vocab_size: int, out_path: Path) -> BPETokenizer:
+def train_bpe(train_file: Path, vocab_size: int, out_path: Path, specials: list[str] = SPECIAL_TOKENS) -> BPETokenizer:
     """Train a SentencePiece BPE model on one text file."""
     import sentencepiece as spm
 
@@ -133,7 +135,7 @@ def train_bpe(train_file: Path, vocab_size: int, out_path: Path) -> BPETokenizer
         model_prefix=str(out_path.with_suffix("")),
         model_type="bpe",
         vocab_size=vocab_size,
-        user_defined_symbols=SPECIAL_TOKENS,  # reserved: never split, always in the vocabulary
+        user_defined_symbols=specials,        # reserved: never split, always in the vocabulary
         byte_fallback=True,                   # unseen characters become raw bytes, not <unk>
         character_coverage=0.9995,            # very rare characters are left to byte fallback
         normalization_rule_name="identity",   # keep the text exactly as it is (no Unicode folding)
@@ -152,10 +154,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--data_dir", type=Path, default=Path("data"))
     parser.add_argument("--vocab_size", type=int, default=8000)
+    parser.add_argument("--tags", action="store_true",
+                        help="also reserve the run 3 source tags (<myth>, <tale>, <saga>); writes bpe<N>_tags.model")
     args = parser.parse_args()
 
-    out_path = args.data_dir / "tokenizer" / f"bpe{args.vocab_size}.model"
-    tok = train_bpe(args.data_dir / "train.txt", args.vocab_size, out_path)
+    name = f"bpe{args.vocab_size}{'_tags' if args.tags else ''}"
+    out_path = args.data_dir / "tokenizer" / f"{name}.model"
+    specials = SPECIAL_TOKENS + (SOURCE_TAGS if args.tags else [])
+    tok = train_bpe(args.data_dir / "train.txt", args.vocab_size, out_path, specials)
     print(f"wrote {out_path} ({tok.vocab_size} tokens)")
 
     # Check: every val text must survive encode -> decode unchanged, and report
@@ -165,7 +171,8 @@ def main() -> None:
         ids = tok.encode(text)
         assert tok.decode(ids) == text, f"{path.name} does not round-trip"
         print(f"  {path.name:<18} {len(text):>9,} chars -> {len(ids):>8,} tokens  ({len(text) / len(ids):.2f} chars/token)")
-    sample = "<dream>\nI was walking by the wine-dark sea with Telemachus.\n</dream>"
+    sample = ("<myth>\nThe gods of Corva met by the wine-dark sea.\n</myth>" if args.tags
+              else "<dream>\nI was walking by the wine-dark sea with Telemachus.\n</dream>")
     print("  example:", [tok.sp.id_to_piece(i) for i in tok.encode(sample)])
 
 
