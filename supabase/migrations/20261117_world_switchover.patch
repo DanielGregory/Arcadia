@@ -1,0 +1,175 @@
+diff --git a/daily/memory_sync.py b/daily/memory_sync.py
+index 1f95bd8..50ce1db 100644
+--- a/daily/memory_sync.py
++++ b/daily/memory_sync.py
+@@ -9,7 +9,7 @@ Full rebuild (run it now and then; it re-draws the whole sky):
+   2. embed each one on the CPU (engine/memory/embed.py, all-MiniLM-L6-v2)
+   3. extract its symbols (engine/memory/symbols.py)
+   4. UMAP the embeddings into the 2D sky and name the constellations (engine/memory/sky.py)
+-  5. upsert memory_dreams / memory_symbols / memory_dream_symbols / memory_constellations
++  5. upsert the world tables dreams / symbols / symbol_occurrences, and sky_constellations
+ 
+ Daily (add_dreams, called by daily/morning.py after the wallpaper is published):
+ each new dream arrives already embedded (the Kaggle job did it) and is placed
+@@ -63,20 +63,30 @@ def delete_all(sb: Supabase, table: str, column: str) -> None:
+ 
+ 
+ def upload_symbols(sb: Supabase, dream_symbols: dict[str, dict[str, int]]) -> None:
+-    """Upsert each dream's symbols, then recompute the symbol totals from all of them."""
+-    rows = [{"dream_id": d, "symbol": s, "mentions": n} for d, syms in dream_symbols.items() for s, n in syms.items()]
+-    names = {r["symbol"] for r in rows}
+-    # Symbols first (the link table references them), with placeholder totals.
+-    existing = {r["name"]: r for r in select(sb, "memory_symbols?select=*")} if not sb.dry_run else {}
+-    sb.upsert("memory_symbols", [{"name": n, "first_seen": existing.get(n, {}).get("first_seen")
+-                                  or next(r["dream_id"] for r in rows if r["symbol"] == n)} for n in sorted(names)])
+-    sb.upsert("memory_dream_symbols", rows)
+-    links = select(sb, "memory_dream_symbols?select=symbol,mentions") if not sb.dry_run else rows
++    """Upsert each dream's symbols (world tables `symbols` and `symbol_occurrences`), then recompute
++    each symbol's totals (frequency = mentions, dreams = dreams it appears in)."""
++    rows = [(d, s, n) for d, syms in dream_symbols.items() for s, n in syms.items()]
++    labels = sorted({s for _, s, _ in rows})
++    first = {}
++    for d, s, _ in rows:
++        first.setdefault(s, d)
++    if sb.dry_run:
++        print(f"  would upsert {len(labels)} symbols and {len(rows)} occurrences")
++        return
++    known = {r["label"]: r for r in select(sb, "symbols?select=id,label,first_seen_dream")}
++    new = [{"label": s, "first_seen_dream": first[s]} for s in labels if s not in known]
++    if new:
++        sb.upsert("symbols", new, on_conflict="label")
++        known = {r["label"]: r for r in select(sb, "symbols?select=id,label,first_seen_dream")}
++    sb.upsert("symbol_occurrences", [{"symbol_id": known[s]["id"], "dream_id": d, "mentions": n} for d, s, n in rows],
++              on_conflict="symbol_id,dream_id")
++    links = select(sb, "symbol_occurrences?select=symbol_id,mentions&dream_id=not.is.null")
+     dreams, mentions = Counter(), Counter()
+     for r in links:
+-        dreams[r["symbol"]] += 1
+-        mentions[r["symbol"]] += r["mentions"]
+-    sb.upsert("memory_symbols", [{"name": n, "dreams": dreams[n], "mentions": mentions[n]} for n in dreams])
++        dreams[r["symbol_id"]] += 1
++        mentions[r["symbol_id"]] += r["mentions"]
++    sb.upsert("symbols", [{"label": r["label"], "dreams": dreams[r["id"]], "frequency": mentions[r["id"]]}
++                          for r in known.values()], on_conflict="label")
+ 
+ 
+ def rebuild(dry_run: bool) -> None:
+@@ -102,10 +112,10 @@ def rebuild(dry_run: bool) -> None:
+     rows = [{**{k: d.get(k) for k in DREAM_COLUMNS}, "embedding": to_pg(v), "sky_x": float(p[0]), "sky_y": float(p[1]),
+              "constellation": int(c)} for d, v, p, c in zip(dreams, vecs, xy, labels)]
+     for i in range(0, len(rows), 100):
+-        sb.upsert("memory_dreams", rows[i:i + 100])
++        sb.upsert("dreams", rows[i:i + 100])
+     upload_symbols(sb, {d["id"]: s for d, s in zip(dreams, symbols)})
+-    delete_all(sb, "memory_constellations", "id")
+-    sb.upsert("memory_constellations", constellations)
++    delete_all(sb, "sky_constellations", "id")
++    sb.upsert("sky_constellations", constellations)
+     print("dry run: nothing uploaded" if dry_run else f"uploaded {len(rows)} dreams to the memory")
+ 
+ 
+@@ -120,7 +130,7 @@ def add_dreams(dreams: list[dict], sb: Supabase | None = None) -> None:
+         near = rpc(sb, "match_dreams", {"query_embedding": to_pg(d["embedding"]), "match_count": 6})
+         near = [n for n in near if n["id"] != d["id"]]
+         if near:
+-            pos = {r["id"]: r for r in select(sb, "memory_dreams?select=id,sky_x,sky_y,constellation&id=in.("
++            pos = {r["id"]: r for r in select(sb, "dreams?select=id,sky_x,sky_y,constellation&id=in.("
+                                                   + ",".join(f'"{n["id"]}"' for n in near) + ")")}
+             for n in near:
+                 n.update(pos.get(n["id"], {}))
+@@ -128,7 +138,7 @@ def add_dreams(dreams: list[dict], sb: Supabase | None = None) -> None:
+         rows.append({**{key: d.get(key) for key in DREAM_COLUMNS}, "embedding": to_pg(d["embedding"]),
+                      "sky_x": x, "sky_y": y, "constellation": c})
+         syms[d["id"]] = d.get("symbols") or extract(d.get("remembered") or d["text"])
+-    sb.upsert("memory_dreams", rows)
++    sb.upsert("dreams", rows)
+     upload_symbols(sb, syms)
+     print(f"  memory: added {len(rows)} dreams to the sky")
+ 
+diff --git a/daily/upload_review.py b/daily/upload_review.py
+index bf6b4bd..e949206 100644
+--- a/daily/upload_review.py
++++ b/daily/upload_review.py
+@@ -10,7 +10,7 @@ What goes where:
+     out/wallpapers/*.png          -> wallpapers/
+   Table "images": one row per uploaded image (kind, prompt, seed, the full
+     metadata JSON, and the dream it shows, if any).
+-  Table "dreams": the read-test dreams (out/read_test/run2.json, and run3.json
++  Table "review_dreams": the read-test dreams (out/read_test/run2.json, and run3.json
+     once it exists), plus the priming-test dreams that have a painting or a
+     wallpaper, linked to it.
+ 
+@@ -71,7 +71,7 @@ class Supabase:
+                                        "cache-control": "max-age=300"}, timeout=120)
+         r.raise_for_status()
+ 
+-    def upsert(self, table: str, rows: list[dict]) -> None:
++    def upsert(self, table: str, rows: list[dict], on_conflict: str | None = None) -> None:
+         if not rows:
+             return
+         if self.dry_run:
+@@ -79,7 +79,8 @@ class Supabase:
+             return
+         # merge-duplicates: insert new rows, update the given columns of existing ones.
+         # mark/note/picked are never in `rows`, so the gallery's choices survive re-runs.
+-        r = self.session.post(f"{self.url}/rest/v1/{table}", json=rows, timeout=60,
++        target = f"?on_conflict={on_conflict}" if on_conflict else ""  # match on a unique column other than the key
++        r = self.session.post(f"{self.url}/rest/v1/{table}{target}", json=rows, timeout=60,
+                               headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+         if r.status_code >= 400:
+             sys.exit(f"upsert into {table} failed: {r.status_code} {r.text}")
+@@ -162,7 +163,7 @@ def main() -> None:
+           f"wallpapers) and {len(dreams)} dreams")
+ 
+     # Dreams first, because images reference them.
+-    sb.upsert("dreams", list(dreams.values()))
++    sb.upsert("review_dreams", list(dreams.values()))
+     for img in images:
+         sb.upload(img["_local"], img["id"])
+         print(f"  uploaded {img['id']}" if not args.dry_run else "", end="\n" if not args.dry_run else "")
+diff --git a/site/index.html b/site/index.html
+index 82d0aef..d2df000 100644
+--- a/site/index.html
++++ b/site/index.html
+@@ -231,9 +231,11 @@ const sky = { dreams: [], cons: [], syms: {}, selected: null, pts: [], edges: []
+ 
+ async function loadSky() {
+   const [dreams, cons, links] = await Promise.all([
+-    api("memory_dreams?select=id,run,kind,tag,prompt,text,remembered,day,sky_x,sky_y,constellation&order=id", { headers: { Prefer: "" } }),
+-    api("memory_constellations?select=*&order=id", { headers: { Prefer: "" } }),
+-    api("memory_dream_symbols?select=dream_id,symbol,mentions", { headers: { Prefer: "" } }),
++    api("dreams?select=id,run,kind,tag,prompt,text,remembered,day,sky_x,sky_y,constellation&order=id", { headers: { Prefer: "" } }),
++    api("sky_constellations?select=*&order=id", { headers: { Prefer: "" } }),
++    // occurrences of a symbol in a dream, with the symbol's label joined in
++    api("symbol_occurrences?select=dream_id,mentions,symbols(label)&dream_id=not.is.null", { headers: { Prefer: "" } })
++      .then(rows => rows.map(r => ({ dream_id: r.dream_id, symbol: r.symbols.label, mentions: r.mentions }))),
+   ]);
+   sky.dreams = dreams.filter(d => d.sky_x != null);
+   sky.cons = cons;
+@@ -436,7 +438,7 @@ async function mark(id, value) {
+   const old = d.mark;
+   d.mark = d.mark === value ? null : value;  // tapping the active button again clears it
+   renderDreams();
+-  try { await api(`dreams?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ mark: d.mark }) }); }
++  try { await api(`review_dreams?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ mark: d.mark }) }); }
+   catch (e) { d.mark = old; renderDreams(); toast("Couldn't save: " + e.message); }
+ }
+ 
+@@ -444,7 +446,7 @@ async function saveNote(id, value, statusEl) {
+   const d = state.dreams.find(x => x.id === id);
+   if ((d.note || "") === value) return;
+   try {
+-    await api(`dreams?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ note: value || null }) });
++    await api(`review_dreams?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ note: value || null }) });
+     d.note = value; if (statusEl) { statusEl.textContent = "Note saved"; setTimeout(() => (statusEl.textContent = ""), 2000); }
+   } catch (e) { toast("Couldn't save the note: " + e.message); }
+ }
+@@ -495,7 +497,7 @@ document.querySelector("main").addEventListener("focusout", e => {
+   try {
+     [state.images, state.dreams] = await Promise.all([
+       api("images?select=id,kind,prompt,seed,meta,dream_id,picked&order=id", { headers: { Prefer: "" } }),
+-      api("dreams?select=*&order=id", { headers: { Prefer: "" } }),
++      api("review_dreams?select=*&order=id", { headers: { Prefer: "" } }),
+     ]);
+     renderCorva(); renderDreams(); renderWallpapers();
+   } catch (e) {

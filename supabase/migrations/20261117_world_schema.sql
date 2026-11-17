@@ -1,6 +1,7 @@
 -- =====================================================================================
 -- Arcadia world database: STRUCTURE ONLY (no simulation logic). From docs/world_engine.md.
--- NOT APPLIED YET: waiting for Daniel's approval.
+-- Approved 2026-11-17; to be applied (backup: HF DannyGregs/arcadia-dreams backups/supabase_20261117T2038Z;
+-- undo: rollback_world_schema.sql). Code switchover: 20261117_world_switchover.patch (git apply after migrating).
 --
 -- The hard rule: no table stores what anything MEANS. Facts live everywhere; meaning,
 -- significance and interpretation live only in `beliefs`, per person, with a confidence.
