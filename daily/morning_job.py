@@ -9,9 +9,11 @@ and publishes what it makes.
 
 The five steps, all in this one file:
 
-  1. DREAM     run 4 dreams 24 candidates: half in its <dream> voice, a
-               quarter each as <myth> and <tale> (half with no opening, half
-               with an opening from the pool below). The day's date is the random
+  1. DREAM     the production model dreams 24 candidates. About a third
+               SWITCH voices after 1-2 sentences (mostly <tale>/<myth> into
+               <dream>, some the reverse; see SWITCHES); the rest keep one voice,
+               half <dream>, a quarter each <myth> and <tale>. Half start from an
+               opening in the pool below, half from nothing. The day's date is the random
                seed, so a morning can always be re-made exactly.
   2. SELECT    every candidate is checked and scored: it should end itself, be
                a sensible length, not repeat itself, and not copy its training
@@ -298,6 +300,38 @@ def score(c: dict, train: str) -> dict:
 # Which voices the candidates are dreamed in: half <dream>, a quarter each <myth> and <tale>.
 TAG_MIX = ("dream", "dream", "myth", "tale")
 
+# Mode-switching: about a third of the candidates start in one voice and switch to another after
+# 1-2 sentences. Mostly a tale or myth sliding into a dream (a story that turns into a dream);
+# some the reverse (a dream that turns into a tale or a myth). The rest keep one voice (TAG_MIX).
+SWITCHES = (("tale", "dream"), ("tale", "dream"), ("myth", "dream"), ("myth", "dream"),
+            ("tale", "dream"), ("myth", "dream"), ("dream", "tale"), ("dream", "myth"))
+_SENTENCE = re.compile(r".+?[.!?][\"'”’)]*(?=\s|$)", re.S)
+
+
+def switch_voice(model, tok, opening: str, first: str, second: str, n_sentences: int, device: str):
+    """Dream the first n sentences in one voice, then relabel them as the second voice and carry on.
+    How it works: the model writes inside <first>...; we keep its first n sentences, then start a
+    fresh passage <second> whose opening IS those sentences, so the model continues them in the
+    second voice. Returns (text, closed, sentences actually written in the first voice)."""
+    head, _ = generate_dream(model, tok, opening, 90, device, cut_sentence=False, tag=first, **SETTINGS)
+    sentences = _SENTENCE.findall(head)
+    part = "".join(sentences[:n_sentences]).strip() or head.strip()
+    used = len(tok.encode(part))
+    # The second voice must write at least 40 tokens: a dream fragment under <myth> otherwise tends to
+    # close the passage at once (seen in the first test: 20-word dreams).
+    text, closed = generate_dream(model, tok, part + " ", max(60, MAX_TOKENS - used), device, tag=second,
+                                  min_new_tokens=40, **SETTINGS)
+    return seam_clean(text), closed, min(n_sentences, len(sentences))
+
+
+def seam_clean(text: str) -> str:
+    """Remove the debris a voice switch tends to leave: verse line numbers ("273.", "22") and editorial
+    brackets ("[V]", "[I like her") that the model reaches for when one kind of text turns into another."""
+    text = re.sub(r"\[[A-Z]{1,4}\]", "", text)          # [V], [BL]
+    text = text.replace("[", "").replace("]", "")
+    text = re.sub(r"(?<=\s)\d{1,4}\.?(?=\s)", "", text)  # stray numbers between words
+    return re.sub(r"[ \t]{2,}", " ", text).strip()
+
 
 def dream(ckpt: str, train: str, n: int, seed: int, device: str) -> list[dict]:
     """Steps 1 and 2: n candidates, scored, best first."""
@@ -305,18 +339,27 @@ def dream(ckpt: str, train: str, n: int, seed: int, device: str) -> list[dict]:
     rng = random.Random(seed)
     openings = rng.sample(OPENINGS, n // 2) + [""] * (n - n // 2)
     rng.shuffle(openings)
-    tags = [TAG_MIX[i % len(TAG_MIX)] for i in range(n)]
-    rng.shuffle(tags)
+    # One mode per candidate: ~a third switch voices (SWITCHES), the rest keep one voice (TAG_MIX).
+    n_switch = round(n / 3)
+    modes = [SWITCHES[i % len(SWITCHES)] for i in range(n_switch)] + \
+            [(TAG_MIX[i % len(TAG_MIX)],) for i in range(n - n_switch)]
+    rng.shuffle(modes)
     out = []
-    for i, (opening, tag) in enumerate(zip(openings, tags)):
+    for i, (opening, mode) in enumerate(zip(openings, modes)):
         torch.manual_seed(seed * 100 + i)  # one fixed seed per candidate: reproducible
-        text, closed = generate_dream(model, tok, opening, MAX_TOKENS, device, tag=tag, **SETTINGS)
+        if len(mode) == 2:
+            k = rng.choice((1, 2))
+            text, closed, k = switch_voice(model, tok, opening, mode[0], mode[1], k, device)
+            tag, mode_name = mode[1], f"{mode[0]}→{mode[1]} after {k}"
+        else:
+            tag, mode_name = mode[0], mode[0]
+            text, closed = generate_dream(model, tok, opening, MAX_TOKENS, device, tag=tag, **SETTINGS)
         # A dream the model closed itself can still end mid-thought ("...the prophets said:").
         text = cut_to_last_sentence(text)
-        c = score({"i": i, "seed": seed * 100 + i, "tag": tag, "opening": opening, "closed": closed, "text": text},
-                  train)
+        c = score({"i": i, "seed": seed * 100 + i, "tag": tag, "mode": mode_name, "opening": opening,
+                   "closed": closed, "text": text}, train)
         out.append(c)
-        print(f"  candidate {i:2d} <{tag}>: {c['words']:3d} words, {'closed' if closed else 'cut   '}, "
+        print(f"  candidate {i:2d} {mode_name:<20}: {c['words']:3d} words, {'closed' if closed else 'cut   '}, "
               f"score {c['score'] if c['score'] is not None else 'rejected: ' + c['rejected']}", flush=True)
     del model
     return sorted(out, key=lambda c: (c["score"] is not None, c["score"] or 0), reverse=True)
@@ -489,7 +532,7 @@ def main() -> None:
     record = {
         "day": day.isoformat(), "number": number, "run": args.run, "seed": seed, "device": args.device,
         "raw": chosen["text"], "as_remembered": remembered, "opening": chosen["opening"],
-        "chosen": chosen["i"], "tag": chosen.get("tag", "dream"), "caption": caption, "label": f"Dream {number} · Corva",
+        "chosen": chosen["i"], "tag": chosen.get("tag", "dream"), "mode": chosen.get("mode"), "caption": caption, "label": f"Dream {number} · Corva",
         "style": style, "painting_prompt": scene, "paint_model": PAINT_MODEL,
         "prompt_sent": f"{scene}, {style['description']}", "prompt_2_sent": f"{style['description']}: {scene}",
         "steps": args.steps, "ip_scale": args.ip_scale,
@@ -536,13 +579,13 @@ def markdown(r: dict) -> str:
               "## Painting", "", f"> {r['painting_prompt']}", "",
               f"Style: **{style.get('name', '?')}** ({style.get('pool', '?')} pool"
               f"{', wildcard' if style.get('wildcard') else ''})", "",
-              "## Candidates", "", "| # | tag | words | closed | trigrams | copied | coherence | eligible | novelty (emb + symbols) | new / rare images | chance | rejected |",
+              "## Candidates", "", "| # | mode | words | closed | trigrams | copied | coherence | eligible | novelty (emb + symbols) | new / rare images | chance | rejected |",
               "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for c in sorted(r["candidates"], key=lambda c: (-c.get("chance", -1), -(c.get("coherence") or 0))):
         nov = f"{c['novelty']} ({c['emb_novelty']} + {c['symbol_bonus']})" if "novelty" in c else ""
         images = " / ".join(", ".join(c.get(k, [])) or "–" for k in ("new_symbols", "rare_symbols")) if "novelty" in c else ""
         chance = f"{c['chance']:.0%}" if "chance" in c else ""
-        lines.append(f"| {c['i']}{' ★' if c['i'] == r['chosen'] else ''} | {c.get('tag', 'dream')} | {c['words']} "
+        lines.append(f"| {c['i']}{' ★' if c['i'] == r['chosen'] else ''} | {c.get('mode', c.get('tag', 'dream'))} | {c['words']} "
                      f"| {'yes' if c['closed'] else 'no'} | {c['distinct_trigrams']} | {c['copied_words']} "
                      f"| {c.get('coherence', '')} | {'yes' if c.get('eligible') else ''} | {nov} | {images} | {chance} "
                      f"| {c.get('rejected', '')} |")

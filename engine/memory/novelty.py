@@ -33,7 +33,7 @@ NEW_SYMBOL = 0.12        # bonus per image never seen in Arcadia's memory
 RARE_SYMBOL = 0.04       # bonus per image seen in <= RARE_MAX dreams
 RARE_MAX = 3
 SYMBOL_CAP = 0.30
-TEMPERATURE = 0.08       # lower = the most novel dream wins more surely; higher = more even odds
+TEMPERATURE = 0.05       # lower = the most novel dream wins more surely; higher = more even odds
 
 
 def recent_chosen(before_day: str, n: int = RECENT) -> list[str]:

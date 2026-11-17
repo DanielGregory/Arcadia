@@ -56,6 +56,7 @@ def sample(
     stop_token: int | None = None,
     no_penalty_ids: set[int] = frozenset(),
     stop_tokens: set[int] = frozenset(),
+    min_new_tokens: int = 0,
 ) -> torch.Tensor:
     """Continue idx (1, T) by up to max_new_tokens tokens; return the full sequence."""
     prompt_len = idx.shape[1]
@@ -75,6 +76,11 @@ def sample(
                 u = torch.tensor(sorted(used), device=logits.device)
                 s = logits[u]
                 logits[u] = torch.where(s > 0, s / repetition_penalty, s * repetition_penalty)
+
+        # 2b. Not allowed to stop yet: for the first min_new_tokens tokens, the end tags are impossible.
+        if idx.shape[1] - prompt_len < min_new_tokens:
+            for t in {stop_token, *stop_tokens} - {None}:
+                logits[t] = float("-inf")
 
         # 3. Temperature.
         logits = logits / temperature
