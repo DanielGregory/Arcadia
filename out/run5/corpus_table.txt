@@ -1,0 +1,142 @@
+set aside (not trained on): data/interpretation/66048.txt  The Interpretation of Dreams (1,093,893 chars)
+
+    id  tag       source                                                          chars      %    val/units
+--------------------------------------------------------------------------------------------------------------
+  1727  myth      The Odyssey (Homer)                                           621,307  1.74%      4/28   
+ 21765  myth      Metamorphoses, Books I–VII (Ovid)                             362,903  1.02%     12/72   
+ 26073  myth      Metamorphoses, Books VIII–XV (Ovid)                           436,040  1.22%      9/57   
+  4775  poem      Theocritus, Bion and Moschus (Theocritus, Bion, Moschus)      217,507  0.61%      6/85   
+   230  poem      Eclogues (Virgil)                                              47,777  0.13%      4/26   
+   232  poem      Georgics (Virgil)                                             123,381  0.35%      3/25   
+   348  myth      Works and Days, Theogony, and the Homeric Hymns (Hesiod /     233,140  0.65%     10/51   
+ 11339  tale      Aesop's Fables (Aesop)                                        200,240  0.56%     30/284  
+  8395  tale      The Gods of Pegana (Lord Dunsany)                              84,457  0.24%      4/37   
+  8183  tale      Time and the Gods (Lord Dunsany)                              217,795  0.61%      6/34   
+   325  tale      Phantastes (George MacDonald)                                 375,005  1.05%      3/31   
+  1640  tale      Lilith (George MacDonald)                                     507,031  1.42%      5/47   
+  8208  poem      Poems of Coleridge (Samuel Taylor Coleridge)                  191,727  0.54%     12/118  
+    11  tale      Alice's Adventures in Wonderland (Lewis Carroll)              145,442  0.41%      2/21   
+    12  tale      Through the Looking-Glass (Lewis Carroll)                     163,389  0.46%      3/28   
+   128  tale      The Arabian Nights Entertainments (Anonymous)                 599,926  1.68%      4/61   
+  2199  myth      The Iliad (Homer)                                             822,586  2.31%      4/31   
+ 22456  myth      The Aeneid (Virgil)                                           551,932  1.55%      3/25   
+   830  myth      The Argonautica (Apollonius of Rhodes)                        325,386  0.91%      2/22   
+  1666  tale      The Golden Ass (Apuleius)                                     431,149  1.21%      6/52   
+  6585  tale      A True Story (True History) (Lucian)                           70,018  0.20%      2/23   
+  1572  wisdom    Timaeus (the Atlantis story) (Plato)                           24,500  0.07%      1/11   
+  1571  wisdom    Critias (Plato)                                                37,813  0.11%      3/17   
+  1497  wisdom    The Republic (Plato)                                          655,355  1.84%      2/24   
+  8418  poem      Hippolytus; The Bacchae (Euripides)                           134,025  0.38%      2/22   
+ 35451  poem      Medea (Euripides)                                              71,323  0.20%      2/23   
+ 10096  poem      The Trojan Women (Euripides)                                   65,686  0.18%      3/23   
+    31  poem      Oedipus the King; Oedipus at Colonus; Antigone (Sophocles)    189,142  0.53%      2/21   
+  8604  poem      The House of Atreus (Agamemnon, Libation-Bearers, Furies)     181,506  0.51%      2/21   
+ 55406  tale      Daphnis and Chloe (Longus)                                    167,480  0.47%      3/23   
+  8129  tale      A Dreamer's Tales (Lord Dunsany)                              197,465  0.55%      3/28   
+  7477  tale      The Book of Wonder (Lord Dunsany)                             125,177  0.35%      3/28   
+ 13821  tale      Tales of Wonder (Lord Dunsany)                                219,326  0.62%      2/21   
+ 10806  tale      The Sword of Welleran and Other Stories (Lord Dunsany)        183,177  0.51%      3/22   
+  7838  tale      Fifty-One Tales (Lord Dunsany)                                 87,056  0.24%      5/51   
+  3055  tale      The Wood Beyond the World (William Morris)                    260,702  0.73%      4/38   
+ 67090  tale      The Worm Ouroboros (E. R. Eddison)                            930,647  2.61%      5/37   
+    84  tale      Frankenstein (Mary Shelley)                                   426,202  1.20%      3/30   
+   205  wisdom    Walden (Henry David Thoreau)                                  588,645  1.65%      6/28   
+  2591  tale      Grimms' Fairy Tales (Jacob and Wilhelm Grimm)                 525,143  1.47%      9/65   
+  2148  tale      Tales (Works of Poe, Raven Edition, Vol. II) (Edgar Allan     541,790  1.52%      4/33   
+   597  myth      The Story of Burnt Njal (Anonymous)                           667,714  1.87%     20/158  
+ 27458  poem      Prometheus Bound (Aeschylus)                                   55,509  0.16%      3/23   
+  2562  poem      The Clouds (Aristophanes)                                      82,779  0.23%      2/22   
+  7998  poem      The Frogs (Aristophanes)                                       73,606  0.21%      2/21   
+  1532  poem      King Lear (William Shakespeare)                               140,357  0.39%      3/25   
+  1524  poem      Hamlet (William Shakespeare)                                  161,340  0.45%      3/23   
+  1533  poem      Macbeth (William Shakespeare)                                  92,108  0.26%      2/23   
+  1540  poem      The Tempest (William Shakespeare)                              88,648  0.25%      3/22   
+  1934  poem      Songs of Innocence and of Experience (William Blake)           29,553  0.08%      4/47   
+  8209  poem      Poems 1817 (John Keats)                                        77,777  0.22%      4/35   
+ 24280  poem      Endymion (John Keats)                                         173,209  0.49%      3/24   
+ 23684  poem      Poems Published in 1820 (Lamia, Isabella, St. Agnes, Odes,    128,053  0.36%     12/103  
+ 12383  poem      The Prelude (William Wordsworth)                              324,913  0.91%      4/29   
+ 76996  poem      The Raven and Other Poems (Edgar Allan Poe)                    45,885  0.13%      4/34   
+    26  poem      Paradise Lost (John Milton)                                   460,298  1.29%      4/27   
+  1321  poem      The Waste Land (T. S. Eliot)                                   16,746  0.05%      1/12   
+  1322  poem      Leaves of Grass (Walt Whitman)                                707,851  1.99%      4/39   
+ 36098  poem      The Flowers of Evil (Charles Baudelaire)                       45,594  0.13%      2/21   
+  1041  poem      Shakespeare's Sonnets (William Shakespeare)                    96,293  0.27%      2/22   
+  1004  poem      The Divine Comedy (Dante Alighieri)                           620,619  1.74%     10/100  
+  1600  wisdom    Symposium (Plato)                                             119,721  0.34%      2/24   
+  1636  wisdom    Phaedrus (Plato)                                              124,345  0.35%      3/24   
+  1656  wisdom    Apology (Plato)                                                59,957  0.17%      3/28   
+  2680  wisdom    Meditations (Marcus Aurelius)                                 318,621  0.89%      2/26   
+   785  wisdom    On the Nature of Things (Lucretius)                           421,077  1.18%      3/23   
+  8438  wisdom    Nicomachean Ethics (Aristotle)                                545,257  1.53%      8/34   
+   216  wisdom    Tao Te Ching (Laozi)                                           58,509  0.16%      3/22   
+   132  wisdom    The Art of War (Sun Tzu)                                       63,420  0.18%      3/27   
+ 11000  myth      The Epic of Gilgamesh (Old Babylonian tablets) (Anonymous)     12,124  0.03%      1/8    
+ 73533  myth      The Poetic Edda (Anonymous)                                   309,595  0.87%      5/65   
+  5186  myth      The Kalevala (Elias Lönnrot (compiler))                       760,462  2.13%      2/21   
+ 24869  myth      The Ramayana (Valmiki)                                      1,426,160  4.00%      3/24     (sampled from 1,865,016)
+ 15474  myth      The Mahabharata, Volume 1 (Vyasa)                             320,232  0.90%     21/175    (sampled from 1,333,716)
+ 15475  myth      The Mahabharata, Volume 2 (Vyasa)                              84,810  0.24%      6/39     (sampled from 355,840)
+ 15476  myth      The Mahabharata, Volume 3 (Vyasa)                             631,045  1.77%     20/183    (sampled from 2,654,842)
+ 15477  myth      The Mahabharata, Volume 4 (Vyasa)                             376,911  1.06%     17/107    (sampled from 1,581,815)
+ 56550  myth      The Popol Vuh (Anonymous)                                      62,828  0.18%      2/28   
+ 69566  myth      The Egyptian Book of the Dead (Anonymous)                     353,499  0.99%     15/197  
+  9914  myth      Enuma Elish (The Babylonian Legends of the Creation) (Anon     45,720  0.13%      3/24   
+  8018  myth      The Book of Job (Anonymous)                                    96,829  0.27%      2/21   
+  8021  myth      Ecclesiastes (Anonymous)                                       29,138  0.08%      2/15   
+  8022  myth      The Song of Songs (Anonymous)                                  14,086  0.04%      1/8    
+  7849  tale      The Trial (Franz Kafka)                                       451,597  1.27%      4/27   
+   174  tale      The Picture of Dorian Gray (Oscar Wilde)                      433,702  1.22%      3/29   
+    43  tale      The Strange Case of Dr Jekyll and Mr Hyde (Robert Louis St    140,511  0.39%      3/28   
+   209  tale      The Turn of the Screw (Henry James)                           230,804  0.65%      3/28   
+  1952  tale      The Yellow Wallpaper (Charlotte Perkins Gilman)                32,030  0.09%      2/17   
+  1597  tale      Andersen's Fairy Tales (Hans Christian Andersen)              303,847  0.85%      3/31   
+  5160  tale      The Mabinogion (Anonymous)                                    560,545  1.57%      3/26   
+ 66057  tale      The Tale of Genji (Part I) (Murasaki Shikibu)                 514,583  1.44%      3/26   
+  2707  chronicle The Histories, Volume 1 (Herodotus)                           740,484  2.08%      2/23     (sampled from 797,806)
+  2456  chronicle The Histories, Volume 2 (Herodotus)                           699,506  1.96%      3/23     (sampled from 752,597)
+  7142  chronicle The History of the Peloponnesian War (Thucydides)           1,199,488  3.36%      5/31   
+  1170  chronicle Anabasis (Xenophon)                                           503,936  1.41%      6/56   
+  6386  chronicle The Twelve Caesars, Volume 1 (Suetonius)                      137,037  0.38%      3/23   
+  6387  chronicle The Twelve Caesars, Volume 2 (Suetonius)                      239,459  0.67%      2/22   
+  6388  chronicle The Twelve Caesars, Volume 3 (Suetonius)                      121,249  0.34%      2/23   
+  6389  chronicle The Twelve Caesars, Volume 4 (Suetonius)                       87,031  0.24%      3/25   
+  6390  chronicle The Twelve Caesars, Volume 5 (Suetonius)                       85,292  0.24%      3/24   
+  6391  chronicle The Twelve Caesars, Volume 6 (Suetonius)                      133,277  0.37%      3/24   
+  6392  chronicle The Twelve Caesars, Volume 7 (Suetonius)                       33,294  0.09%      2/20   
+  6393  chronicle The Twelve Caesars, Volume 8 (Suetonius)                       18,955  0.05%      2/12   
+  6394  chronicle The Twelve Caesars, Volume 9 (Suetonius)                       26,943  0.08%      1/16   
+  6395  chronicle The Twelve Caesars, Volume 10 (Suetonius)                      38,818  0.11%      3/24   
+  6396  chronicle The Twelve Caesars, Volume 11 (Suetonius)                      22,779  0.06%      2/14   
+  6397  chronicle The Twelve Caesars, Volume 12 (Suetonius)                      57,526  0.16%      3/26   
+  3623  chronicle The Golden Bough (James George Frazer)                      1,428,130  4.01%     11/72     (sampled from 2,255,139)
+    HF  dream     DreamBank (5,908 of 16,132 reports)                         4,744,666 13.31%    591/5908   (sampled from 12,978,011)
+--------------------------------------------------------------------------------------------------------------
+        work      The Poems of Keats                                            379,039  1.06%
+        work      The Mahabharata                                             1,412,998  3.96%
+        work      The Histories                                               1,439,990  4.04%
+        work      The Twelve Caesars                                          1,001,660  2.81%
+--------------------------------------------------------------------------------------------------------------
+        tale      (tag total)                                                 9,126,236 25.60%
+        myth      (tag total)                                                 8,544,447 23.97%
+        chronicle (tag total)                                                 5,573,204 15.63%
+        dream     (tag total)                                                 4,744,666 13.31%
+        poem      (tag total)                                                 4,643,212 13.02%
+        wisdom    (tag total)                                                 3,017,220  8.46%
+
+total characters:  35,649,309
+train / val:       31,940,166 / 3,708,601  (10.4% val)
+largest work:      DreamBank (13.31%)
+unique characters: 237
+                   \n !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_abcdefghijklmnopqrstuvwxyz{}~£§¯°´·½¾ÁÂÄÆÇÉËÖÜßàáâãäæçèéêëíîïñóôöùúûüþÿĀāŌōŒœŚśšŪūŭǹȦȧΑΓΕΛΜΝΞΟάέήίαβγδεηθικλμνξοπρςστυφχωόύώϣֶּׁאדשḍḥḫṇṛṣṭἀἈἐἔἕἠἡἰἴὅὐὑὔὗὴὶὸῖῦῳῶῷ–—‘’“”…⁂ⲃⲟⲩⲱ
+
+Skipped from the reading list:
+  - The Castle (Kafka): no public-domain English translation available as text: the Muirs' 1930 translation only entered the US public domain in 2026 and is not on Project Gutenberg
+  - Letters from a Stoic (Seneca): Gummere's translation (1917-25) is public domain but not on Project Gutenberg; Gutenberg has only other Seneca (On Benefits, Minor Dialogues)
+  - The Enneads (Plotinus): MacKenna's translation (1917-30) is not on Project Gutenberg; only one short essay is
+  - The Panchatantra: no public-domain English translation on Project Gutenberg (Ryder's 1925 one is PD in the US but not digitised there)
+  - The Book of Dede Korkut: no public-domain English translation exists (the first full ones are from 1972 and 1974)
+  - The Descent of Inanna: no public-domain English translation: the Sumerian text was pieced together and translated (Kramer) from the 1930s on
+  - One Thousand and One Nights: dropped as a duplicate of The Arabian Nights (Lang's selection is already in)
+  - The Oneirocritica (Artemidorus): for data/interpretation/: no public-domain English translation on Project Gutenberg (Wood's 1644 version is not digitised there)
+wrote data/run5/arcadia.txt, train.txt, val.txt, val_<tag>.txt

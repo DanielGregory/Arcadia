@@ -5,18 +5,23 @@ Steps:
      DreamBank reports (cached in data/raw/dreambank/, see fetch_dreambank.py).
   2. Strip Gutenberg headers/footers, translator prefaces, introductions,
      notes, indexes and footnotes, using the per-book rules in books.py.
-  3. Cap each SEASONING book at 4% of the final corpus by randomly sampling
-     whole paragraphs to keep.
+  3. Cap every work at 4% of the final corpus by randomly sampling whole
+     paragraphs to keep (a work can span several Gutenberg files, e.g. the
+     Mahabharata's four volumes). Plays are turned into plain verse or prose:
+     speaker names, stage directions and cast lists go.
   4. Randomly sample whole DreamBank reports, each wrapped in <dream>...</dream>,
-     until the "dreambank" tier is 25% of the final corpus.
-  5. Write data/arcadia.txt, then a 90/10 train/val split (data/train.txt,
-     data/val.txt): ~10% of each book's sections, and ~10% of the sampled
+     until DreamBank is --dreambank_share of the final corpus (run 5: 13.5%).
+  5. Write <out_dir>/arcadia.txt, then a 90/10 train/val split (train.txt,
+     val.txt, and val_<tag>.txt per source tag): ~10% of each book's sections, and ~10% of the sampled
      dream reports, go to val.
-  6. Print a per-source table, the tier split, and total and unique character counts.
+  6. Print a per-source table, the per-tag split, total and unique character
+     counts, and the books from the reading list that were skipped (and why).
+  7. Set the dream-interpretation books aside in data/interpretation/ (not trained on).
 
 Usage:
     python -m engine.data_prep.build_corpus
     python -m engine.data_prep.build_corpus --refresh --seed 7
+    python -m engine.data_prep.build_corpus --tags --dreambank_share 0.135 --out_dir data/run5   # run 5
 """
 
 from __future__ import annotations
@@ -32,21 +37,20 @@ from pathlib import Path
 import requests
 from tqdm import tqdm
 
-from engine.data_prep.books import BOOKS, SEASONING, Book
+from engine.data_prep.books import BOOKS, INTERPRETATION, SKIPPED, Book
 from engine.data_prep.fetch_dreambank import load_reports
 from engine.data_prep.fetch_gutenberg import HEADERS, fetch_raw, strip_gutenberg
 
-SEASONING_CAP = 0.04
-DREAMBANK = "dreambank"
-DREAMBANK_SHARE = 0.25  # default; run 3 uses --dreambank_share 0.12
+WORK_CAP = 0.04         # no work may be more than 4% of the corpus
+DREAMBANK = "dream"     # DreamBank's tag
+DREAMBANK_SHARE = 0.135
 
 # Source tags (--tags, run 3 on): every passage of a book is wrapped in its
-# tier's tag, the way each DreamBank report is wrapped in <dream>...</dream>.
+# tag (books.py), the way each DreamBank report is wrapped in <dream>...</dream>.
 # The tag tells the model which voice it is reading, and at sampling time
 # lets us ask for a voice. Passages are runs of whole paragraphs of about
 # PASSAGE_CHARS characters (~one 256-token training window), so almost every
 # training window contains a tag.
-TIER_TAGS = {"core": "myth", "dream": "tale", "seasoning": "saga"}
 PASSAGE_CHARS = 1000
 VAL_FRACTION = 0.10
 # Sections longer than this share of their book are cut into paragraph-aligned
@@ -179,10 +183,73 @@ def generic_heading(text: str) -> bool:
     return len(letters) > 2 and sum(c.isupper() for c in letters) >= 0.8 * len(letters)
 
 
+# --------------------------------------------------------------------- plays
+# A speaker's name on a line of its own: "KENT.", "FIRST WITCH.", "_XANTHIAS_".
+SPEAKER_LINE = re.compile(r"_?[A-Z][A-Z’'\-]*(?:[ ,&][A-Z][A-Z’'\-]*)*_?\.?(?:\s*\[[^\]]*\]?)?")
+# A speaker's name at the start of a line, in capitals: "VUL. Thy tongue", "DIONYSUS. Aye".
+SPEAKER_PREFIX = re.compile(r"^_?[A-Z][A-Z’'\-]+(?: [A-Z][A-Z’'\-]+)*_?\.(?:\s*\([^)]*\)\.?)?\s+")
+# A stage direction on its own: "Enter Kent, Gloucester and Edmund.", "Exeunt.", "[Thunder.]"
+STAGE_LINE = re.compile(r"(?:\[.*|\(.*\)\.?|(?:Enter|Exit|Exeunt|Re-enter|Manet|Flourish|Alarum|Alarums|Sennet"
+                        r"|Trumpets?|Thunder|Music|Storm|Noise within|Retreat|Hautboys|Dies|A tucket)\b.*)")
+# Cast lists: the heading, and every short line after it up to the first blank line.
+CAST_HEADING = re.compile(r"(?:DRAMATIS PERSON[AÆ]E?|Dramatis Person[aæ]e?|PERSONS (?:OF THE DRAMA|REPRESENTED)\.?"
+                          r"|CHARACTERS (?:OF|IN) THE PLAY|PERSONS OF THE DIALOGUE.*)\s*")
+
+
+# Cast-list lines: "THESEUS, King of Athens", or a short Title-Case name ("The Priest of Zeus.").
+CAST_CAPS = re.compile(r"(?:A |THE )?[A-Z][A-Z’'\-]+(?: [A-Z][A-Z’'\-]+)*,.*")
+CAST_NAME = re.compile(r"(?:The |A |An )?[A-Z][a-z’'\-]+(?: (?:of|the|and|to|in|at)? ?[A-Z][a-z’'\-]+){0,5}\.?")
+# The setting, before the first line is spoken: "Scene: Thebes.", "The Scene is the Palace of Atreus".
+SETTING = re.compile(r"(?:the )?scene(?::| is | represents | lies ).*", re.S | re.I)
+
+
+def play_lines(para: str, book: Book) -> str:
+    """A play paragraph as plain verse or prose: no speakers, stage directions or cast lists."""
+    para = re.sub(r"\[[^\]]*\]", "", para, flags=re.S)        # [_Exit._], [Lies down ...]
+    # These editions set stage directions (and some speaker names) in _italics_:
+    # a paragraph or line that is italic from end to end is not spoken.
+    if re.fullmatch(r"\s*_[^_]+_[.,:;\s]*", para, flags=re.S):
+        return ""
+    para = "\n".join(l for l in para.split("\n") if not re.fullmatch(r"\s*_[^_]+_[.,:;]?\s*", l))
+    lines = para.split("\n")
+    if CAST_HEADING.fullmatch(lines[0].strip()) or SETTING.fullmatch(para.replace("_", "").strip()):
+        return ""
+    stripped = [l.strip() for l in lines if l.strip()]
+    names = [l.replace("_", "") for l in stripped]
+    if names and ((CAST_CAPS.fullmatch(names[0]) or SPEAKER_LINE.fullmatch(names[0]))
+                  and (n_cast := sum(bool(CAST_CAPS.fullmatch(l) or SPEAKER_LINE.fullmatch(l)) for l in names))
+                  > len(names) / 2  # long entries wrap onto a second line
+                  and (n_cast >= 2 or (len(names) == 1 and CAST_CAPS.fullmatch(names[0])))
+                  or (len(stripped) >= 2 and all(CAST_NAME.fullmatch(l) for l in stripped))):
+        return ""  # a cast list
+    if len(stripped) == 1 and CAST_NAME.fullmatch(stripped[0]) and stripped[0][-1].isalpha():
+        return ""  # a speaker's name in mixed case on its own ("A Watchman"); spoken lines end in punctuation
+    speakers = re.compile(rf"^(?:{book.speakers})(?:\s*\([^)]*\))?\.\s*") if book.speakers else None
+    out = []
+    for line in lines:
+        s = line.strip()
+        if not s:
+            continue
+        if SPEAKER_LINE.fullmatch(s) and sum(c.isalpha() for c in s) >= 2:
+            continue
+        if STAGE_LINE.fullmatch(s.replace("_", "").strip()):
+            continue
+        s = SPEAKER_PREFIX.sub("", s)
+        if speakers:
+            s = speakers.sub("", s)
+        if s:
+            out.append(s)
+    return "\n".join(out)
+
+
 def clean_paragraph(raw: str, book: Book) -> str | None:
     if book.drop_indented and all(l[:1].isspace() for l in raw.split("\n")):
         return None
     para = textwrap.dedent(raw)
+    if book.play:
+        para = play_lines(para, book)
+        if not para:
+            return None
     for pat in GENERIC_DROP + book.drop_paragraphs:
         if re.match(pat, para):
             return None
@@ -198,6 +265,7 @@ def clean_paragraph(raw: str, book: Book) -> str | None:
     para = re.sub(r"\{([^{}]*)\}", r"\1", para)  # Riley's {supplied words}
     para = para.replace("_", "")                  # _italics_
     para = para.replace("`", "‘")                 # old-style `opening quotes'
+    para = re.sub(r"([,;:])(?=[^\W\d_])", r"\1 ", para)  # a removed marker can leave "Válmíki,bird"
     para = re.sub(r"[ \t]{2,}", " ", para)
     para = re.sub(r"[ \t]+([,;:.!?])", r"\1", para)
     para = "\n".join(l.strip() for l in para.split("\n")).strip()
@@ -237,6 +305,8 @@ def clean_book(raw: str, book: Book) -> list[Section]:
         is_head = bool(section_rx.fullmatch(text)) if section_rx else generic_heading(text)
         if is_head and any(not p.heading for p in sections[-1]):
             sections.append([])
+        if is_head and book.play:
+            continue  # a play's ACT/SCENE heading: a section boundary, but not text to read
         sections[-1].append(Para(text, is_head))
     sections = [s for s in sections if any(not p.heading for p in s)]
     return subdivide(sections)
@@ -271,16 +341,15 @@ def subdivide(sections: list[Section]) -> list[Section]:
 
 
 # ----------------------------------------------------------------- seasoning
-def final_total(sizes: dict[int, int], seasoning_ids: set[int], dreambank_share: float = DREAMBANK_SHARE,
+def final_total(work_sizes: dict[str, int], dreambank_share: float = DREAMBANK_SHARE,
                 dreambank_chars: int = 0) -> int:
-    """Solve for the final corpus size T, where each seasoning book is capped at
-    4% of T and DreamBank adds 25% of T:  T = fixed + sum(min(s_i, 0.04 T)) + 0.25 T."""
-    fixed = sum(n for i, n in sizes.items() if i not in seasoning_ids)
-    # dreambank_chars: a fixed amount of DreamBank (--dreambank_reports) instead of a share.
-    total = (sum(sizes.values()) + dreambank_chars) / (1 - dreambank_share)
-    for _ in range(200):
-        cap = SEASONING_CAP * total
-        new_total = (fixed + sum(min(sizes[i], cap) for i in seasoning_ids) + dreambank_chars) / (1 - dreambank_share)
+    """Solve for the final corpus size T, where every work is capped at 4% of T
+    and DreamBank adds `dreambank_share` of T:  T = sum(min(s_w, 0.04 T)) + share * T.
+    The cap depends on T and T on the cap, so iterate until it settles."""
+    total = (sum(work_sizes.values()) + dreambank_chars) / (1 - dreambank_share)
+    for _ in range(500):
+        cap = WORK_CAP * total
+        new_total = (sum(min(n, cap) for n in work_sizes.values()) + dreambank_chars) / (1 - dreambank_share)
         if abs(new_total - total) < 1:
             break
         total = new_total
@@ -373,16 +442,16 @@ def join(sections: list[Section]) -> str:
 # ---------------------------------------------------------------------- main
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    parser.add_argument("--data-dir", type=Path, default=Path("data"), help="where data/raw/ (the download cache) lives")
+    parser.add_argument("--out_dir", type=Path, help="where to write the corpus (default: --data-dir; run 5: data/run5)")
     parser.add_argument("--seed", type=int, default=1729)
     parser.add_argument("--refresh", action="store_true", help="re-download cached texts")
     parser.add_argument("--dreambank_share", type=float, default=DREAMBANK_SHARE,
-                        help="DreamBank's share of the final corpus (run 2: 0.25, run 3: 0.12)")
-    parser.add_argument("--dreambank_reports", type=int, default=0,
-                        help="use exactly this many DreamBank reports instead of a share (run 3: 2529, the run 2 count)")
+                        help="DreamBank's share of the final corpus (run 2: 0.25, run 3: 0.12, run 5: 0.135)")
     parser.add_argument("--tags", action="store_true",
-                        help="wrap book passages in <myth>/<tale>/<saga> source tags (run 3)")
+                        help="wrap every passage in its source tag: <myth>, <tale>, <poem>, <wisdom>, <chronicle>")
     args = parser.parse_args()
+    out_dir = args.out_dir or args.data_dir
 
     cache = args.data_dir / "raw" / "gutenberg"
     cache.mkdir(parents=True, exist_ok=True)
@@ -397,82 +466,99 @@ def main() -> None:
 
     rng = random.Random(args.seed)
     raw_sizes = {i: book_len(s) for i, s in books.items()}
-    seasoning_ids = {b.gutenberg_id for b in BOOKS if b.tier == SEASONING}
-    # DreamBank either fills a share of the corpus, or (--dreambank_reports N) is a
-    # fixed number of whole reports and its share falls out of the book total.
-    dream_rng = random.Random(f"{args.seed}-{DREAMBANK}")
-    if args.dreambank_reports:
-        order = list(range(len(reports)))
-        dream_rng.shuffle(order)
-        dreams = [wrap_dream(reports[i]["text"]) for i in order[: args.dreambank_reports]]
-        dream_chars = sum(len(d) + len(PARA_SEP) for d in dreams)
-        target_total = final_total(raw_sizes, seasoning_ids, 0.0, dream_chars)
-    else:
-        target_total = final_total(raw_sizes, seasoning_ids, args.dreambank_share)
-    cap = int(SEASONING_CAP * target_total)
-    for i in sorted(seasoning_ids):
-        if raw_sizes[i] > cap:
-            books[i] = trim(books[i], cap, rng)
+    works: dict[str, list[Book]] = {}
+    for book in BOOKS:
+        works.setdefault(book.work_name, []).append(book)
+    work_sizes = {w: sum(raw_sizes[b.gutenberg_id] for b in bs) for w, bs in works.items()}
+
+    # 4% cap per work. A work over the cap is sampled down; its volumes keep
+    # their share of the work (a 4-volume work gives each volume ~1% if equal).
+    target_total = final_total(work_sizes, args.dreambank_share)
+    cap = int(WORK_CAP * target_total)
+    for w, bs in works.items():
+        if work_sizes[w] > cap:
+            for b in bs:
+                share = raw_sizes[b.gutenberg_id] / work_sizes[w]
+                books[b.gutenberg_id] = trim(books[b.gutenberg_id], int(cap * share), rng)
 
     # DreamBank gets its own RNG so its sample doesn't shift when the book list changes.
-    if not args.dreambank_reports:
-        dreams = sample_dreams(reports, int(args.dreambank_share * target_total), dream_rng)
+    dream_rng = random.Random(f"{args.seed}-dreambank")
+    dreams = sample_dreams(reports, int(args.dreambank_share * target_total), dream_rng)
     dream_val = set(dream_rng.sample(range(len(dreams)), round(VAL_FRACTION * len(dreams))))
 
     full, train, val = [], [], []
-    val_by_tier: dict[str, list[str]] = {}  # the same val text, grouped by tier
+    val_by_tag: dict[str, list[str]] = {}  # the same val text, grouped by tag
     rows = []
     for book in BOOKS:
         sections = books[book.gutenberg_id]
         val_idx = split_sections(sections, rng)
-        tag = TIER_TAGS[book.tier] if args.tags else None
+        tag = book.tag if args.tags else None
         full.append(join_tagged(sections, tag))
         train.append(join_tagged([s for k, s in enumerate(sections) if k not in val_idx], tag))
         val.append(join_tagged([s for k, s in enumerate(sections) if k in val_idx], tag))
-        val_by_tier.setdefault(book.tier, []).append(val[-1])
-        rows.append((book.gutenberg_id, book.tier, f"{book.title} ({book.author})", len(full[-1]),
+        val_by_tag.setdefault(book.tag, []).append(val[-1])
+        rows.append((book.gutenberg_id, book.tag, book.work_name, f"{book.title} ({book.author})", len(full[-1]),
                      raw_sizes[book.gutenberg_id], len(val_idx), len(sections)))
 
     full.append(PARA_SEP.join(dreams))
     train.append(PARA_SEP.join(d for k, d in enumerate(dreams) if k not in dream_val))
     val.append(PARA_SEP.join(d for k, d in enumerate(dreams) if k in dream_val))
-    val_by_tier[DREAMBANK] = [val[-1]]
+    val_by_tag[DREAMBANK] = [val[-1]]
     dream_pool = sum(len(wrap_dream(r["text"])) + len(PARA_SEP) for r in reports)
-    rows.append(("HF", DREAMBANK, f"DreamBank ({len(dreams):,} of {len(reports):,} reports)",
+    rows.append(("HF", DREAMBANK, "DreamBank", f"DreamBank ({len(dreams):,} of {len(reports):,} reports)",
                  len(full[-1]), dream_pool, len(dream_val), len(dreams)))
 
     corpus = BOOK_SEP.join(full)
-    args.data_dir.mkdir(parents=True, exist_ok=True)
-    (args.data_dir / "arcadia.txt").write_text(corpus, encoding="utf-8")
-    (args.data_dir / "train.txt").write_text(BOOK_SEP.join(t for t in train if t), encoding="utf-8")
-    (args.data_dir / "val.txt").write_text(BOOK_SEP.join(v for v in val if v), encoding="utf-8")
-    # Per-tier copies of val.txt (val_core.txt, val_dream.txt, ...) so training
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "arcadia.txt").write_text(corpus, encoding="utf-8")
+    (out_dir / "train.txt").write_text(BOOK_SEP.join(t for t in train if t), encoding="utf-8")
+    (out_dir / "val.txt").write_text(BOOK_SEP.join(v for v in val if v), encoding="utf-8")
+    # Per-tag copies of val.txt (val_myth.txt, val_dream.txt, ...) so training
     # can report how well each kind of text is learned.
-    for tier, parts in val_by_tier.items():
-        (args.data_dir / f"val_{tier}.txt").write_text(BOOK_SEP.join(v for v in parts if v), encoding="utf-8")
+    for tag, parts in val_by_tag.items():
+        (out_dir / f"val_{tag}.txt").write_text(BOOK_SEP.join(v for v in parts if v), encoding="utf-8")
+
+    # 7. The dream-interpretation books, cleaned the same way but set aside.
+    interp = args.data_dir / "interpretation"
+    interp.mkdir(parents=True, exist_ok=True)
+    for book in INTERPRETATION:
+        text = join(clean_book(load_raw(book, cache, session, args.refresh), book))
+        (interp / f"{book.gutenberg_id}.txt").write_text(text, encoding="utf-8")
+        print(f"set aside (not trained on): {interp / f'{book.gutenberg_id}.txt'}  {book.title} ({len(text):,} chars)")
 
     total = len(corpus)
     print()
-    print(f"{'id':>6}  {'tier':<9} {'source':<50} {'chars':>10} {'%':>6}  {'val/units':>11}")
-    print("-" * 100)
-    tiers: dict[str, int] = {}
-    for sid, tier, title, n, raw_n, n_val, n_units in rows:
-        tiers[tier] = tiers.get(tier, 0) + n
-        trimmed = f"  (sampled from {raw_n:,})" if n < raw_n else ""
-        print(f"{sid:>6}  {tier:<9} {title[:50]:<50} {n:>10,} {100 * n / total:>5.2f}%"
+    print(f"{'id':>6}  {'tag':<9} {'source':<58} {'chars':>10} {'%':>6}  {'val/units':>11}")
+    print("-" * 110)
+    by_tag: dict[str, int] = {}
+    by_work: dict[str, int] = {}
+    for sid, tag, work, title, n, raw_n, n_val, n_units in rows:
+        by_tag[tag] = by_tag.get(tag, 0) + n
+        by_work[work] = by_work.get(work, 0) + n
+        trimmed = f"  (sampled from {raw_n:,})" if n < raw_n * 0.98 else ""
+        print(f"{sid:>6}  {tag:<9} {title[:58]:<58} {n:>10,} {100 * n / total:>5.2f}%"
               f"  {n_val:>5}/{n_units:<5}{trimmed}")
-    print("-" * 100)
-    for tier, n in tiers.items():
-        print(f"{'':>6}  {tier:<9} {'(tier total)':<50} {n:>10,} {100 * n / total:>5.2f}%")
+    print("-" * 110)
+    multi = [w for w in works if len(works[w]) > 1]
+    for w in multi:
+        print(f"{'':>6}  {'work':<9} {w[:58]:<58} {by_work[w]:>10,} {100 * by_work[w] / total:>5.2f}%")
+    print("-" * 110)
+    for tag, n in sorted(by_tag.items(), key=lambda kv: -kv[1]):
+        print(f"{'':>6}  {tag:<9} {'(tag total)':<58} {n:>10,} {100 * n / total:>5.2f}%")
     print()
     train_n = sum(map(len, train))
     val_n = sum(map(len, val))
     chars = sorted(set(corpus))
     print(f"total characters:  {total:,}")
     print(f"train / val:       {train_n:,} / {val_n:,}  ({100 * val_n / (train_n + val_n):.1f}% val)")
+    print(f"largest work:      {max(by_work, key=by_work.get)} ({100 * max(by_work.values()) / total:.2f}%)")
     print(f"unique characters: {len(chars)}")
     print("                   " + "".join(c if c.isprintable() and c != " " else repr(c)[1:-1] for c in chars))
-    print(f"wrote {args.data_dir / 'arcadia.txt'}, train.txt, val.txt, val_<tier>.txt")
+    print()
+    print("Skipped from the reading list:")
+    for title, reason in SKIPPED:
+        print(f"  - {title}: {reason}")
+    print(f"wrote {out_dir / 'arcadia.txt'}, train.txt, val.txt, val_<tag>.txt")
 
 
 if __name__ == "__main__":
