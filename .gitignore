@@ -26,3 +26,6 @@ data/*
 # Model checkpoints
 *.pt
 checkpoints/
+
+# Generated images (downloaded from Kaggle runs)
+assets/generated/
