@@ -88,3 +88,14 @@ python -m engine.hub pull --repo <user>/arcadia-dreams --run full
 ```
 
 The Kaggle notebook's last cell does the push, using a Kaggle Secret named `HF_TOKEN`.
+
+## Run 2: BPE tokenizer
+
+```bash
+python -m engine.data_prep.build_corpus
+python -m engine.tokenizer --vocab_size 8000            # SentencePiece BPE, trained on train.txt
+python -m engine.train --config configs/run2.py --out_dir checkpoints/run2
+python -m engine.sample --ckpt checkpoints/run2/best.pt --dreams 3 --temperature 0.9
+```
+
+`engine/train.py` reports loss per token and bits per character, overall and for each tier (core, dream, seasoning, dreambank), so runs with different tokenizers can be compared. On Kaggle use `notebooks/kaggle_train_run2.ipynb`. `engine/train_char.py` and `notebooks/kaggle_train.ipynb` are kept unchanged as the run 1 baseline.

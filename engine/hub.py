@@ -39,13 +39,12 @@ MODEL_CARD = """---
 license: other
 tags:
 - arcadia
-- character-level
 - gpt
 ---
 
 # Arcadia dream model
 
-A small GPT-style transformer trained from scratch to generate dreams for the
+A small GPT-style transformer (character-level in run 1, BPE from run 2) trained from scratch to generate dreams for the
 Arcadia simulated world. Code: https://github.com/DanielGregory/Arcadia
 
 Each folder is one training run: `best.pt` (lowest validation loss),
@@ -90,7 +89,9 @@ def build_upload(run_dir: Path, staging: Path, include_latest: bool) -> list[Pat
     info = {
         "step": ckpt["step"],
         "val_loss": ckpt["val_loss"],
-        "vocab_size": len(ckpt["chars"]),
+        "val_bits_per_char": ckpt.get("val_bpc"),
+        "tokenizer": ckpt["tokenizer"]["kind"] if "tokenizer" in ckpt else "char",
+        "vocab_size": ckpt["model_config"]["vocab_size"],
         "model_config": ckpt["model_config"],
         "train_config": ckpt["train_config"],
         "git_commit": git_commit(),

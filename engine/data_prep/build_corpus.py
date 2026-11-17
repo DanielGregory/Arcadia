@@ -369,6 +369,7 @@ def main() -> None:
     dream_val = set(dream_rng.sample(range(len(dreams)), round(VAL_FRACTION * len(dreams))))
 
     full, train, val = [], [], []
+    val_by_tier: dict[str, list[str]] = {}  # the same val text, grouped by tier
     rows = []
     for book in BOOKS:
         sections = books[book.gutenberg_id]
@@ -376,12 +377,14 @@ def main() -> None:
         full.append(join(sections))
         train.append(join([s for k, s in enumerate(sections) if k not in val_idx]))
         val.append(join([s for k, s in enumerate(sections) if k in val_idx]))
+        val_by_tier.setdefault(book.tier, []).append(val[-1])
         rows.append((book.gutenberg_id, book.tier, f"{book.title} ({book.author})", len(full[-1]),
                      raw_sizes[book.gutenberg_id], len(val_idx), len(sections)))
 
     full.append(PARA_SEP.join(dreams))
     train.append(PARA_SEP.join(d for k, d in enumerate(dreams) if k not in dream_val))
     val.append(PARA_SEP.join(d for k, d in enumerate(dreams) if k in dream_val))
+    val_by_tier[DREAMBANK] = [val[-1]]
     dream_pool = sum(len(wrap_dream(r["text"])) + len(PARA_SEP) for r in reports)
     rows.append(("HF", DREAMBANK, f"DreamBank ({len(dreams):,} of {len(reports):,} reports)",
                  len(full[-1]), dream_pool, len(dream_val), len(dreams)))
@@ -391,6 +394,10 @@ def main() -> None:
     (args.data_dir / "arcadia.txt").write_text(corpus, encoding="utf-8")
     (args.data_dir / "train.txt").write_text(BOOK_SEP.join(t for t in train if t), encoding="utf-8")
     (args.data_dir / "val.txt").write_text(BOOK_SEP.join(v for v in val if v), encoding="utf-8")
+    # Per-tier copies of val.txt (val_core.txt, val_dream.txt, ...) so training
+    # can report how well each kind of text is learned.
+    for tier, parts in val_by_tier.items():
+        (args.data_dir / f"val_{tier}.txt").write_text(BOOK_SEP.join(v for v in parts if v), encoding="utf-8")
 
     total = len(corpus)
     print()
@@ -413,7 +420,7 @@ def main() -> None:
     print(f"train / val:       {train_n:,} / {val_n:,}  ({100 * val_n / (train_n + val_n):.1f}% val)")
     print(f"unique characters: {len(chars)}")
     print("                   " + "".join(c if c.isprintable() and c != " " else repr(c)[1:-1] for c in chars))
-    print(f"wrote {args.data_dir / 'arcadia.txt'}, train.txt, val.txt")
+    print(f"wrote {args.data_dir / 'arcadia.txt'}, train.txt, val.txt, val_<tier>.txt")
 
 
 if __name__ == "__main__":
