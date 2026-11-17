@@ -64,7 +64,11 @@ def push(job: dict) -> None:
 def wait(kernel: str, poll: int = 60) -> str:
     last = None
     while True:
-        status = kaggle("kernels", "status", kernel, check=False).strip().split()[-1].strip('"')
+        reply = kaggle("kernels", "status", kernel, check=False).strip()
+        # A refused key looks like any other reply; stop instead of polling forever.
+        if "Authentication required" in reply or "was denied" in reply:
+            sys.exit(f"Kaggle refused the API key while checking {kernel}:\n{reply[:300]}")
+        status = reply.split()[-1].strip('"')
         if status != last:
             print(f"{time.strftime('%H:%M:%S')} {status}", flush=True)
             last = status
