@@ -1,22 +1,44 @@
 {
- "id": "corva_v2_06",
+ "id": "corva_v4_07",
  "kind": "canonical_corva",
- "prompt": "Corva, an ancient harbor city of white marble temples with columns terraced up a steep hillside, dark cypress trees between them, a curved harbor full of wooden galleys with square sails and oars, rowing boats, mountains fading into haze, sun low over a calm sea, figures unloading a galley on the quay",
- "prompt_2": "ancient harbor city, white columned temples terraced up a hillside, cypresses, galleys with square sails in the harbor, figures unloading a galley on the quay, Claude Lorrain oil painting, golden hour, hazy mountains, painterly",
- "negative_prompt": "empty coastline, wilderness, modern buildings, cars, text, watermark, signature, picture frame, border, photograph, 3d render, cartoon, blurry, deformed",
- "seed": 1006,
+ "prompt": "Corva harbor town: many white houses and terraces climbing the steep green hillside, a zigzag stone stairway and a switchback road winding from the quay up to the temple citadel on the summit, the colonnaded palace on the quay, cypresses, ancient galleys, calm sea, sun low in haze",
+ "prompt_2": "hillside town of many houses, zigzag stairway up to the summit temple, warm golden hour, Claude Lorrain oil painting",
+ "negative_prompt": "empty hillside, bare slope, repeated identical buildings, duplicated temples, modern buildings, cars, three-masted ship, grey, washed out, text, watermark, signature, frame, photograph, blurry",
+ "seed": 4007,
  "width": 1344,
  "height": 768,
- "revision_of": "corva_06",
+ "init_image": "assets/canonical/corva.png",
+ "strength": 0.65,
+ "ip_adapter_image": "assets/reference/corva_reference.jpg",
+ "ip_adapter_scale": 0.8,
+ "ip_adapter_mode": "style",
+ "revision_of": "corva_v2_06",
  "model": "stabilityai/stable-diffusion-xl-base-1.0",
  "vae": "madebyollin/sdxl-vae-fp16-fix",
- "steps": 30,
+ "steps": 40,
  "guidance_scale": 6.5,
- "seconds": 26.2,
- "git_commit": "cc84f227c39ace0f812f4f570ccc95ae429565da",
+ "seconds": 27.4,
+ "git_commit": "5cc843ca85cb84e99364baa9cc21a2fd222c7b5c",
  "reference": "assets/reference/corva_reference.jpg",
+ "ip_adapter_used": true,
+ "ip_adapter": {
+  "repo": "h94/IP-Adapter",
+  "subfolder": "sdxl_models",
+  "weight_name": "ip-adapter_sdxl_vit-h.safetensors",
+  "image_encoder": "models/image_encoder"
+ },
  "canonical": true,
  "picked_in": "review gallery (Supabase images.picked)",
- "picked_from": "generated/corva/corva_v2_06.png",
- "previous_pick": "assets/canonical/corva_previous_v2_02.png (corva_v2_02, replaced because refinements of it repeated the same temple)"
+ "picked_from": "generated/corva/corva_v4_07.png",
+ "lineage": [
+  "corva_v2_06 (picked)",
+  "img2img refinement v4: more houses, a way up the hill, style-only reference"
+ ],
+ "previous_picks": [
+  "assets/canonical/corva_previous_v2_02.png",
+  "assets/canonical/corva_previous_v2_06.png"
+ ],
+ "known_issues": [
+  "two lamp posts on the central path (anachronistic)"
+ ]
 }
