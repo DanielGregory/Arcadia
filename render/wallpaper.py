@@ -6,11 +6,15 @@ Layout (top to bottom):
     ── as dreamed ──
     the raw dream, exactly as the model wrote it small italic, faint
 
-The background is either a painting of the dream (the daily morning
-pipeline, daily/morning_job.py) or, without one, a soft sky gradient. The
-painting is scaled to cover the whole screen and the text sits on a frosted
-panel (the painting blurred and darkened beneath it) so it stays readable on
-any picture. The sky's palette (dawn, morning, dusk or night) is picked from a
+Two layouts:
+
+  PAINTING (the daily morning pipeline, daily/morning_job.py): the art is the
+  point. The painting fills the screen untouched and the dream is a small
+  caption in a corner (bottom-left on a desktop, low on a phone, clear of the
+  lock-screen clock and the dock), on a soft shadow rather than a box. Only the
+  "as remembered" text goes on; the raw dream lives in the gallery.
+
+  SKY (no painting): the text is the point, as in the layout below. The sky's palette (dawn, morning, dusk or night) is picked from a
 hash of the dream text, so the same dream always gets the same sky, with a
 little film grain and a vignette. The text sizes shrink until everything fits.
 
@@ -108,31 +112,69 @@ def cover(picture: Image.Image, size: tuple[int, int]) -> Image.Image:
     return scaled.crop((left, top, left + w, top + h))
 
 
-def frosted_panel(img: Image.Image, box: tuple[int, int, int, int], radius: int) -> Image.Image:
-    """Blur and darken the picture inside a rounded box, so text on it is readable."""
-    w, h = img.size
-    blurred = img.filter(ImageFilter.GaussianBlur(max(w, h) / 90))
-    dark = Image.blend(blurred, Image.new("RGB", img.size, (12, 12, 20)), 0.55)
+def soft_shadow(img: Image.Image, box: tuple[int, int, int, int], blur: float, strength: int = 165) -> Image.Image:
+    """Darken the painting softly around a box: a shadow with no edges, so it reads as light, not as a panel."""
     mask = Image.new("L", img.size, 0)
-    ImageDraw.Draw(mask).rounded_rectangle(box, radius=radius, fill=255)
-    mask = mask.filter(ImageFilter.GaussianBlur(radius / 3))  # soft edge
-    return Image.composite(dark, img, mask)
+    ImageDraw.Draw(mask).rectangle(box, fill=strength)
+    mask = mask.filter(ImageFilter.GaussianBlur(blur))
+    return Image.composite(Image.new("RGB", img.size, (8, 8, 14)), img, mask)
+
+
+def render_caption(text: str, out_path: Path, painting: Image.Image, size: tuple[int, int], number: int | None,
+                   date: dt.date | None, font_path: str | None, italic_path: str | None) -> None:
+    """The painting full screen, the dream as a small caption in a corner."""
+    w, h = size
+    img = cover(painting, size)
+    draw = ImageDraw.Draw(img)
+    font_path = font_path or find_font(SERIF)
+    phone = h > w
+    # Where the caption goes, as fractions of the screen. Phones keep the top third
+    # for the clock and the bottom for the lock-screen buttons; desktops keep the
+    # bottom strip for a dock or taskbar.
+    if phone:
+        left, box_w, bottom, max_h, base_px = 0.08 * w, 0.84 * w, 0.12 * h, 0.32 * h, 40 * w / 1290
+    else:
+        left, box_w, bottom, max_h, base_px = 0.045 * w, 0.31 * w, 0.09 * h, 0.40 * h, 29 * w / 2560
+
+    date = date or dt.date.today()
+    header = "  ·  ".join(filter(None, ["ARCADIA", f"DREAM {number}" if number else None,
+                                        date.strftime("%-d %B %Y").upper()]))
+    spaced = " ".join(header)
+    # The largest text size (down to 70% of the base) that fits in max_h.
+    for px in range(int(base_px), int(base_px * 0.7) - 1, -1):
+        font = ImageFont.truetype(font_path, px)
+        lines = wrap(draw, text, font, int(box_w))
+        line_h = int(px * 1.45)
+        header_px = max(12, int(px * 0.55))
+        block_h = int(header_px * 2.4) + len(lines) * line_h
+        if block_h <= max_h:
+            break
+    header_font = ImageFont.truetype(font_path, header_px)
+    top = int(h - bottom - block_h)
+    pad = px * 1.6
+    img = soft_shadow(img, (int(left - pad), int(top - pad), int(left + box_w + pad), int(h - bottom + pad)), blur=pad * 1.4)
+    draw = ImageDraw.Draw(img)
+    draw.text((left, top), spaced, font=header_font, fill=(226, 218, 206))
+    y = top + int(header_px * 2.4)
+    for line in lines:
+        draw.text((left, y), line, font=font, fill=(250, 244, 234))
+        y += line_h
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out_path, optimize=True)
 
 
 def render(remembered: str, raw: str, out_path: Path, size=(2560, 1440), number: int | None = None,
            date: dt.date | None = None, font_path: str | None = None, italic_path: str | None = None,
            background: Image.Image | None = None) -> str:
     """Draw one wallpaper; returns the palette name used ("painting" with a background picture)."""
+    if background is not None:
+        render_caption(remembered, out_path, background, size, number, date, font_path, italic_path)
+        return "painting"
     w, h = size
     seed = int(hashlib.sha256(remembered.encode()).hexdigest(), 16)
-    if background is not None:
-        palette = "painting"
-        ink, ink2 = (250, 244, 234), (226, 218, 206)  # warm off-white on the dark panel
-        img = cover(background, size)
-    else:
-        palette = list(PALETTES)[seed % len(PALETTES)]
-        top, bottom, ink, ink2 = PALETTES[palette]
-        img = sky(size, top, bottom, seed)
+    palette = list(PALETTES)[seed % len(PALETTES)]
+    top, bottom, ink, ink2 = PALETTES[palette]
+    img = sky(size, top, bottom, seed)
     draw = ImageDraw.Draw(img)
     font_path = font_path or find_font(SERIF)
     italic_path = italic_path or find_font(SERIF_ITALIC)
@@ -162,14 +204,6 @@ def render(remembered: str, raw: str, out_path: Path, size=(2560, 1440), number:
             break
 
     y = int((h - block_h) / 2 + h * 0.03)
-    if background is not None:
-        # The panel covers the text block with some padding; the header gets its own small one.
-        pad = int(48 * unit)
-        img = frosted_panel(img, (margin_x - pad, y - pad, w - margin_x + pad, y + block_h + pad), int(28 * unit))
-        hw = draw.textlength(spaced, font=header_font)
-        img = frosted_panel(img, (int(w / 2 - hw / 2 - 30 * unit), int(h * 0.07 - 26 * unit),
-                                  int(w / 2 + hw / 2 + 30 * unit), int(h * 0.07 + 26 * unit)), int(20 * unit))
-        draw = ImageDraw.Draw(img)
     draw.text((w / 2, int(h * 0.07)), spaced, font=header_font, fill=ink2, anchor="mm")
 
     for line in main_lines:

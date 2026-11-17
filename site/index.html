@@ -152,12 +152,11 @@ function renderToday() {
   el.innerHTML = `
     <p class="today-head">Morning ${esc(meta.number ?? "")} · ${esc(fmtDay(m.day))}</p>
     <article class="card">
-      <img class="wall" src="${imgUrl(m.wallpaper_desktop)}" alt="" data-full="${imgUrl(m.wallpaper_desktop)}">
+      <img src="${imgUrl(m.painting)}" alt="" data-full="${imgUrl(m.painting)}">
       <div class="body">
         <div class="downloads">
-          <a href="${imgUrl(m.wallpaper_desktop)}" download>Desktop</a>
-          <a href="${imgUrl(m.wallpaper_phone)}" download>Phone</a>
-          <a href="${imgUrl(m.painting)}" download>Painting</a>
+          <a href="${imgUrl(m.wallpaper_desktop)}" download>Desktop wallpaper</a>
+          <a href="${imgUrl(m.wallpaper_phone)}" download>Phone wallpaper</a>
         </div>
         ${m.remembered ? `<p class="label">As remembered</p><p class="text">${esc(m.remembered)}</p>` : ""}
         <p class="label">As dreamed</p><p class="${m.remembered ? "raw" : "text"}">${esc(m.raw)}</p>
