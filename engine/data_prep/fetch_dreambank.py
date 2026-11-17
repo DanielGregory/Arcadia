@@ -4,8 +4,9 @@ Keeps reports of 50-400 words (whitespace-split), with whitespace normalised and
 no content filtering. Two format fixes are applied first: Mac Roman mojibake is
 repaired, and the study questionnaire some series append after the dream
 ("Answers to questions 2. Frustrated... 3. actual participant4. unpleasant5. ...")
-is cut off. The kept reports are cached as JSON lines in
-data/raw/dreambank/reports_v2.jsonl, so later builds need neither the network
+is cut off, and the date stamps and titles some series put at the start of a
+report ("(02/01/97)["I have the big gun."] ...") are removed. The kept reports
+are cached as JSON lines in data/raw/dreambank/reports_v3.jsonl, so later builds need neither the network
 nor the `datasets` library.
 
 Usage:
@@ -37,7 +38,23 @@ MOJIBAKE = str.maketrans({"Ò": "“", "Ó": "”", "Ô": "‘", "Õ": "’", "�
 # phrase on is removed (the dream itself is untouched).
 QUESTIONNAIRE = re.compile(r"\s*Answers to questions\b.*$", re.DOTALL)
 
-CACHE_NAME = "reports_v2.jsonl"  # v2: questionnaire trailers removed
+# Many series start each report with a date stamp and sometimes a title or
+# counter: "(02/01/97)["I have the big gun."] I am on a beach...",
+# "(2002-01-26) Well, I went...", "(06/30/98)[2nd dream] ...", "(3) ...".
+# These leading stamps are record-keeping, not dream text; strip them (and any
+# "..." left behind). Only the very start of a report is touched.
+_DATE = r"\d{1,4}[/.-]\d{1,2}(?:[/.-]\d{1,4})*"
+LEADING_STAMP = re.compile(
+    r"^\s*(?:"
+    rf"\([^()]*{_DATE}[^()]*\)"            # (02/01/97), (2002-01-26), (9th grader, 02/01/97)
+    r"|\(\d{1,3}\)"                       # (3)
+    r"|\[\s*\"[^\]]*\"\s*\]"               # ["Title."]
+    r"|\[\s*\d+(?:st|nd|rd|th)\s+dream\s*\]"  # [2nd dream]
+    r"|\.{2,}"                             # "...." after a stamp
+    r"|\s+)+"
+)
+
+CACHE_NAME = "reports_v3.jsonl"  # v2: questionnaire trailers removed; v3: leading date stamps removed
 
 
 def download(hf_cache: Path) -> list[dict]:
@@ -47,7 +64,7 @@ def download(hf_cache: Path) -> list[dict]:
     kept = []
     for row in ds:
         text = QUESTIONNAIRE.sub("", (row["dreams"] or "").translate(MOJIBAKE))
-        text = re.sub(r"\s+", " ", text).strip()
+        text = LEADING_STAMP.sub("", re.sub(r"\s+", " ", text)).strip()
         if MIN_WORDS <= len(text.split()) <= MAX_WORDS:
             kept.append({"series": row["series"], "text": text})
     return kept
