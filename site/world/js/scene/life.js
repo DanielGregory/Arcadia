@@ -42,7 +42,7 @@ export function makeShips(L) {
     }
     ship.position.set(s.x, 0.15, s.z);
     ship.rotation.y = s.rot;
-    ship.scale.setScalar(0.85 + ((i * 0.37) % 0.3));
+    ship.scale.setScalar((s.scale ?? (kind === "fishing" ? 0.8 : 0.55)) * (0.92 + ((i * 0.37) % 0.16)));   // real size next to the houses
     ship.traverse(o => { o.castShadow = true; });
     group.add(ship);
     return { ship, phase: i * 1.7, speed: 0.6 + (i % 5) * 0.12, small: kind === "fishing" };
@@ -200,7 +200,8 @@ export function makeClouds(count = 16, wide = 0) {
     update(dt, state, camera = null) {
       for (const c of clouds) {
         if (camera) {
-          const above = c.big ? 1 : 1 - THREE.MathUtils.smoothstep(camera.position.y, 320, 650);
+          // (the sky now paints its own clouds: these are for flying, faded in as you climb)
+          const above = c.big ? THREE.MathUtils.smoothstep(camera.position.y, 350, 900) : 0;
           const inside = THREE.MathUtils.smoothstep(camera.position.distanceTo(c.s.position), c.s.scale.x * 0.3, c.s.scale.x * 0.9);
           c.s.material.opacity = above * inside;
           c.s.visible = c.s.material.opacity > 0.01;

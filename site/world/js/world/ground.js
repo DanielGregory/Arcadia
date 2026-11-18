@@ -9,7 +9,7 @@
 // and olive groves are; the tree placement (tilework.js) uses the same functions, so the trees
 // stand where the ground is coloured for them.
 
-import { fbm, CITY } from "./terrain.js";
+import { fbm, CITY, inland } from "./terrain.js";
 import { roadDist, riverAt, villageNear } from "./featuremap.js";
 
 // sRGB hex -> linear RGB
@@ -43,6 +43,11 @@ export function groveAt(x, z, y, slope) {
   const patches = sstep(fbm(x * 0.0035 - 4.1, z * 0.0035 + 2.9, 3), 0.55, 0.66);
   const inVillage = v ? sstep(v.d, v.v.r * 0.9, v.v.r * 1.2) : 1;   // not in the streets
   return Math.min(1, nearVillage * 0.9 + patches) * (1 - sstep(slope, 0.2, 0.35)) * inVillage * (1 - cityNear(x, z));
+}
+// Inside Corva's built-up area itself (its terraces), where nothing wild grows.
+export function cityCore(x, z) {
+  const s = inland(x, z);
+  return s > -5 && s < 172 && z > -(150 - s * 0.55) - 8 && z < 95 - s * 0.55 + 8;
 }
 // 1 inside Corva's own area (its hand-placed trees and streets), fading out by ~600 m
 export function cityNear(x, z) { return 1 - sstep(Math.hypot(x - CITY.x, z - CITY.z), 420, 600); }

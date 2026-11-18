@@ -15,7 +15,7 @@ self.onmessage = e => {
     return;
   }
   const t = buildTile(m.x0, m.z0, m.size, m.res);
-  const trees = m.trees ? tileTrees(m.x0, m.z0, m.size, m.size / m.res, m.trees) : null;
+  const trees = m.trees ? tileTrees(m.x0, m.z0, m.size, m.size / m.res, m.trees, m.near) : null;
   const transfer = [t.pos.buffer, t.nor.buffer, t.col.buffer, t.uv.buffer];
   if (trees) for (const k in trees) transfer.push(trees[k].buffer);
   self.postMessage({ kind: "tile", id: m.id, res: m.res, trees, ...t }, transfer);

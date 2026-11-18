@@ -24,8 +24,8 @@ function place(mesh, i, x, y, z, rot, sx, sy, sz) {
 const C3 = hex => new THREE.Color(hex);
 const TOWNS = {
   corva: {
-    kinds: { cube: 0.16, gable: 0.15, hip: 0.12, twostorey: 0.18, courtyard: 0.1, tower: 0.1, lshape: 0.11, stair: 0.08 },
-    walls: ["#f3ede0", "#efe4cc", "#ecd6ad", "#ecd2c0", "#f1e3c4", "#e9e2d6"], trims: ["#3f6f8f", "#4f7254", "#7a3b2e", "#5a3f2a", "#2f5f6f"],
+    kinds: { cube: 0.26, stair: 0.1, twostorey: 0.16, lshape: 0.1, gable: 0.1, hip: 0.1, tower: 0.1, courtyard: 0.08 },
+    walls: ["#f1e6cf", "#ecdcbb", "#e8d3ad", "#f0dfc0", "#e6d6bb", "#f3eadb"], trims: ["#3f6f8f", "#4f7254", "#7a3b2e", "#5a3f2a", "#2f5f6f"],
     roofs: ["#b0603d", "#a8573a", "#bf7350", "#9c5034"],
   },
   harbour: {
@@ -110,11 +110,30 @@ export function makeCity(L, quality, seed = 1717, { plaster = null, detail = 1 }
   L.walls.forEach((w, i) => place(walls, i, w.x, -3, w.z, w.rot, w.wide || 2.6, w.h + 3, w.len));
   stairs.receiveShadow = walls.receiveShadow = true;
   group.add(stairs, walls);
+  // retaining walls under the terraces: stone, from below the street up to the house's floor
+  const ret = L.retaining || [];
+  const retaining = new THREE.InstancedMesh(box, lambert("#c2b293"), Math.max(1, ret.length));
+  ret.forEach((w, i) => place(retaining, i, w.x, w.y - 1.5, w.z, w.rot, 1.1, w.top - w.y + 1.5, w.len));
+  retaining.count = ret.length;
+  retaining.castShadow = retaining.receiveShadow = true;
+  // sea stacks: tall broken pillars of rock in the water below the cliffs
+  const rocks = L.rocks || [];
+  const stacks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 1).translate(0, 0.5, 0), lambert("#b4a088"), Math.max(1, rocks.length));
+  const rp = stacks.geometry.attributes.position;
+  for (let i = 0; i < rp.count; i++) {                            // rough them up, narrower toward the top
+    const y = rp.getY(i), n = 0.75 + 0.5 * Math.abs(Math.sin(i * 12.9898) * 0.6);
+    rp.setXYZ(i, rp.getX(i) * n * (1.15 - y * 0.5), y, rp.getZ(i) * n * (1.15 - y * 0.5));
+  }
+  stacks.geometry.computeVertexNormals();
+  rocks.forEach((k, i) => place(stacks, i, k.x, -12, k.z, k.rot, k.w, k.h + 12, k.w * 0.8));
+  stacks.count = rocks.length;
+  stacks.castShadow = stacks.receiveShadow = true;
+  group.add(retaining, stacks);
 
   return {
     group,
     // the materials, so AI textures can be laid on them (aiassets.js)
-    materials: { houses: houseMat, temples: material, stairs: stairs.material, walls: walls.material },
+    materials: { houses: houseMat, temples: material, stairs: stairs.material, walls: walls.material, retaining: retaining.material },
     update(state) { material.userData.night.value = houseMat.userData.night.value = state.night; },   // windows glow as night falls
   };
 }

@@ -69,37 +69,54 @@ export function generateLayout(seed = 1717, quality = "medium") {
     grid.take(p.x, p.z, t.w + 6, t.d + 6);
   }
 
-  // --- the zigzag stairway from the quay to the summit -------------------------------------
-  const path = [];
-  for (let s = 6, k = 0; s <= 112; s += 1.0, k++) {
-    const zig = 11 * Math.sin((s / 26) * Math.PI);       // switchbacks across the slope
-    path.push(at(s, -12 + zig));
-  }
-  for (let i = 0; i < path.length; i += 1) {
-    const a = path[i], b = path[Math.min(i + 1, path.length - 1)];
-    L.stairs.push({ x: a.x, z: a.z, y: a.y, rot: Math.atan2(b.x - a.x, b.z - a.z) });
-    grid.take(a.x, a.z, 4, 4);
-  }
-  L.streets.push(path.map(p => ({ x: p.x, y: p.y + 1.2, z: p.z })));
+  // --- stairways: one main zigzag from the quay to the summit, and three narrower winding ones
+  // (each a list of steps; lanterns walk them at night)
+  const stairway = (z0, amp, period, s0, s1) => {
+    const path = [];
+    for (let s = s0; s <= s1; s += 1.0) path.push(at(s, z0 + amp * Math.sin((s / period) * Math.PI) + 3 * Math.sin(s / 7)));
+    for (let i = 0; i < path.length; i++) {
+      const a = path[i], b = path[Math.min(i + 1, path.length - 1)];
+      L.stairs.push({ x: a.x, z: a.z, y: a.y, rot: Math.atan2(b.x - a.x, b.z - a.z) });
+      grid.take(a.x, a.z, 4, 4);
+    }
+    L.streets.push(path.map(p => ({ x: p.x, y: p.y + 1.2, z: p.z })));
+  };
+  stairway(-12, 11, 26, 6, 112);
+  stairway(-98, 7, 18, 14, 140);
+  stairway(48, 6, 17, 8, 120);
+  stairway(-58, 6, 21, 10, 132);
+  const stairCount = L.streets.length;
 
   // --- terraces of houses -------------------------------------------------------------------
-  // (wider than stage 1's: the capital should be the biggest place on the island by far)
-  for (let s = 12; s <= 160; s += 9) {
+  // Stacked up the hill as in the painting: rows only 7 m apart that wander with the slope, so the
+  // houses of each row stand above the roofs of the one below; one, two or three storeys; clustered
+  // together with gaps for gardens; a stone retaining wall under each house's front where it stands
+  // above the street; a street along the foot of every row.
+  L.retaining = [];
+  for (let s = 10; s <= 165; s += 7) {
     const street = [];
     for (let z = -cityHalf(s); z <= cityHalf(s, 1); ) {   // the city narrows towards the top
-      const w = 4.5 + r() * 4, d = 4 + r() * 3.5, h = 3.2 + r() * 3.6 + (r() < 0.25 ? 3 : 0);
-      const jitter = r() * 1.5;
-      const p = at(s + jitter, z);
-      if (r() < 0.9 && grid.free(p.x, p.z, d + 1, w + 1) && slopeAt(p.x, p.z) < 1.4 && inland(p.x, p.z) > 6) {
-        // a third of the houses get a smaller upper storey set back from the street
-        const upper = r() < 0.35 ? { w: w * (0.45 + r() * 0.25), d: d * (0.45 + r() * 0.2), h: 2.4 + r() * 1.4, off: (r() - 0.5) * w * 0.3 } : null;
-        L.houses.push({ x: p.x, z: p.z, y: p.y, w, d, h, rot: facing(z), upper });
-        grid.take(p.x, p.z, d + 1, w + 1);
+      const sr = s + 2.5 * Math.sin(z / 19 + s * 0.37) + (fbm(z * 0.05, s * 0.05, 2) - 0.5) * 4;
+      const cluster = fbm(z * 0.035 + 3, sr * 0.035 - 1, 2);
+      const w = 4.2 + r() * 3.6, d = 4.5 + r() * 3.5;
+      let h = 3.2 + r() * 2.6;
+      if (r() < 0.35) h += 2.8;                           // two storeys
+      if (r() < 0.12) h += 2.8;                           // three
+      const p = at(sr + r() * 1.2, z);
+      // (only the front part of each house is reserved: on the slope its back is under the next
+      // row's fronts, which is what makes the stacked look)
+      if (cluster > 0.27 && grid.free(p.x, p.z, d * 0.55, w + 1) && slopeAt(p.x, p.z) < 1.8 && inland(p.x, p.z) > 6) {
+        L.houses.push({ x: p.x, z: p.z, y: p.y, w, d, h, rot: facing(z) + (r() - 0.5) * 0.15 });
+        grid.take(p.x, p.z, d * 0.55, w + 1);
         if (r() < 0.12) L.chimneys.push({ x: p.x, y: p.y + h + 0.6, z: p.z });
+        const f = at(sr - d / 2 - 1.4, z);
+        if (p.y - f.y > 0.6) L.retaining.push({ x: f.x, z: f.z, y: f.y, top: p.y + 0.35, len: w + 1.4, rot: facing(z) });
       }
-      const q = at(s - 5, z);                             // the street runs just below each terrace
-      street.push({ x: q.x, y: q.y + 1.1, z: q.z });
-      z += w + 1.7 + r() * 1.8;                           // (enough that the next house clears this one's margin)
+      // the street along the foot of the row; it breaks off where the slope turns to cliff
+      const q = at(sr - d / 2 - 3, z);
+      if (slopeAt(q.x, q.z) < 0.9 && inland(q.x, q.z) > 4) street.push({ x: q.x, y: q.y + 1.1, z: q.z });
+      else if (street.length) { if (street.length > 3) L.streets.push(street.splice(0)); else street.length = 0; }
+      z += w + 1.2 + r() * 1.4;
     }
     if (street.length > 3) L.streets.push(street);
   }
@@ -142,18 +159,31 @@ export function generateLayout(seed = 1717, quality = "medium") {
     grid.take(p.x, p.z, 2, 2);
   }
 
-  // --- ships: some moored along the quay, the rest out in the bay ---------------------------
-  for (let i = 0; i < 16; i++) {
-    const moored = i < 6;
-    const z = moored ? -40 + i * 13 + r() * 4 : (r() - 0.5) * 230;
-    const s = moored ? -(7 + r() * 3) : -(25 + r() * 170);
-    const x = coastX(z) - s;
-    if (heightAt(x, z) > -2) continue;
-    L.ships.push({ x, z, rot: moored ? facing(z) + Math.PI / 2 : r() * Math.PI * 2, size: 0.8 + r() * 0.8,
-                   sail: !moored || r() < 0.3 });
+  // --- ships: a few, at their real size, clustered along the quay by the harbour wall ----------
+  // (merchantmen and galleys tied up alongside, fishing boats inside the mole, two traders at anchor)
+  const moored = ["merchant", "galley", "merchant", "merchant", "galley"];
+  moored.forEach((kind, i) => {
+    const z = -44 + i * 19 + r() * 4, x = coastX(z) + 7 + r() * 1.5;
+    if (heightAt(x, z) < -1.2) L.ships.push({ x, z, rot: facing(z) + Math.PI / 2, kind, scale: 0.5, sail: false });
+  });
+  for (let i = 0; i < 6; i++) {
+    const z = 28 + r() * 26, x = coastX(z) + 12 + r() * 14;
+    if (heightAt(x, z) < -1.2) L.ships.push({ x, z, rot: r() * 6.28, kind: "fishing", scale: 0.8, sail: false });
   }
-  // Corva's streets (below each terrace) are paved; the stairway (the first street) has its own steps
-  L.paths = L.streets.slice(1).map(st => ({ pts: st.map(p => ({ x: p.x, z: p.z })), width: 3.4, surface: "paving" }));
+  for (let i = 0; i < 2; i++) {
+    const z = -40 + r() * 90, x = coastX(z) + 70 + r() * 90;
+    if (heightAt(x, z) < -3) L.ships.push({ x, z, rot: r() * 6.28, kind: "merchant", scale: 0.55, sail: true });
+  }
+  // --- sea stacks: rock pillars standing in the water below the cliffs -------------------------
+  L.rocks = [];
+  for (let i = 0; i < 14; i++) {
+    const north = i < 10, z = north ? -130 - r() * 300 : 150 + r() * 160;
+    const x = Math.min(coastX(z), 420) + 10 + r() * 55;
+    if (heightAt(x, z) > -2) continue;
+    L.rocks.push({ x, z, w: 4 + r() * 8, h: 7 + r() * 20, rot: r() * 6.28 });
+  }
+  // Corva's streets are paved (the stairways have their own steps)
+  L.paths = L.streets.slice(stairCount).map(st => ({ pts: st.map(p => ({ x: p.x, z: p.z })), width: 3.2, surface: "paving" }));
   L.squares = [];
   L.grid = grid;
   return L;

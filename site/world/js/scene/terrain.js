@@ -30,6 +30,10 @@ const TREES = {
              fit: s => [1.3 * s, 1.9 * s, 1.35 * s, 1.9 * s] },
   cypress: { geo: () => new THREE.ConeGeometry(1, 1, 6).translate(0, 0.5, 0), color: "#2c3a20",
              fit: s => [-0.4, 1.0 * s, 9 * s, 1.0 * s] },
+  scrub:   { geo: () => new THREE.IcosahedronGeometry(1, 0), color: "#6b7446",
+             fit: s => [0.25 * s, 0.85 * s, 0.6 * s, 0.85 * s] },
+  boulder: { geo: () => new THREE.DodecahedronGeometry(1, 0), color: "#c2b39c",
+             fit: s => [0.1 * s, 0.8 * s, 0.5 * s, 0.7 * s] },
 };
 const m4 = new THREE.Matrix4(), qt = new THREE.Quaternion(), UP = new THREE.Vector3(0, 1, 0), v3 = new THREE.Vector3(), sc = new THREE.Vector3(), tint = new THREE.Color();
 
@@ -112,7 +116,7 @@ export class Terrain {
       const t0 = performance.now();
       for (const t of todo) {
         const res = this.resFor(t.want);
-        const trees = t.want < this.treeLevels ? tileTrees(t.x0, t.z0, this.size, this.size / res, this.treeSpacing) : null;
+        const trees = t.want < this.treeLevels ? tileTrees(t.x0, t.z0, this.size, this.size / res, this.treeSpacing, t.want === 0) : null;
         this.receive({ id: t.id, res, trees, ...buildTile(t.x0, t.z0, this.size, res) }, t.want);
         if (performance.now() - t0 > budget) break;
       }
@@ -125,7 +129,7 @@ export class Terrain {
       this.pending++;
       const res = this.resFor(t.want);
       this.workers[this.nextWorker++ % this.workers.length].postMessage({ id: t.id, x0: t.x0, z0: t.z0, size: this.size, res,
-                                                                          trees: t.want < this.treeLevels ? this.treeSpacing : 0 });
+                                                                          trees: t.want < this.treeLevels ? this.treeSpacing : 0, near: t.want === 0 });
     }
   }
 

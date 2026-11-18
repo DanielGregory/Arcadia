@@ -99,7 +99,7 @@ terrain.update(camera.position, { sync: true });
 const shoreReady = terrain.shoreMap().then(m => sea.setIslandShore(islandShoreTexture(m)));
 if (params.get("shot") === "1") await shoreReady;
 const distant = makeDistantIslands();
-if (tex.stone) for (const k of ["stairs", "walls"]) { city.materials[k].map = tex.stone; city.materials[k].needsUpdate = true; }
+if (tex.stone) for (const k of ["stairs", "walls", "retaining"]) { city.materials[k].map = tex.stone; city.materials[k].needsUpdate = true; }
 if (tex.hillside) {
   // A detail map (mean 0.5, doubled), faded out beyond ~400 m: further away its 24 m repeat would
   // show as a grid of squares, and at that distance it can't be seen as texture anyway.
@@ -108,6 +108,8 @@ if (tex.hillside) {
     shader.fragmentShader = shader.fragmentShader.replace("#include <map_fragment>", `
       #ifdef USE_MAP
         float detailFade = smoothstep(420.0, 160.0, length(vViewPosition));
+        // not on steep faces: its world-space squares would stretch down a cliff into stripes
+        detailFade *= smoothstep(0.55, 0.8, dot(normalize(vNormal), normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz)));
         diffuseColor.rgb *= mix(vec3(1.0), texture2D(map, vMapUv).rgb * 2.0, detailFade);
       #endif`);
   };
@@ -149,14 +151,15 @@ function applyDay(state, time) {
 
   // (the sun light's position follows the camera's target: set in frame())
   sunLight.color.copy(state.sunColor);
-  sunLight.intensity = state.sunPower * (state.sunUp > 0.02 ? 1.4 : 0.9);
+  // a strong low sun and a weaker fill from the sky: real shadows, the contrast of the painting
+  sunLight.intensity = state.sunPower * (state.sunUp > 0.02 ? 1.9 : 0.9);
   hemi.color.copy(state.skyAmbient);
   hemi.groundColor.copy(state.groundAmbient);
-  hemi.intensity = 1.6;
+  hemi.intensity = 1.25 + 0.35 * state.night;
   scene.fog.color.copy(state.fog);
   // the air thins as you climb: from high up the whole island should be visible, so the haze
   // fades with the camera's height (stage 1's view, ~60 m up, is unchanged)
-  scene.fog.density = 0.00018 * airAbove();
+  scene.fog.density = 0.0001 * airAbove();
 }
 // 1 near the ground, about a third by 1 km up, a tenth by 3 km
 function airAbove() { return 1 / (1 + Math.max(0, camera.position.y - 150) / 350); }
@@ -177,7 +180,7 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-const hazeNear = new THREE.Color(), hazeFar = new THREE.Color(), VIOLET = new THREE.Color("#8d92b8");
+const hazeNear = new THREE.Color(), hazeFar = new THREE.Color(), VIOLET = new THREE.Color("#7f8cbf");
 let dayT = fixedTime ?? START_TIME, live = fixedTime === null, clock = 0, lastNow = performance.now(), frames = 0;
 const shot = params.get("shot") === "1";
 if (shot) clock = 40;   // as if the scene had been running a while
@@ -208,10 +211,12 @@ function frame(now) {
   if (backdrops) backdrops.update(state, rig.target);
   fpsCount(dt);
   // aerial perspective: near haze is the light in the air, far haze cools toward violet-blue
-  hazeNear.copy(state.fog).lerp(state.horizon, 0.5);
-  hazeFar.copy(state.horizon).lerp(VIOLET, 0.32).multiplyScalar(0.55 + 0.45 * state.sunUp);
-  painter.render(scene, camera, { exposure: 1.12 + 0.9 * state.night, night: state.night, hazeNear, hazeFar,
-                                  hazeScale: (0.00055 + 0.00025 * (1 - Math.abs(state.sun.y))) * airAbove() });
+  // aerial perspective: warm light in the near air, cooling to blue-violet with distance (the
+  // beige wash over everything came from too much of the warm near haze)
+  hazeNear.copy(state.fog).lerp(state.horizon, 0.35).lerp(VIOLET, 0.15);
+  hazeFar.copy(state.horizon).lerp(VIOLET, 0.55).multiplyScalar(0.55 + 0.45 * state.sunUp);
+  painter.render(scene, camera, { exposure: 1.28 + 0.9 * state.night, night: state.night, hazeNear, hazeFar,
+                                  hazeScale: (0.00032 + 0.00014 * (1 - Math.abs(state.sun.y))) * airAbove() });
   document.getElementById("clock").textContent = timeLabel(dayT);
   frames++;
   // ?shot=1: draw a few frames (so smoke and lanterns settle), then stop, for screenshots

@@ -10,7 +10,7 @@
 // the light doesn't show a line where they meet.
 
 import { heightAt, fbm } from "./terrain.js";
-import { groundColor, woodAt, groveAt, cityNear } from "./ground.js";
+import { groundColor, woodAt, groveAt, cityNear, cityCore } from "./ground.js";
 import { roadDist, riverAt, villageNear, pathClearance } from "./featuremap.js";
 
 export function buildTile(x0, z0, size, res) {
@@ -84,6 +84,8 @@ export function shoreBytes(rect, nx, nz) {
 //   oak      round dark crowns in the forests (lower down) and along the rivers (plane trees)
 //   olive    silver-green, in straight rows in the groves
 //   cypress  tall narrow spires by the villages and lining the roads
+//   scrub    low dark bushes of the maquis on open hillsides (nearest tiles only)
+//   boulder  grey rocks scattered on the slopes, more where it's steep (nearest tiles only)
 // `spacing` sets how dense the forests are (it's coarser on phones). `step` is the tile's point
 // spacing: trees are stood on the same height the tile shows, so they don't float or sink.
 
@@ -93,8 +95,8 @@ function hash2(x, z, s) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
 }
 
-export function tileTrees(x0, z0, size, step, spacing) {
-  const kinds = { pine: [], oak: [], olive: [], cypress: [] };
+export function tileTrees(x0, z0, size, step, spacing, near = false) {
+  const kinds = { pine: [], oak: [], olive: [], cypress: [], scrub: [], boulder: [] };
   const ground = (x, z) => heightAt(x, z, step);
   const slopeHere = (x, z) => Math.hypot(ground(x + 3, z) - ground(x - 3, z), ground(x, z + 3) - ground(x, z - 3)) / 6;
   // no trees in the water, on roads, in river channels, in village streets or in Corva
@@ -146,6 +148,22 @@ export function tileTrees(x0, z0, size, step, spacing) {
     const y = ground(x, z);
     if (y < 2.5 || cityNear(x, z) > 0.5) continue;
     add("cypress", x, y, z, 0.8 + hash2(gx, gz, 16) * 0.5);
+  }
+  // scrub and boulders: only on the nearest tiles (they're small), everywhere wild, including the
+  // slopes round Corva (not in its streets)
+  if (near) {
+    const sp = Math.max(6, spacing * 0.45);
+    for (let gz = z0; gz < z0 + size; gz += sp) for (let gx = x0; gx < x0 + size; gx += sp) {
+      const x = gx + hash2(gx, gz, 21) * sp, z = gz + hash2(gx, gz, 22) * sp;
+      const y = ground(x, z);
+      if (y < 2 || cityCore(x, z) || roadDist(x, z) < 4 || pathClearance(x, z) < 1) continue;
+      const rv = riverAt(x, z);
+      if (rv && rv.d < rv.w + 2) continue;
+      const slope = slopeHere(x, z), r = hash2(gx, gz, 23);
+      const bush = (0.18 + 0.4 * fbm(x * 0.01 + 7, z * 0.01, 2)) * (y < 900 ? 1 : 0.3) * (1 - groveAt(x, z, y, slope));
+      if (r < bush) add("scrub", x, y, z, 0.6 + hash2(gx, gz, 24) * 0.9);
+      else if (r < bush + 0.03 + Math.min(0.2, slope * 0.15)) add("boulder", x, y, z, 0.6 + Math.pow(hash2(gx, gz, 25), 2) * 1.6);
+    }
   }
   const out = {};
   for (const k in kinds) out[k] = new Float32Array(kinds[k]);

@@ -14,8 +14,8 @@ const KEYS = [
   [0.29, "#4b6c9e", "#f0b08c", "#ffb27e", 1.25, "#7d8aa8", "#4a3c30", "#d6aa90"],  // dawn
   [0.36, "#5d8cc0", "#e6d3b2", "#fff0d6", 2.20, "#9ab0cc", "#5c5240", "#cfc8b8"],  // morning
   [0.50, "#6a9acb", "#dcd9c8", "#fff8ec", 2.70, "#a8bfd6", "#6a604c", "#cfd2cc"],  // noon
-  [0.66, "#6690bf", "#ead6a8", "#ffe7bc", 2.40, "#a2b2c6", "#6c5c44", "#d8ccb0"],
-  [0.73, "#5a7ca9", "#ffc785", "#ffbc70", 2.60, "#9aa6c0", "#6a5238", "#e6c6a2"],  // golden hour
+  [0.66, "#4a80bd", "#ead6a8", "#ffe7bc", 2.40, "#a2b2c6", "#6c5c44", "#d8ccb0"],
+  [0.73, "#2f6db8", "#ffc785", "#ffbc70", 2.60, "#9aa6c0", "#6a5238", "#e6c6a2"],  // golden hour (a clear blue overhead, as in the painting)
   [0.785, "#3e507f", "#f28d5c", "#ff8448", 1.10, "#6a6888", "#4a3428", "#c8866a"], // sunset
   [0.83, "#1e2650", "#704a6e", "#b07090", 0.35, "#38375a", "#1e1a20", "#4c3a52"],  // dusk
   [0.90, "#0b1430", "#262f58", "#9fb2e8", 0.50, "#304476", "#13161f", "#1e2a4a"],  // night

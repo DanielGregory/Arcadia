@@ -18,7 +18,7 @@
 // Everything that sits on the ground (buildings, trees, the camera) asks heightAt(), so nothing
 // that uses it needed to change when the land grew from a bay into an island.
 
-import { riverAt } from "./featuremap.js";
+import { riverAt, villageNear } from "./featuremap.js";
 
 export const SEA_LEVEL = 0;
 
@@ -100,7 +100,12 @@ function seaFloor(x, z, s) { return Math.max(-14, s * 0.35) + fbm(x * 0.05, z * 
 // receding up the north shore. (Lowered by a third in step B: built as a backdrop for one fixed
 // view, from the air they stood as a 700 m wall behind the city.)
 function bayLand(x, z, s) {
-  const hill = 52 * (1 - Math.exp(-Math.max(0, s - 8) / 55));
+  const hill = 66 * (1 - Math.exp(-Math.max(0, s - 8) / 52));      // (steeper than stage 1's: the city is stacked up it)
+  // sheer cliffs about 30 m high north of the harbour (z < -90): the city above them stands on the
+  // clifftop, as in the painting; the beach and quay south of them stay low (and so does the south
+  // shore the first view looks from)
+  const cliffs = smooth(Math.min(1, Math.max(0, (-z - 70) / 40)))
+                 * (26 + 10 * fbm(x * 0.02 + 4, z * 0.02, 2)) * smooth(Math.min(1, Math.max(0, (s - 1) / 9)));
   const summit = 10 * Math.exp(-((x + 105) ** 2 + (z + 14) ** 2) / 900);
   const start = 250 + Math.max(0, -z - 80) * 0.55;
   const m = Math.max(0, s - start);
@@ -109,7 +114,7 @@ function bayLand(x, z, s) {
   const far = Math.pow(1 - Math.abs(fbm(x * 0.0022 + 9.1, z * 0.0022 - 4.4, 3) * 2 - 1), 4);      // the distant ranges
   const mountains = m > 0 ? (m * 0.3 + 110 * ridge + 120 * peaks + 150 * far * smooth(Math.min(1, m / 600)))
                            * smooth(Math.min(1, m / 260)) : 0;
-  return hill + summit + mountains;
+  return hill + summit + mountains + cliffs;
 }
 
 // The rest of the island: rolling hills and basins (room for villages and olive groves), rising to
@@ -123,7 +128,12 @@ function islandLand(x, z, s) {
   const mountain = 820 * Math.pow(massif, 1.4) * (0.55 + 0.45 * ridged);
   const spurs = 260 * Math.pow(1 - Math.abs(fbm(x * 0.0026 + 8.2, z * 0.0026 - 0.6, 3) * 2 - 1), 3)
                 * smooth(Math.min(1, massif * 2.2));
-  return hills + (mountain + spurs) * smooth(Math.min(1, Math.max(0, s / 900)));
+  // crags: sharp ridged rock on the mountain's upper slopes
+  const crags = 150 * Math.pow(1 - Math.abs(fbm(x * 0.006 - 2.2, z * 0.006 + 6.1, 3) * 2 - 1), 5) * smooth(Math.min(1, massif * 3));
+  // sea cliffs along stretches of the coast: the land stands 25-60 m above the water, ending sheer
+  const cliffAmt = smooth(Math.min(1, Math.max(0, (fbm(x * 0.0011 + 2.0, z * 0.0011 - 7.0, 3) - 0.47) / 0.12)));
+  const cliffs = cliffAmt * (25 + 35 * fbm(x * 0.004, z * 0.004, 2)) * smooth(Math.min(1, Math.max(0, (s + 1) / 14)));
+  return hills + cliffs + (mountain + spurs + crags) * smooth(Math.min(1, Math.max(0, s / 900)));
 }
 
 // step: when the caller only samples every `step` metres (a coarse ground tile), roughness finer
@@ -139,8 +149,27 @@ export function heightAt(x, z, step = 0) {
   // small roughness everywhere on land, larger further inland
   const fine = 1 - smooth(Math.min(1, Math.max(0, (step - 6) / 14)));     // 1 up to 6 m spacing, 0 by 20 m
   const rough = fine > 0 ? (fbm(x * 0.04, z * 0.04, 4) - 0.5) * (2 + Math.min(18, s * 0.05)) * fine : 0;
-  const h = beach + land + rough * smooth(Math.min(1, Math.max(0, s / 20)));
+  let h = beach + land + rough * smooth(Math.min(1, Math.max(0, s / 20)));
+  // olive terraces: in the groves the hillside is cut into level steps ~3 m high with steep stone
+  // risers (fine tiles only: coarse ones can't show 3 m steps)
+  if (fine > 0 && h > 8 && h < 330) {
+    const m = terraceMask(x, z) * fine;
+    if (m > 0) {
+      const t = h / 3.2, f = t - Math.floor(t);
+      h += ((Math.floor(t) + smooth(Math.min(1, Math.max(0, (f - 0.78) / 0.22)))) * 3.2 - h) * m;
+    }
+  }
   return carve(x, z, h);
+}
+
+// Where the hillsides are terraced for olives: round the villages (not in their streets) and in
+// patches of the lower hills; never in Corva (its own hill has the city's terraces).
+function terraceMask(x, z) {
+  if (Math.hypot(x - CITY.x, z - CITY.z) < 650) return 0;
+  const v = villageNear(x, z);
+  const near = v ? (1 - smooth(Math.min(1, Math.max(0, (v.d - v.v.r * 1.3) / (v.v.r * 5))))) * smooth(Math.min(1, Math.max(0, (v.d - v.v.r * 1.1) / 30))) : 0;
+  const patches = smooth(Math.min(1, Math.max(0, (fbm(x * 0.0035 - 4.1, z * 0.0035 + 2.9, 3) - 0.55) / 0.11)));
+  return Math.min(1, near * 0.9 + patches);
 }
 
 // Rivers cut their valleys: along a river the ground can be no higher than the water (a channel
