@@ -113,6 +113,9 @@ export function makeCity(L, quality, seed = 1717) {
   const litColor = new THREE.Color("#ffb45c"), darkColor = new THREE.Color("#3b3027");
   return {
     group,
+    // the materials, so AI textures can be laid on them (aiassets.js)
+    materials: { houses: houses.material, uppers: uppers.material, roofs: roofs.material, blocks: blocks.material,
+                 stairs: stairs.material, walls: walls.material },
     update(state) {  // windows glow as night falls
       winLit.material.color.copy(darkColor).lerp(litColor, state.night).multiplyScalar(1 + state.night * 1.8);
     },

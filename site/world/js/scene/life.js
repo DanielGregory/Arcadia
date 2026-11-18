@@ -34,7 +34,7 @@ function hullGeometry() {
   return g;
 }
 
-export function makeShips(L) {
+export function makeShips(L, makeAiShip = null) {
   const group = new THREE.Group();
   const hull = hullGeometry(), wood = new THREE.MeshLambertMaterial({ color: "#5b3d27" });
   const mast = new THREE.CylinderGeometry(0.12, 0.15, 10, 6).translate(0, 5, 0);
@@ -45,8 +45,11 @@ export function makeShips(L) {
   const sailMat = new THREE.MeshLambertMaterial({ color: "#eadfc4", side: THREE.DoubleSide });
   const ships = L.ships.map((s, i) => {
     const ship = new THREE.Group();
-    ship.add(new THREE.Mesh(hull, wood), new THREE.Mesh(mast, wood));
-    if (s.sail) ship.add(new THREE.Mesh(sailGeo, sailMat));
+    if (makeAiShip) ship.add(makeAiShip());   // the image-to-3D ship, already the right size
+    else {
+      ship.add(new THREE.Mesh(hull, wood), new THREE.Mesh(mast, wood));
+      if (s.sail) ship.add(new THREE.Mesh(sailGeo, sailMat));
+    }
     ship.position.set(s.x, 0.15, s.z);
     ship.rotation.y = s.rot;
     ship.scale.setScalar(s.size);

@@ -20,6 +20,8 @@ import { makeCity, makeTrees } from "./scene/city.js";
 import { makeShips, makeSmoke, Lanterns, makeClouds } from "./scene/life.js";
 import { Painter } from "./render/painterly.js";
 import { DriftRig } from "./camera.js";
+import { loadManifest, loadBackdrops, loadTextures, loadObject } from "./scene/aiassets.js";
+import { at } from "./world/layout.js";
 
 const qualityName = chooseQuality();
 const Q = QUALITY[qualityName];
@@ -40,13 +42,52 @@ const painter = new Painter(renderer, Q);
 
 // --- the world ----------------------------------------------------------------------------------
 const layout = generateLayout(seed, qualityName);
+// AI-made assets (render/make_assets.py): ?ai=1 (default) or ?ai=0 for the hand-built world only;
+// ?backdrop=sdxl|corva|none picks the painted backdrop set.
+const useAI = params.get("ai") !== "0";
+const manifest = useAI ? await loadManifest() : null;
+const objModel = params.get("model") || "triposr";
+const aiObj = {};
+for (const name of ["temple", "ship", "statue", "fountain"]) {
+  const pick = manifest?.objects?.[objModel] && Object.keys(manifest.objects[objModel]).find(k => k.startsWith(name));
+  aiObj[name] = pick ? await loadObject(objModel, pick) : null;
+}
 const sky = makeSky(), sea = makeSea(shoreTexture(heightAt));
-const city = makeCity(layout, Q, seed);
-const ships = makeShips(layout);
+// the AI temple replaces the hand-built summit temple (the first in the layout)
+const city = makeCity(aiObj.temple ? { ...layout, temples: layout.temples.slice(1) } : layout, Q, seed);
+const ships = makeShips(layout, aiObj.ship ? () => { const s = aiObj.ship(5.5); s.rotation.y = Math.PI / 2; return s; } : null);
+const backdrops = useAI ? await loadBackdrops(params.get("backdrop") || "sdxl", manifest) : null;
+if (backdrops) scene.add(backdrops.group);
+if (aiObj.temple) {
+  const t = layout.temples[0];
+  const temple = aiObj.temple(11 * t.scale);
+  temple.position.set(t.x, t.y - 0.5, t.z);
+  temple.rotation.y = t.rot + Math.PI / 2;
+  scene.add(temple);
+}
+if (aiObj.statue) {   // on the quay in front of the quay temple
+  const p = at(6, -27), s = aiObj.statue(4.2);
+  s.position.set(p.x, p.y, p.z);
+  s.rotation.y = Math.PI / 2;
+  scene.add(s);
+}
+if (aiObj.fountain) {   // in a little square halfway up the town
+  const p = at(37, 6), f = aiObj.fountain(2.6);
+  f.position.set(p.x, p.y - 0.2, p.z);
+  scene.add(f);
+}
 const smoke = makeSmoke(layout, Q.smoke);
 const lanterns = new Lanterns(layout.streets, 25, Q.lights);
 const clouds = makeClouds(qualityName === "low" ? 10 : 18);
-scene.add(sky.mesh, sea.mesh, makeLand(Q.terrain), city.group, makeTrees(layout), ships.group,
+const land = makeLand(Q.terrain);
+const tex = useAI ? await loadTextures(manifest) : {};
+if (tex.plaster) for (const k of ["houses", "uppers"]) city.materials[k].map = tex.plaster;
+if (tex.terracotta) city.materials.roofs.map = tex.terracotta, city.materials.roofs.color.set("#ffffff");
+if (tex.stone) for (const k of ["stairs", "walls", "blocks"]) city.materials[k].map = tex.stone;
+if (tex.hillside) { land.material.map = tex.hillside; land.material.color.setScalar(2.0); }   // a detail map, mean 0.5
+for (const m of Object.values(city.materials)) m.needsUpdate = true;
+land.material.needsUpdate = true;
+scene.add(sky.mesh, sea.mesh, land, city.group, makeTrees(layout), ships.group,
           smoke.points, lanterns.points, clouds.group, ...lanterns.lights);
 
 const sunLight = new THREE.DirectionalLight(0xffffff, 2);
@@ -123,6 +164,8 @@ function frame(now) {
   smoke.update(clock, state);
   lanterns.update(dt, clock, state);
   clouds.update(dt, state);
+  if (backdrops) backdrops.update(state, rig.target);
+  fpsCount(dt);
   // aerial perspective: near haze is the light in the air, far haze cools toward violet-blue
   hazeNear.copy(state.fog).lerp(state.horizon, 0.5);
   hazeFar.copy(state.horizon).lerp(VIOLET, 0.32).multiplyScalar(0.55 + 0.45 * state.sunUp);
@@ -152,4 +195,12 @@ for (const btn of document.querySelectorAll("[data-time]")) {
 const qsel = document.getElementById("quality");
 qsel.value = qualityName;
 qsel.addEventListener("change", () => { safeSet("corva-quality", qsel.value); location.search = `?q=${qsel.value}`; });
-window.__corva = { layout, renderer, setTime: t => { live = false; dayT = t; } };   // for tests
+// ?fps=1: an on-screen frame counter (frames per second, averaged over a second)
+const fpsEl = params.get("fps") === "1" ? Object.assign(document.createElement("div"), { id: "fps" }) : null;
+if (fpsEl) document.body.append(fpsEl);
+let fpsFrames = 0, fpsTime = 0, fpsValue = 0;
+function fpsCount(dt) {
+  fpsFrames++; fpsTime += dt;
+  if (fpsTime >= 1) { fpsValue = fpsFrames / fpsTime; fpsFrames = 0; fpsTime = 0; if (fpsEl) fpsEl.textContent = `${fpsValue.toFixed(0)} fps · ${qualityName}`; }
+}
+window.__corva = { layout, renderer, fps: () => fpsValue, setTime: t => { live = false; dayT = t; } };   // for tests

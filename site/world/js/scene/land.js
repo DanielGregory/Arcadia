@@ -40,6 +40,10 @@ export function makeLand(resolution, { minX = -900, maxX = 420, minZ = -800, max
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  // UVs in world space, one tile every 24 m, for an optional detail texture
+  const uv = new Float32Array((pos.length / 3) * 2);
+  for (let k = 0, j = 0; k < pos.length; k += 3, j += 2) { uv[j] = pos[k] / 24; uv[j + 1] = pos[k + 2] / 24; }
+  geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
   geo.setIndex(index);
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
