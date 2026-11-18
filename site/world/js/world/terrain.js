@@ -18,6 +18,8 @@
 // Everything that sits on the ground (buildings, trees, the camera) asks heightAt(), so nothing
 // that uses it needed to change when the land grew from a bay into an island.
 
+import { riverAt } from "./featuremap.js";
+
 export const SEA_LEVEL = 0;
 
 // --- tiny deterministic noise (value noise + fractal sum) -----------------------------------
@@ -94,8 +96,9 @@ export function inland(x, z) {
 // The sea floor: shelves down away from the shore.
 function seaFloor(x, z, s) { return Math.max(-14, s * 0.35) + fbm(x * 0.05, z * 0.05, 2) * 1.5; }
 
-// Stage 1's land round the bay, unchanged: the quay, the city's hill and summit, and the ranges
-// behind it receding up the north shore.
+// Stage 1's land round the bay: the quay, the city's hill and summit, and the ranges behind it
+// receding up the north shore. (Lowered by a third in step B: built as a backdrop for one fixed
+// view, from the air they stood as a 700 m wall behind the city.)
 function bayLand(x, z, s) {
   const hill = 52 * (1 - Math.exp(-Math.max(0, s - 8) / 55));
   const summit = 10 * Math.exp(-((x + 105) ** 2 + (z + 14) ** 2) / 900);
@@ -104,7 +107,7 @@ function bayLand(x, z, s) {
   const ridge = Math.pow(fbm(x * 0.006 + 3.1, z * 0.009 - 1.7, 5), 1.6);
   const peaks = Math.pow(1 - Math.abs(fbm(x * 0.004 - 5.3, z * 0.004 + 2.2, 3) * 2 - 1), 3);   // sharp ridgelines
   const far = Math.pow(1 - Math.abs(fbm(x * 0.0022 + 9.1, z * 0.0022 - 4.4, 3) * 2 - 1), 4);      // the distant ranges
-  const mountains = m > 0 ? (m * 0.38 + 150 * ridge + 150 * peaks + 260 * far * smooth(Math.min(1, m / 600)))
+  const mountains = m > 0 ? (m * 0.3 + 110 * ridge + 120 * peaks + 150 * far * smooth(Math.min(1, m / 600)))
                            * smooth(Math.min(1, m / 260)) : 0;
   return hill + summit + mountains;
 }
@@ -115,9 +118,9 @@ function islandLand(x, z, s) {
   const coastal = smooth(Math.min(1, Math.max(0, s / 600)));              // the land climbs off the shore
   const hills = (30 + 190 * Math.pow(fbm(x * 0.0008 + 2.3, z * 0.0008 - 5.1, 4), 1.4)) * coastal;
   const dc = Math.hypot(x - PEAK.x, (z - PEAK.z) * 0.8);                  // the massif runs north-south
-  const massif = Math.exp(-((dc / 1900) ** 2));
+  const massif = Math.exp(-((dc / 1350) ** 2));                          // the mountain's spread (step B: was 1900)
   const ridged = Math.pow(1 - Math.abs(fbm(x * 0.0011 - 1.7, z * 0.0011 + 3.9, 4) * 2 - 1), 2);
-  const mountain = 1000 * Math.pow(massif, 1.4) * (0.55 + 0.45 * ridged);
+  const mountain = 820 * Math.pow(massif, 1.4) * (0.55 + 0.45 * ridged);
   const spurs = 260 * Math.pow(1 - Math.abs(fbm(x * 0.0026 + 8.2, z * 0.0026 - 0.6, 3) * 2 - 1), 3)
                 * smooth(Math.min(1, massif * 2.2));
   return hills + (mountain + spurs) * smooth(Math.min(1, Math.max(0, s / 900)));
@@ -136,7 +139,22 @@ export function heightAt(x, z, step = 0) {
   // small roughness everywhere on land, larger further inland
   const fine = 1 - smooth(Math.min(1, Math.max(0, (step - 6) / 14)));     // 1 up to 6 m spacing, 0 by 20 m
   const rough = fine > 0 ? (fbm(x * 0.04, z * 0.04, 4) - 0.5) * (2 + Math.min(18, s * 0.05)) * fine : 0;
-  return beach + land + rough * smooth(Math.min(1, Math.max(0, s / 20)));
+  const h = beach + land + rough * smooth(Math.min(1, Math.max(0, s / 20)));
+  return carve(x, z, h);
+}
+
+// Rivers cut their valleys: along a river the ground can be no higher than the water (a channel
+// 1.6 m deep in the middle), rising from its banks at about 1 in 3, then more steeply. Taking the lower of that and
+// the land gives V-shaped valleys that fade out where the land is already low. (The river's water
+// height falls steadily from source to sea, worked out when the river is made: features.js.)
+function carve(x, z, h) {
+  const r = riverAt(x, z);
+  if (!r) return h;
+  // beyond ~250 m the valley side steepens quickly, so the carving always fades out long before the
+  // edge of the area the lookup covers (~500 m): no plateaus with square edges
+  const far = Math.max(0, r.d - 250);
+  const bank = r.h - 1.6 * (1 - smooth(Math.min(1, r.d / r.w))) + Math.max(0, r.d - r.w) * 0.32 + far * far * 0.02;
+  return Math.min(h, bank);
 }
 
 // Slope (0 flat .. 1+ steep), for choosing grass / rock and where trees may grow.

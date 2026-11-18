@@ -150,4 +150,49 @@ export function generateLayout(seed = 1717, quality = "medium") {
   return L;
 }
 
+// --- villages (step B) ---------------------------------------------------------------------------
+// Each village of the island's features (features.js) becomes a cluster of houses round a small
+// square: a little temple on one side, the houses facing in toward it, packed closer near the
+// middle and thinning out, with a lane round it for lanterns at night. Added to the same layout
+// lists as Corva's, so the same builders draw them (and later stages see them as places).
+export function addVillages(L, villages, seed = 1717) {
+  const r = rng(seed + 41);
+  const grid = new Grid();
+  L.villages = [];
+  for (const v of villages) {
+    const sq = { x: v.x, z: v.z, y: heightAt(v.x, v.z) };
+    // a small temple on the uphill side of the square, facing it
+    const ex = heightAt(v.x + 10, v.z) - heightAt(v.x - 10, v.z), ez = heightAt(v.x, v.z + 10) - heightAt(v.x, v.z - 10);
+    const up = Math.atan2(ez, ex), tx = v.x + Math.cos(up) * 26, tz = v.z + Math.sin(up) * 26;
+    L.temples.push({ x: tx, z: tz, y: heightAt(tx, tz), w: 8, d: 11, cols: [4, 6], rot: -(up + Math.PI), scale: 0.6 });
+    grid.take(tx, tz, 16, 16);
+    grid.take(v.x, v.z, 22, 22);                       // the square itself stays open
+    const houses = 14 + Math.floor(r() * 14);
+    let placed = 0;
+    for (let tries = 0; placed < houses && tries < houses * 30; tries++) {
+      const a = r() * Math.PI * 2, d = 16 + Math.pow(r(), 1.4) * v.r;
+      const x = v.x + Math.cos(a) * d, z = v.z + Math.sin(a) * d;
+      const w = 4 + r() * 3.5, dd = 4 + r() * 3, h = 3 + r() * 2.8 + (r() < 0.15 ? 2.5 : 0);
+      if (!grid.free(x, z, dd + 2, w + 2) || slopeAt(x, z) > 0.75 || heightAt(x, z) < 3) continue;
+      const y = heightAt(x, z);
+      // facing the square: the house's front (its local +x) points back toward the middle
+      const rot = -Math.atan2(v.z - z, v.x - x);
+      const upper = r() < 0.2 ? { w: w * 0.55, d: dd * 0.5, h: 2.2 + r(), off: (r() - 0.5) * w * 0.3 } : null;
+      L.houses.push({ x, z, y, w, d: dd, h, rot, upper });
+      grid.take(x, z, dd + 2, w + 2);
+      if (r() < 0.25) L.chimneys.push({ x, y: y + h + 0.6, z });
+      placed++;
+    }
+    // a lane round the square for the evening lanterns
+    const lane = [];
+    for (let k = 0; k <= 24; k++) {
+      const a = (k / 24) * Math.PI * 2, x = v.x + Math.cos(a) * 20, z = v.z + Math.sin(a) * 20;
+      lane.push({ x, y: heightAt(x, z) + 1.1, z });
+    }
+    L.streets.push(lane);
+    L.villages.push({ name: v.name, x: v.x, z: v.z, y: sq.y, houses: placed });
+  }
+  return L;
+}
+
 export { at, facing, inland };

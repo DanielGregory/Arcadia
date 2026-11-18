@@ -6,15 +6,20 @@
 //   render/  the painterly post-process
 //   camera.js the fly rig: drag, pinch, twist, tap to travel; "Corva" flies home
 //
-// Next (step B): villages, roads, rivers and forests from the same seed; then (step C) the map
-// stored in the world tables so the simulation can change it.
+// Step B added the island's villages, rivers, roads, forests and olive groves (made from the seed:
+// world/features.js); next (step C) the map is stored in the world tables so the simulation can
+// change it.
 
 import * as THREE from "../vendor/three.module.min.js";
 import { QUALITY, params, chooseQuality, safeSet, DAY_SECONDS, START_TIME } from "./config.js";
-import { generateLayout } from "./world/layout.js";
+import { generateLayout, addVillages } from "./world/layout.js";
+import { generateFeatures } from "./world/features.js";
+import { setFeatures } from "./world/featuremap.js";
+import { makeRivers } from "./scene/rivers.js";
+import { makeLabels } from "./scene/labels.js";
 import { dayState, TIMES } from "./world/daycycle.js";
 import { makeSky, makeSea, shoreTexture, islandShoreTexture } from "./scene/skysea.js";
-import { heightAt } from "./world/terrain.js";
+import { heightAt, CITY } from "./world/terrain.js";
 import { Terrain } from "./scene/terrain.js";
 import { makeDistantIslands } from "./scene/horizon.js";
 import { makeCity, makeTrees } from "./scene/city.js";
@@ -47,7 +52,13 @@ if (params.has("view")) {
 const painter = new Painter(renderer, Q);
 
 // --- the world ----------------------------------------------------------------------------------
-const layout = generateLayout(seed, qualityName);
+// The island's villages, rivers and roads: saved for the default seed (tools/make_features.mjs),
+// made here for any other. They must be in place before anything asks the ground's height, since
+// the rivers carve their valleys into it.
+const features = await fetch(`assets/island/features-${seed}.json`).then(r => (r.ok ? r.json() : null)).catch(() => null)
+                 ?? generateFeatures(seed);
+setFeatures(features);
+const layout = addVillages(generateLayout(seed, qualityName), features.villages, seed);
 // AI-made assets (render/make_assets.py): ?ai=1 (default) or ?ai=0 for the hand-built world only;
 // ?backdrop=sdxl|corva|none picks the painted backdrop set.
 const useAI = params.get("ai") !== "0";
@@ -95,7 +106,8 @@ const smoke = makeSmoke(layout, Q.smoke);
 const lanterns = new Lanterns(layout.streets, 25, Q.lights);
 const clouds = makeClouds(qualityName === "low" ? 10 : 18, qualityName === "low" ? 16 : 34);
 // the ground, in tiles; the first batch is built right away so the first frame is complete
-const terrain = new Terrain({ finest: Q.tileRes, levels: 5 });
+const terrain = new Terrain({ finest: Q.tileRes, levels: 5, treeSpacing: Q.treeSpacing, treeLevels: Q.treeLevels });
+const rivers = makeRivers(features.rivers);
 const land = terrain.group;
 rig.update(0, 0);
 terrain.update(camera.position, { sync: true });
@@ -121,7 +133,7 @@ if (tex.hillside) {
 }
 for (const m of Object.values(city.materials)) m.needsUpdate = true;
 terrain.material.needsUpdate = true;
-scene.add(sky.mesh, sea.mesh, land, distant, city.group, makeTrees(layout), ships.group,
+scene.add(sky.mesh, sea.mesh, land, distant, rivers.group, city.group, makeTrees(layout), ships.group,
           smoke.points, lanterns.points, clouds.group, ...lanterns.lights);
 
 const sunLight = new THREE.DirectionalLight(0xffffff, 2);
@@ -210,6 +222,8 @@ function frame(now) {
   smoke.update(clock, state);
   lanterns.update(dt, clock, state);
   clouds.update(dt, state, camera);
+  rivers.update(state, clock, scene.fog.density);
+  labels.update(camera, rig.view.dist);
   if (backdrops) backdrops.update(state, rig.target);
   fpsCount(dt);
   // aerial perspective: near haze is the light in the air, far haze cools toward violet-blue
@@ -251,6 +265,13 @@ function fpsCount(dt) {
   fpsFrames++; fpsTime += dt;
   if (fpsTime >= 1) { fpsValue = fpsFrames / fpsTime; fpsFrames = 0; fpsTime = 0; if (fpsEl) fpsEl.textContent = `${fpsValue.toFixed(0)} fps · ${qualityName}`; }
 }
+// Place names: tap one to fly there
+const labels = makeLabels([
+  { name: "Corva", kind: "city", x: CITY.x, z: CITY.z, y: heightAt(CITY.x, CITY.z) + 30 },
+  ...features.villages.map(v => ({ name: v.name, kind: "village", x: v.x, z: v.z, y: heightAt(v.x, v.z) })),
+  { name: features.mountain.name, kind: "mountain", x: features.mountain.x, z: features.mountain.z,
+    y: heightAt(features.mountain.x, features.mountain.z) },
+], p => (p.kind === "city" ? rig.home() : rig.flyTo({ x: p.x, z: p.z, dist: p.kind === "mountain" ? 2600 : 520, el: 0.3 })));
 // "Corva": fly home to the city
 document.getElementById("home")?.addEventListener("click", () => rig.home());
 // a one-time hint on how to fly, gone after the first touch (or 9 s)
@@ -260,4 +281,4 @@ if (hint && !shot) {
   canvas.addEventListener("pointerdown", hide, { once: true });
   setTimeout(hide, 9000);
 } else hint?.remove();
-window.__corva = { layout, renderer, rig, terrain, fps: () => fpsValue, setTime: t => { live = false; dayT = t; } };   // for tests
+window.__corva = { layout, features, renderer, rig, terrain, fps: () => fpsValue, setTime: t => { live = false; dayT = t; } };   // for tests
