@@ -1,0 +1,20 @@
+{
+ "backdrops": {
+  "sdxl": [
+   "sky",
+   "far",
+   "mid"
+  ],
+  "corva": [
+   "sky",
+   "far",
+   "mid"
+  ]
+ },
+ "textures": [
+  "hillside",
+  "plaster",
+  "stone"
+ ],
+ "objects": {}
+}
