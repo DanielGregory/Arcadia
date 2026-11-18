@@ -38,6 +38,7 @@ world/godot/.godot/
 out/morning/
 out/preview/
 out/portraits*/
+out/portrait_candidates/
 out/morning_run.log
 out/run5/kaggle_run.log
 out/assets_run.log
