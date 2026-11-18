@@ -154,6 +154,24 @@ def _triposr_weights_for_new_transformers(out: Path) -> Path:
     return local
 
 
+def cut_white_background(img):
+    """The concepts were painted on a plain light background: make the background-coloured region that touches the picture's
+    edges transparent (a flood fill from the border, so white marble inside the object stays)."""
+    import numpy as np
+    from PIL import Image
+    from scipy import ndimage
+
+    a = np.array(img.convert("RGB")).astype(np.float32)
+    # "background" = close to the colour of the corners (SDXL's "white" came out as a soft light grey)
+    corners = np.concatenate([a[:16, :16], a[:16, -16:], a[-16:, :16], a[-16:, -16:]]).reshape(-1, 3).mean(axis=0)
+    whiteish = (np.abs(a - corners).max(axis=2) < 22) & (a.max(axis=2) - a.min(axis=2) < 20)
+    labels, _ = ndimage.label(whiteish)
+    border = np.unique(np.concatenate([labels[0], labels[-1], labels[:, 0], labels[:, -1]]))
+    bg = np.isin(labels, border[border > 0])
+    alpha = 1.0 - ndimage.gaussian_filter(bg.astype(np.float32), 1.0)   # a slightly soft edge
+    return Image.fromarray(np.dstack([a.astype(np.uint8), (alpha * 255).astype(np.uint8)]), "RGBA")
+
+
 def triposr(out: Path) -> None:
     """TripoSR: one picture -> a 3D mesh with vertex colours, in about a second on a T4."""
     import numpy as np
@@ -170,21 +188,23 @@ def triposr(out: Path) -> None:
         "def marching_cubes(vol, thresh):\n"
         "    v, f, _, _ = _mc(vol.detach().cpu().numpy(), thresh)\n"
         "    return torch.from_numpy(v[:, ::-1].copy()).float(), torch.from_numpy(f.astype('int64'))\n")
-    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "omegaconf", "einops", "trimesh", "rembg",
-                    "onnxruntime", "scikit-image"], check=True)
+    # tsr.utils imports rembg (a background remover). Installing rembg upgrades numpy on Kaggle and
+    # breaks scipy, and our concepts are already on plain white, so an empty stand-in module does.
+    (repo / "rembg.py").write_text("# stand-in: not used, see render/make_assets.py\n")
+    # --no-deps: leave Kaggle's numpy/scipy exactly as they are
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--no-deps", "omegaconf",
+                    "antlr4-python3-runtime==4.9.3", "einops", "trimesh"], check=True)
     sys.path.insert(0, str(repo))
-    import rembg
     from tsr.system import TSR
-    from tsr.utils import remove_background, resize_foreground
+    from tsr.utils import resize_foreground
 
     model = TSR.from_pretrained(str(_triposr_weights_for_new_transformers(out)), config_name="config.yaml",
                                 weight_name="model.ckpt")
     model.renderer.set_chunk_size(8192)
     model.to("cuda")
-    session = rembg.new_session()
     for path in sorted((out / "concepts").glob("*.png")):
         t = time.time()
-        img = resize_foreground(remove_background(Image.open(path), session), 0.85)
+        img = resize_foreground(cut_white_background(Image.open(path)), 0.85)
         a = np.array(img).astype(np.float32) / 255.0
         a = a[:, :, :3] * a[:, :, 3:4] + (1 - a[:, :, 3:4]) * 0.5   # on mid grey, as TripoSR was trained
         img = Image.fromarray((a * 255).astype(np.uint8))

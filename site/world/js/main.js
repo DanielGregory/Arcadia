@@ -56,7 +56,8 @@ const sky = makeSky(), sea = makeSea(shoreTexture(heightAt));
 // the AI temple replaces the hand-built summit temple (the first in the layout)
 const city = makeCity(aiObj.temple ? { ...layout, temples: layout.temples.slice(1) } : layout, Q, seed);
 const ships = makeShips(layout, aiObj.ship ? () => { const s = aiObj.ship(5.5); s.rotation.y = Math.PI / 2; return s; } : null);
-const backdrops = useAI ? await loadBackdrops(params.get("backdrop") || "sdxl", manifest) : null;
+const backdrops = useAI ? await loadBackdrops(params.get("backdrop") || "sdxl", manifest,
+                                             { paintedSky: params.get("paintedsky") === "1" }) : null;
 if (backdrops) scene.add(backdrops.group);
 if (aiObj.temple) {
   const t = layout.temples[0];

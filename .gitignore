@@ -39,3 +39,4 @@ out/morning/
 out/morning_run.log
 out/run5/kaggle_run.log
 out/assets_run.log
+.claude/settings.local.json

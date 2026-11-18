@@ -30,9 +30,10 @@ function loadTexture(url, srgb = true) {
 // --- backdrops --------------------------------------------------------------------------------
 // A card is a piece of a cylinder round the city, facing inward, spanning from the east (inland,
 // behind the mountains) round to just short of the sunset in the north-north-west.
-// angles are atan2(z, x): from the east (x = -1, z = -0.25) round through the north-east to just west of
-// north (x = 0.12, z = -1), stopping short of the sunset so the real sun stays in view
-const ARC_FROM = Math.atan2(-0.25, -1), ARC_TO = Math.atan2(-1, 0.12);
+// Angles are atan2(z, x). The arc stands where the viewer sees open horizon: out over the sea from the
+// north-north-east round to the west-north-west, so the painted ranges are the far shore of the bay,
+// low on the horizon under the setting sun (as in the reference). Its ends fade out softly.
+const ARC_FROM = Math.atan2(-1, -0.35), ARC_TO = Math.atan2(-0.3, 1);
 function card(texture, radius, bottom, height, order) {
   let a0 = ARC_FROM, a1 = ARC_TO;
   if (a1 < a0) a1 += Math.PI * 2;
@@ -60,6 +61,7 @@ function card(texture, radius, bottom, height, order) {
       void main() {
         vec4 c = texture2D(map, vUv);
         float fade = fadeTop > 0.0 ? smoothstep(1.0, 1.0 - fadeTop, vUv.y) : 1.0;   // the painted sky melts into the dome
+        fade *= smoothstep(0.0, 0.25, vUv.x) * smoothstep(2.0, 1.75, vUv.x);         // soft ends of the arc
         // painted textures are sRGB; the painter expects linear light
         // the paintings are already graded and warm: calm them a little so the painter's own grade
         // (and glow) doesn't push them to saturated orange
@@ -74,10 +76,13 @@ function card(texture, radius, bottom, height, order) {
   return { mesh, uniforms, isSky: order === 0 };
 }
 
-export async function loadBackdrops(set, manifest) {
+export async function loadBackdrops(set, manifest, { paintedSky = false } = {}) {
   if (!set || set === "none" || !manifest?.backdrops?.[set]) return null;
   const group = new THREE.Group();
-  const layers = [["sky", 3600, -200, 1900, 0], ["far", 2700, -260, 760, 1], ["mid", 1900, -160, 380, 2]];
+  // The painted sky is off unless asked for (?paintedsky=1): a fixed golden-hour painting fights the
+  // day cycle's own sky, so in the test it read as an orange panel.
+  const layers = [...(paintedSky ? [["sky", 3600, -200, 1900, 0]] : []),
+                  ["far", 2900, -200, 560, 1], ["mid", 2100, -140, 300, 2]];
   const cards = [];
   for (const [name, radius, bottom, height, order] of layers) {
     const tex = await loadTexture(`${BASE}backdrops/${set}/${name}.png`);
