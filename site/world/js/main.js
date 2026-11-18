@@ -196,8 +196,10 @@ for (const btn of document.querySelectorAll("[data-time]")) {
 const qsel = document.getElementById("quality");
 qsel.value = qualityName;
 qsel.addEventListener("change", () => { safeSet("corva-quality", qsel.value); location.search = `?q=${qsel.value}`; });
-// ?fps=1: an on-screen frame counter (frames per second, averaged over a second)
-const fpsEl = params.get("fps") === "1" ? Object.assign(document.createElement("div"), { id: "fps" }) : null;
+// ?fps (or ?fps=1): an on-screen frame counter (frames per second, averaged over a second).
+// It shows "measuring…" at once, so you can tell the counter is on before the first second is up.
+const fpsEl = params.has("fps") && params.get("fps") !== "0"
+  ? Object.assign(document.createElement("div"), { id: "fps", textContent: "measuring…" }) : null;
 if (fpsEl) document.body.append(fpsEl);
 let fpsFrames = 0, fpsTime = 0, fpsValue = 0;
 function fpsCount(dt) {
