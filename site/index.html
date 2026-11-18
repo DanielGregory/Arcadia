@@ -128,6 +128,16 @@ const STORAGE = `${SUPABASE_URL}/storage/v1/object/public/arcadia/`;
 
 const state = { images: [], dreams: [], mornings: [], filter: "all", run: null, day: null };
 
+// Every row of a query: Supabase returns at most 1000 rows per request, so page through.
+async function apiAll(path) {
+  const rows = [];
+  for (let offset = 0; ; offset += 1000) {
+    const page = await api(`${path}&limit=1000&offset=${offset}`, { headers: { Prefer: "" } });
+    rows.push(...page);
+    if (page.length < 1000) return rows;
+  }
+}
+
 async function api(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...options,
@@ -231,10 +241,10 @@ const sky = { dreams: [], cons: [], syms: {}, selected: null, pts: [], edges: []
 
 async function loadSky() {
   const [dreams, cons, links] = await Promise.all([
-    api("dreams?select=id,run,kind,tag,prompt,text,remembered,day,sky_x,sky_y,constellation&order=id", { headers: { Prefer: "" } }),
+    apiAll("dreams?select=id,run,kind,tag,prompt,text,remembered,day,sky_x,sky_y,constellation&order=id"),
     api("sky_constellations?select=*&order=id", { headers: { Prefer: "" } }),
     // occurrences of a symbol in a dream, with the symbol's label joined in
-    api("symbol_occurrences?select=dream_id,mentions,symbols(label)&dream_id=not.is.null", { headers: { Prefer: "" } })
+    apiAll("symbol_occurrences?select=dream_id,mentions,symbols(label)&dream_id=not.is.null&order=id")
       .then(rows => rows.map(r => ({ dream_id: r.dream_id, symbol: r.symbols.label, mentions: r.mentions }))),
   ]);
   sky.dreams = dreams.filter(d => d.sky_x != null);

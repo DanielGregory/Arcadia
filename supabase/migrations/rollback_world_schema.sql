@@ -1,4 +1,5 @@
--- Undo 20261117_world_schema.sql (only if something breaks). Then restore the memory_* rows
+-- Undo 20261117_world_schema.sql (only if something breaks). If 20261118_drop_memory_tables.sql has NOT run yet,
+-- skip the memory_* "create table" statements below (those tables still exist). Then restore the memory_* rows
 -- with `python daily/memory_sync.py` (it rebuilds them from the repo) or from the JSON backup.
 drop view if exists public.faction_disagreements, public.faction_shared_beliefs;
 drop table if exists public.vital_signs, public.chronicles, public.faction_practices, public.faction_members,

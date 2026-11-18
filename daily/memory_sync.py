@@ -51,9 +51,15 @@ def rpc(sb: Supabase, name: str, args: dict) -> list[dict]:
 
 
 def select(sb: Supabase, query: str) -> list[dict]:
-    r = sb.session.get(f"{sb.url}/rest/v1/{query}", timeout=60)
-    r.raise_for_status()
-    return r.json()
+    """Every row of a query, paging through Supabase's 1000-rows-per-request limit."""
+    rows = []
+    while True:
+        r = sb.session.get(f"{sb.url}/rest/v1/{query}", headers={"Range": f"{len(rows)}-{len(rows) + 999}"}, timeout=60)
+        r.raise_for_status()
+        page = r.json()
+        rows += page
+        if len(page) < 1000:
+            return rows
 
 
 def delete_all(sb: Supabase, table: str, column: str) -> None:

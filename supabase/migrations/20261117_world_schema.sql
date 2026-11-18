@@ -1,7 +1,8 @@
 -- =====================================================================================
 -- Arcadia world database: STRUCTURE ONLY (no simulation logic). From docs/world_engine.md.
--- Approved 2026-11-17; to be applied (backup: HF DannyGregs/arcadia-dreams backups/supabase_20261117T2038Z;
--- undo: rollback_world_schema.sql). Code switchover: 20261117_world_switchover.patch (git apply after migrating).
+-- APPLIED 2026-11-18 01:15 UTC (backup: HF DannyGregs/arcadia-dreams backups/supabase_20261117T2143Z;
+-- undo: rollback_world_schema.sql). Applied without the final DROP of the old memory_* tables, which
+-- needs a confirmation in the Supabase connector: that is 20261118_drop_memory_tables.sql, run later.
 --
 -- The hard rule: no table stores what anything MEANS. Facts live everywhere; meaning,
 -- significance and interpretation live only in `beliefs`, per person, with a confidence.
@@ -312,6 +313,7 @@ language sql stable set search_path = public as $$
   where c.table_schema = 'public'
     and t.table_type = 'BASE TABLE'          -- views store nothing; the belief views are computed from beliefs
     and c.table_name <> 'beliefs'
+    and c.table_name not like 'memory\_%'      -- the retired Phase 2 tables, until they are dropped
     and c.column_name ~* '(meaning|significan|symbolism|symbolic|interpret|omen|portent|signif|purpose|stands_for|represents|moral|lesson|prophecy|destiny)'
 $$;
 
@@ -343,7 +345,7 @@ language sql stable set search_path = public, extensions as $$
   where d.id = dream_id and m.id <> dream_id limit match_count;
 $$;
 
-drop table public.memory_dream_symbols, public.memory_symbols, public.memory_constellations, public.memory_dreams;
+-- (The old memory_* tables are dropped separately: 20261118_drop_memory_tables.sql.)
 
 -- =====================================================================================
 -- 16. Access: the public site may READ the world; only the engine (secret key) writes.
