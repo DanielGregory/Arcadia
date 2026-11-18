@@ -44,6 +44,23 @@ export function makeCity(L, quality, seed = 1717) {
     }
   });
   roofed.forEach((h, i) => place(roofs, i, h.x, h.y + h.h, h.z, h.rot, h.d * 1.45, 1.6, h.w * 1.45));
+  // upper storeys, set back from the front; and a door on the sea side of every house
+  const tops = L.houses.filter(h => h.upper);
+  const uppers = new THREE.InstancedMesh(box, lambert("#ffffff"), tops.length);
+  tops.forEach((h, i) => {
+    const [ux, uz] = local(h.x, h.z, h.rot, -h.d * 0.18, h.upper.off);
+    place(uppers, i, ux, h.y + h.h, uz, h.rot, h.upper.d, h.upper.h, h.upper.w);
+    uppers.setColorAt(i, WHITES[Math.floor(r() * WHITES.length)]);
+  });
+  uppers.castShadow = uppers.receiveShadow = true;
+  group.add(uppers);
+  const doorGeo = new THREE.PlaneGeometry(1.1, 2.1).rotateY(Math.PI / 2).translate(0, 1.05, 0);
+  const doors = new THREE.InstancedMesh(doorGeo, new THREE.MeshLambertMaterial({ color: "#4a3627" }), L.houses.length);
+  L.houses.forEach((h, i) => {
+    const [dx, dz] = local(h.x, h.z, h.rot, h.d / 2 + 0.04, (r() - 0.5) * h.w * 0.5);
+    place(doors, i, dx, h.y - 0.05, dz, h.rot, 1, 1, 1);
+  });
+  group.add(doors);
   houses.castShadow = houses.receiveShadow = true;
   group.add(houses, roofs);
 

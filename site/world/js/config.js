@@ -8,9 +8,9 @@
 export const QUALITY = {
   // pixelRatio: how sharp; renderScale: the share of those pixels the painting pass renders;
   // kuwahara: brush size of the oil-paint filter (0 = off); terrain: grid resolution.
-  low:    { pixelRatio: 1,   renderScale: 0.7,  kuwahara: 2, terrain: 150, shadows: false, lights: 0, smoke: 40 },
-  medium: { pixelRatio: 1.5, renderScale: 0.85, kuwahara: 3, terrain: 240, shadows: false, lights: 2, smoke: 70 },
-  high:   { pixelRatio: 2,   renderScale: 1.0,  kuwahara: 4, terrain: 340, shadows: true,  lights: 4, smoke: 110 },
+  low:    { pixelRatio: 1,   renderScale: 0.7,  kuwahara: 2, terrain: 150, shadows: false, shadowSize: 0,    lights: 0, smoke: 40,  glow: 0.8 },
+  medium: { pixelRatio: 1.5, renderScale: 0.85, kuwahara: 3, terrain: 240, shadows: true,  shadowSize: 1024, lights: 2, smoke: 70,  glow: 1.0 },
+  high:   { pixelRatio: 2,   renderScale: 1.0,  kuwahara: 4, terrain: 340, shadows: true,  shadowSize: 2048, lights: 4, smoke: 110, glow: 1.0 },
 };
 
 export const params = new URLSearchParams(location.search);

@@ -13,7 +13,8 @@ import * as THREE from "../vendor/three.module.min.js";
 import { QUALITY, params, chooseQuality, safeSet, DAY_SECONDS, START_TIME } from "./config.js";
 import { generateLayout } from "./world/layout.js";
 import { dayState, TIMES } from "./world/daycycle.js";
-import { makeSky, makeSea } from "./scene/skysea.js";
+import { makeSky, makeSea, shoreTexture } from "./scene/skysea.js";
+import { heightAt } from "./world/terrain.js";
 import { makeLand } from "./scene/land.js";
 import { makeCity, makeTrees } from "./scene/city.js";
 import { makeShips, makeSmoke, Lanterns, makeClouds } from "./scene/life.js";
@@ -32,14 +33,14 @@ renderer.setPixelRatio(Math.min(devicePixelRatio || 1, Q.pixelRatio));
 renderer.shadowMap.enabled = Q.shadows;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0xffffff, 0.0005);
+scene.fog = new THREE.FogExp2(0xffffff, 0.00018);   // light: the painter adds the real haze
 const camera = new THREE.PerspectiveCamera(38, 1, 1, 9000);
 const rig = new DriftRig(camera, canvas, { still: params.get("still") === "1" });
 const painter = new Painter(renderer, Q);
 
 // --- the world ----------------------------------------------------------------------------------
 const layout = generateLayout(seed, qualityName);
-const sky = makeSky(), sea = makeSea();
+const sky = makeSky(), sea = makeSea(shoreTexture(heightAt));
 const city = makeCity(layout, Q, seed);
 const ships = makeShips(layout);
 const smoke = makeSmoke(layout, Q.smoke);
@@ -54,7 +55,7 @@ scene.add(sunLight, sunLight.target, hemi);
 sunLight.target.position.set(-50, 20, -10);
 if (Q.shadows) {
   sunLight.castShadow = true;
-  sunLight.shadow.mapSize.set(2048, 2048);
+  sunLight.shadow.mapSize.set(Q.shadowSize, Q.shadowSize);
   Object.assign(sunLight.shadow.camera, { left: -170, right: 170, top: 170, bottom: -170, near: 10, far: 900 });
   sunLight.shadow.bias = -0.0008;
   sunLight.shadow.normalBias = 0.6;
@@ -86,7 +87,7 @@ function applyDay(state, time) {
   hemi.intensity = 1.6;
   scene.fog.color.copy(state.fog);
   // a little denser haze at dawn and golden hour, when the light lies along the bay
-  scene.fog.density = 0.00042 + 0.00022 * (1 - Math.abs(state.sun.y));
+  scene.fog.density = 0.00018;
 }
 
 function resize() {
@@ -105,6 +106,7 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
+const hazeNear = new THREE.Color(), hazeFar = new THREE.Color(), VIOLET = new THREE.Color("#8d92b8");
 let dayT = fixedTime ?? START_TIME, live = fixedTime === null, clock = 0, lastNow = performance.now(), frames = 0;
 const shot = params.get("shot") === "1";
 if (shot) clock = 40;   // as if the scene had been running a while
@@ -121,7 +123,11 @@ function frame(now) {
   smoke.update(clock, state);
   lanterns.update(dt, clock, state);
   clouds.update(dt, state);
-  painter.render(scene, camera, 1.12 + 0.9 * state.night, state.night);
+  // aerial perspective: near haze is the light in the air, far haze cools toward violet-blue
+  hazeNear.copy(state.fog).lerp(state.horizon, 0.5);
+  hazeFar.copy(state.horizon).lerp(VIOLET, 0.32).multiplyScalar(0.55 + 0.45 * state.sunUp);
+  painter.render(scene, camera, { exposure: 1.12 + 0.9 * state.night, night: state.night, hazeNear, hazeFar,
+                                  hazeScale: 0.00055 + 0.00025 * (1 - Math.abs(state.sun.y)) });
   document.getElementById("clock").textContent = timeLabel(dayT);
   frames++;
   // ?shot=1: draw a few frames (so smoke and lanterns settle), then stop, for screenshots

@@ -52,13 +52,30 @@ export function makeSky() {
   return { mesh, uniforms };
 }
 
-export function makeSea() {
+// The sea needs to know how deep the water is under each point, for the turquoise shallows and the
+// foam along the shore. Bake heightAt() near the coast into a small texture once, at startup.
+// (Bytes, not floats: every phone can filter them smoothly.) height = value * 16 - 8 metres.
+export function shoreTexture(heightAt, rect = { x: -40, z: -560, w: 420, d: 1000 }, nx = 192, nz = 448) {
+  const data = new Uint8Array(nx * nz);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const h = heightAt(rect.x + (rect.w * i) / (nx - 1), rect.z + (rect.d * j) / (nz - 1));
+    data[j * nx + i] = Math.round(Math.min(1, Math.max(0, (h + 8) / 16)) * 255);
+  }
+  const tex = new THREE.DataTexture(data, nx, nz, THREE.RedFormat, THREE.UnsignedByteType);
+  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return { tex, rect: new THREE.Vector4(rect.x, rect.z, rect.w, rect.d) };
+}
+
+export function makeSea(shore) {
   const uniforms = {
+    shoreTex: { value: shore.tex }, shoreRect: { value: shore.rect },
     time: { value: 0 }, sunDir: { value: new THREE.Vector3() }, sunColor: { value: new THREE.Color() },
     sunUp: { value: 1 }, zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() },
     ambient: { value: new THREE.Color() }, fogColor: { value: new THREE.Color() }, fogDensity: { value: 0.0012 },
     lightDir: { value: new THREE.Vector3() }, night: { value: 0 },
     deep: { value: new THREE.Color("#1d4a5c") }, shallow: { value: new THREE.Color("#3f7f86") },
+    turquoise: { value: new THREE.Color("#5fb3ad") },
   };
   const material = new THREE.ShaderMaterial({
     uniforms, fog: false,
@@ -71,8 +88,15 @@ export function makeSea() {
       }`,
     fragmentShader: /* glsl */`
       uniform float time, sunUp, fogDensity, night;
-      uniform vec3 sunDir, sunColor, zenith, horizon, ambient, fogColor, lightDir, deep, shallow;
+      uniform vec3 sunDir, sunColor, zenith, horizon, ambient, fogColor, lightDir, deep, shallow, turquoise;
+      uniform sampler2D shoreTex; uniform vec4 shoreRect;
       varying vec3 vWorld;
+      // depth of water here, from the baked land heights (deep everywhere outside the baked area)
+      float waterDepth(vec2 p) {
+        vec2 uv = (p - shoreRect.xy) / shoreRect.zw;
+        if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return 30.0;
+        return -(texture2D(shoreTex, uv).r * 16.0 - 8.0);
+      }
       // sum of a few travelling waves: returns the slope (d height / dx, d height / dz)
       vec2 waves(vec2 p) {
         vec2 g = vec2(0.0);
@@ -97,8 +121,16 @@ export function makeSea() {
         float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, view), 0.0), 5.0);
         vec3 r = reflect(-view, n);
         vec3 sky = mix(horizon, zenith, pow(clamp(r.y, 0.0, 1.0), 0.42));
-        vec3 body = mix(deep, shallow, 0.25) * (ambient * 1.25 + sunColor * 0.12 * sunUp);
-        vec3 col = mix(body, sky, clamp(fres * 0.95, 0.0, 1.0));
+        float depth = waterDepth(vWorld.xz);
+        vec3 light = ambient * 1.25 + sunColor * 0.12 * sunUp;
+        vec3 body = mix(deep, shallow, 0.25);
+        body = mix(body, turquoise, smoothstep(7.0, 0.8, depth) * mix(0.35, 1.0, sunUp));   // sand showing through the shallows
+        vec3 col = mix(body * light, sky, clamp(fres * 0.95, 0.0, 1.0) * mix(1.0, 0.55, smoothstep(5.0, 0.5, depth)));
+        // foam: bands that run up the beach and fade, broken by the waves
+        float wave = sin(depth * 5.0 - time * 1.6 + g.x * 40.0) * 0.5 + 0.5;
+        float foam = smoothstep(1.6, 0.15, depth) * (0.35 + 0.65 * wave) + smoothstep(0.35, 0.0, depth) * 0.6;
+        // foam is lit like everything else: bright in sun, a faint grey line by moonlight
+        col = mix(col, (ambient * mix(0.7, 1.6, sunUp) + sunColor * 0.6 * sunUp) * 0.95, clamp(foam, 0.0, mix(0.45, 0.85, sunUp)));
         float s = max(dot(r, sunDir), 0.0);
         col += sunColor * (pow(s, 420.0) * 9.0 + pow(s, 60.0) * 0.55) * sunUp;   // the sun's path
         float m = max(dot(r, lightDir), 0.0);

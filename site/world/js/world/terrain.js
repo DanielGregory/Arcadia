@@ -58,7 +58,9 @@ export function heightAt(x, z) {
   const m = Math.max(0, s - start);
   const ridge = Math.pow(fbm(x * 0.006 + 3.1, z * 0.009 - 1.7, 5), 1.6);
   const peaks = Math.pow(1 - Math.abs(fbm(x * 0.004 - 5.3, z * 0.004 + 2.2, 3) * 2 - 1), 3);   // sharp ridgelines
-  const mountains = m > 0 ? (m * 0.38 + 150 * ridge + 120 * peaks) * smooth(Math.min(1, m / 260)) : 0;
+  const far = Math.pow(1 - Math.abs(fbm(x * 0.0022 + 9.1, z * 0.0022 - 4.4, 3) * 2 - 1), 4);      // the distant ranges
+  const mountains = m > 0 ? (m * 0.38 + 150 * ridge + 150 * peaks + 260 * far * smooth(Math.min(1, m / 600)))
+                           * smooth(Math.min(1, m / 260)) : 0;
   // small roughness everywhere on land, larger further inland
   const rough = (fbm(x * 0.04, z * 0.04, 4) - 0.5) * (2 + Math.min(18, s * 0.05));
   return beach + hill + summit + mountains + rough * smooth(Math.min(1, Math.max(0, s / 20)));

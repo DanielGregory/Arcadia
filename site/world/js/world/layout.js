@@ -86,7 +86,9 @@ export function generateLayout(seed = 1717, quality = "medium") {
       const jitter = r() * 3;
       const p = at(s + jitter, z);
       if (r() < 0.86 && grid.free(p.x, p.z, d + 1, w + 1) && slopeAt(p.x, p.z) < 1.4) {
-        L.houses.push({ x: p.x, z: p.z, y: p.y, w, d, h, rot: facing(z) });
+        // a third of the houses get a smaller upper storey set back from the street
+        const upper = r() < 0.35 ? { w: w * (0.45 + r() * 0.25), d: d * (0.45 + r() * 0.2), h: 2.4 + r() * 1.4, off: (r() - 0.5) * w * 0.3 } : null;
+        L.houses.push({ x: p.x, z: p.z, y: p.y, w, d, h, rot: facing(z), upper });
         grid.take(p.x, p.z, d + 1, w + 1);
         if (r() < 0.12) L.chimneys.push({ x: p.x, y: p.y + h + 0.6, z: p.z });
       }
