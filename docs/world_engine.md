@@ -1,187 +1,243 @@
-# World engine: design spec (draft)
+# World engine: design spec v2
 
-Status: draft for Daniel to edit. No code yet. **LOCKED** = Daniel's decision; **PROPOSED** = Claude's
-suggestion, open to change. Follows `docs/VISION.md`: the engine records what happens, never what it means.
+Status: v2, for Danny to edit. **LOCKED** = Danny's decision. **PROPOSED** = Claude's suggestion, open to change.
+Follows `docs/VISION.md` and the seed story in `docs/seed_history.md`. v0 is built as an offline sandbox (§11).
 
 ## 0. Ground rules
 
-- **LOCKED: time.** One Arcadia year per real day, run as 4 seasonal ticks (spring, summer, autumn, winter).
-- **LOCKED: population.** ~25 named inhabitants as full agents and ~200 townsfolk as aggregate counts. When a
-  named person dies, someone from the crowd can be promoted to a named agent.
-- **LOCKED: creator.** Daniel plants one thing a week (object, stranger or dream) and never controls its meaning.
-- **LOCKED: budget.** About 1 hour of CPU per daily run, ~150–200 pretrained-model calls.
-- **LOCKED: the hard rule.** No table stores what anything *means*. Objects, events, places and symbols hold
-  facts only (owner, location, history, who was involved). Meaning, significance and interpretation live only
-  in `beliefs`, per person, with a confidence. Factions store practices and members, never an official meaning.
+- **LOCKED: the core architecture (VISION.md).** The world engine is the truth. The storyteller proposes anything;
+  the world engine validates it. Inhabitants interpret through their own beliefs. The transformer gives language and
+  imagination. There is no master narrator.
+- **LOCKED: time.** One Arcadia year per real day, as 4 seasonal ticks. Adjustable.
+- **LOCKED: the world.** One island (~5–10 km): Corva on the harbour, 2–4 villages in the hills, a central mountain,
+  rivers, forests, olive groves. Visual anchor: terraced white houses with terracotta roofs climbing cliffs above the
+  sea, Greek temples, golden light.
+- **LOCKED: Corva is already old on Day 1.** No empty shore, no founders' arrival: its founding is legend.
+  **There is no inscription.**
+- **LOCKED: creator.** Danny plants one thing per week (object, stranger or dream) and never controls its meaning.
+- **LOCKED: budget.** About 1 hour of CPU per daily run.
+- **LOCKED: the hard rule.** No table stores what anything means. Facts live in objects, events, places and symbols;
+  all meaning lives in `beliefs`, per person, with a confidence.
 - **PROPOSED: enforcing the hard rule.**
-  1. No column named meaning, significance, purpose, omen, symbolism or anything like it, outside `beliefs`.
-     A schema lint checks this in CI.
-  2. Event text is written by the engine from structured fields using templates ("Ione and Damas raised a wall
-     at the spring."). The storyteller's own wording stays in the proposal log and never enters `events`.
-  3. Anything that interprets (chronicles, faction "shared beliefs") is either attributed to a specific person or
-     computed as a view over `beliefs`. It is never stored as fact.
+  1. No column named meaning, significance, purpose, omen or the like outside `beliefs` (`world_meaning_lint()`).
+  2. Event text is written by the engine from templates. The storyteller's own wording stays in the proposal log.
+  3. Anything that interprets is attributed to a person or a house (accounts, chronicles, legends) or computed as a
+     view over `beliefs` (house feelings, faction views). Never stored as fact.
+  4. Proposals whose wording asserts a meaning ("the omen…", "fate…", "the gods want…") are rejected.
 
-## 1. Data model (Supabase)
+## 1. The seed (LOCKED: `docs/seed_history.md`)
 
-All tables share `id`, `created_at` and the in-world time `(year, season)`. **PROPOSED** everywhere below.
+Day 1 is the season after **the Flight from Corva**: at the autumn festival of the sea, Livia Corvane (20, only
+daughter of Marius Corvane, betrothed to Lucan Valerius) and Soren of the Harbor (22, a foundling raised by Galen
+Theren) vanished together. The public account (rumours of kidnap, of a willing flight, of a Theren plot; a sailor's
+"east", a merchant's "northern road"; the old temple servant at the western gate; the old priestess's dream of a
+golden ring sinking and two stars disappearing) enters the world as events and as each person's first beliefs.
 
-| Table | Holds (facts only) | Notes |
-|---|---|---|
-| `people` | name, born_year, died_year, origin, household, traits (0–1: openness, caution, warmth, pride, piety), temperament (one of 4), needs (hunger, warmth, safety, belonging, standing; 0–1), health, place_id, alive, promoted_from_crowd | Traits are fixed; needs change each tick. |
-| `relationships` | person_a, person_b, kind (kin / spouse / friend / rival / teacher), strength −1..1, formed_event | PROPOSED split from `people`. |
-| `memories` | person, source (event / dream / told-by / chronicle), source_id, text *as remembered*, vividness 0–1, distortions (count + list), last_recalled | Text may drift (§4); `source_id` still points at the true record. |
-| `townsfolk` | per tick: count, births, deaths, mood −1..1, food_share, faction_sizes (json) | Aggregate only, no individuals. |
-| `places` | name(s) and who uses each name, kind (shore, spring, field, grove, house, wall, harbour, stone, …), parent place, built_by, built_event, condition | A place's *use* is recorded as activity counts, not purpose. |
-| `objects` | kind and physical description, made_by, owner (person / faction / none), location (place or person), condition, made_event | History is the list of events that touched it. |
-| `events` | append-only. kind (closed vocabulary), place, actors[], objects[], outcome (success / partial / failure), facts (json), template text, proposal_id, planting_id | No updates or deletes. Corrections are new events. |
-| `dreams` | dreamer, (year, season), tag used, memory seeds used, text, model run | Raw text; no "as remembered" pass (§6). |
-| `symbols` | label (a short *image* phrase: "the sea sleeping in the sky"), embedding, first_seen, frequency | The label describes an image, never what it stands for. |
-| `symbol_occurrences` | symbol, dream_id or event_id, (year, season) | Links each symbol to every dream and event it appears in. |
-| `beliefs` | holder, subject_type (event / symbol / object / place / person / planting), subject_id, interpretation (free text), confidence 0–1, source (own dream, told by X, chronicle, faction), formed, history of changes | **The only place meaning lives.** |
-| `factions` | name (chosen by members), founded_event | No stored meaning. |
-| `faction_members` / `faction_practices` | person, joined, role / an *observable* practice ("pour wine into the sea before the first winter storm"), started_event | Practices are actions, not reasons. |
-| views: `faction_shared_beliefs`, `faction_disagreements` | beliefs held by ≥60% of members / pairs of members with conflicting beliefs about the same subject | Computed from `beliefs`, never stored. |
-| `chronicles` | author, events[], text, written (year, season), readers[] | A chronicle is an object a person made. Its text is that person's account and is labelled as such. |
-| `storyteller_proposals` | tick, kind, payload (json), storyteller's wording, status (accepted / partial / failed / rejected), reason, resulting event | Every attempt, including rejections. |
-| `creator_plantings` | week, kind (object / stranger / dream), payload, planted tick, event_id | Plus a view of everything that followed (§7). |
-| `vital_signs` | one row per tick (§7) | |
+- **Private truths** are character-only memories, never shown in public reports: Livia's (love, and also escape),
+  Neria's (she knew, helped, and alone knew the night), Tiberon's (real resentment, never acted on). **Galen's**
+  knowledge of Soren's father is undecided even to the creator and is **not stored at all**; nothing may resolve it.
+  Soren's father has no lineage row: an unknown parent is a missing row, never an invented one.
+- **Sealed at genesis:** the lovers' true location is chosen by the engine at random and stored in `sealed_facts`,
+  readable by the engine only. No report prints it. (**PROPOSED:** an in-world discovery is possible: a search of
+  the right place can, rarely, turn up a trace. Such an event is stored `sealed` and redacted in reports until Danny
+  decides how a discovery should surface.)
 
-## 2. The seasonal tick, step by step (PROPOSED)
+## 2. The houses (LOCKED structure; roles an accepted draft)
 
-1. **Advance time and the world.** Season, weather roll, needs drift, resources produced and consumed, aging (§4).
-   Pure code.
-2. **Retrieve memories.** For each living named person, pick the 3–5 memories most likely to surface: vivid,
-   recent, emotionally strong, or sharing a symbol with something that just happened. Pure code.
-3. **Dream.** Each named person dreams once per tick with the run 4 model (the best checkpoint at that time),
-   primed with fragments of their retrieved memories. The tag comes from temperament: melancholic → `<tale>`,
-   choleric → `<saga>`, sanguine → `<dream>`, phlegmatic → `<myth>`, with a 30% chance of a random tag so nobody
-   is fixed. The mode-switching sampler can blend tags later.
-4. **Interpret.** The 8 most salient dreams and events of the tick (by surprise, symbol recurrence, emotional
-   weight, and anything planted) are interpreted by the people involved, through a small instruct model given the
-   person's traits, needs, beliefs and relationships. The output is a belief (interpretation and confidence) or
-   an intention ("I will go to the stone at dawn").
-5. **Propose.** The storyteller is given the world summary, recent events, intentions and needs. It proposes
-   4–6 actions or events: people acting on intentions, or the world acting (storm, illness, a ship on the horizon).
-6. **Validate.** The world engine checks each proposal against the rules (§3) and resolves it as success,
-   partial, failure or rejected. All of them are logged.
-7. **Record.** Accepted outcomes are written to `events` as template text. Objects, places, people and townsfolk
-   update. Witnesses get memories.
-8. **Extract symbols.** New dreams and events are scanned for recurring images, batched 5 at a time. Each candidate
-   is matched by embedding to existing `symbols` (a match increases its frequency) or creates a new one.
-9. **Update and spread beliefs.** People who witnessed or heard of an event may form or revise a belief. Beliefs
-   spread along relationships: a person's chance of adopting a belief rises with the teller's strength and
-   standing and with how well it fits what they already believe. Confidence changes when evidence repeats or
-   contradicts. Once a year someone may write a chronicle.
-10. **Log vital signs.**
+Houses are **landed families first** (Greek *oikos*, Roman *gentes*). Each head controls land, marriages and
+alliances. **Each house holds ONE hereditary claim**: rights and influence, not manual jobs.
 
-## 3. Validation rules (PROPOSED)
+| House | Role (accepted draft) | Hereditary claim (**PROPOSED** wording) | Head |
+|---|---|---|---|
+| Corvane | Ruling house; claims to be the founders. Old, proud, under pressure. Livia's house. | The council seat: the presiding voice | Marius Corvane |
+| Valerius | Rising military power; wealth from ships and war. Ambitious, disciplined. Lucan's house. | Command of the war fleet and the harbour guard | Gaius Valerius (**PROPOSED**) |
+| Theren | Old olive and vineyard land in the hills. Quiet, kind, guarded. Took in Soren. | The oldest grove rights: the first pressing | Galen Theren; eldest son Tiberon |
+| Aurelian | Temple and priesthood. Pious, secretive, kingmakers. | The high priesthood of the sea temple | Theodric Aurelian (**PROPOSED**) |
+| Marcellan | Merchant fleet, trade with other islands. Practical, plays all sides. | The harbour dues and trading charters | Octavia Marcellan (**PROPOSED**) |
+| Cassian | Stonecutters and builders of the terraces. Hot-tempered, proud. | Cutting the quarries and building the terraces | Rufus Cassian (**PROPOSED**) |
+| Severin | Law and judgment; their elders settle disputes. Severe, rigid. | The judges' bench | Aldric Severin (**PROPOSED**) |
+| Damaris | Healers and midwives. Small, trusted, knows everyone's secrets. Neria serves here. | Attending every birth and death | Hesione Damaris (**PROPOSED**) |
+| Veyra | Mountain herders and hunters. Isolated, suspicious of Corva. | Grazing and hunting the mountain | Kael Veyra (**PROPOSED**) |
+| Solenne | Faded nobility, once great, now nearly gone. Bitter. | A seat of honour at the festival (all that remains) | Seraphine Solenne (**PROPOSED**) |
 
-- **Rejected (impossible; logged, not an event).** The actor is dead, absent or a child. The object or place
-  doesn't exist. The action breaks physics or the season (planting in winter, sailing in a winter storm without a
-  boat). A cause from nowhere ("the gods send fire"). Or the proposal *asserts a meaning* ("the omen tells them…").
-  Each rejection records which rule it broke.
-- **Possible: roll for the outcome.** Chance = base rate for the kind × the actor's relevant traits × needs ×
-  resources × weather.
-  - **Success:** the full effect, with costs paid.
-  - **Partial:** a reduced effect (half a harvest, a wall that leans) with full costs.
-  - **Failure:** costs paid and no effect, sometimes with a side-effect (an injury, a lost tool).
+Everyone not in the seed story is a **PROPOSED placeholder** (`proposed = true` in the database) for Danny to
+rewrite: the heads above marked so, their heirs and families, the old priestess's name (Ismene), the old temple
+servant (Philo), the sailor (Dion) and the merchant (Hesper), and Livia's mother (Aelia, dead eight years; the ring
+was hers).
 
-  A failed attempt is still a fact and is recorded as an event; it often matters more than a success.
-- **Strange but possible.** The storyteller may propose rare natural events (a stranded whale, a comet, a red
-  tide) out of a "strangeness budget" of about 2 per year. Beyond that they are rejected as "budget spent".
-- **Creator plantings always enter the world** as an arrival or a discovery. Everything after that goes through
-  normal validation.
+**PROPOSED stores:** each house holds food, goods and materials; its land yields them by season
+(`config/rules.yaml`, `houses.yield`); members and clients eat.
 
-## 4. The simplest rules that could work (PROPOSED)
+## 3. Population (LOCKED tiers, PROPOSED numbers in rules.yaml)
 
-- **Resources (3):** food, materials (wood and stone), goods (tools, cloth, wine). Fields, sea and groves produce
-  food by season; building costs materials.
-- **Needs (5):** hunger, warmth, safety, belonging, standing. They drift each tick and are eased by resources or
-  events. Unmet needs raise the chance of conflict, migration or illness.
-- **Seasons and weather:** spring sowing; summer fishing and building; autumn harvest; winter storms and scarcity.
-  Each tick rolls the weather from a seasonal table (calm / rain / heat / storm / drought).
-- **Aging and death:** +1 year per day. Annual death chance rises gently after 50 and steeply after 70, and is
-  raised by hunger, illness and injury. A named death promotes a townsperson if the crowd has someone suitable.
-- **Births:** spouses aged 18–40 have about a 25% chance a year, scaled by food. Townsfolk use the same rates
-  applied to counts.
-- **Forgetting:** memory vividness × 0.8 per tick; recalling or retelling it adds 0.3. Below 0.1, the memory is
-  forgotten.
-- **Distortion:** each retelling has a 15% chance of changing one detail (who was there, where, the weather), or of
-  absorbing a symbol from the teller's recent dreams. The memory's `source_id` still points at the true event,
-  so the gap between the record and what people remember can be measured.
+- **~25 principals:** full agents. They dream, interpret, and act through the storyteller.
+- **~75 side characters:** named, in houses. They age, marry, die and dream, and act by simple rules.
+- **~200 townsfolk:** counts only, as clients of houses or unattached.
+- **Houses act as groups:** one storyteller call per house per season, proposing actions by its members.
+- **Promotion:** a side character becomes a principal when something happens to them; a townsperson becomes named
+  the same way (Soren is this mechanic in story form). **PROPOSED trigger:** being an actor or target in an
+  event, or the teller of a dream that gets interpreted, twice in a year.
 
-## 5. Genesis (PROPOSED except where locked)
+## 4. Patronage (LOCKED)
 
-- **LOCKED:** the founders arrive at an empty Mediterranean shore and build Corva from nothing. An inscription is
-  already there; nobody knows who made it or can read it.
-- **The founders:** 25 named people (5 households and 4 people travelling alone), ages 2–64, plus about 40
-  unnamed people who become the first townsfolk. They arrive together on two ships.
-- **Why they came:** each person has their *own* reason, recorded as a memory, not a fact about the group: flight
-  from a war, exile, debt, trade, following a dream, or simply going where their family went. The founders don't
-  agree on why they left, so that disagreement exists from day one.
-- **The inscription:** an `objects` row: a weathered standing stone near the spring, with lines of marks. Its
-  marks are generated once as a random glyph sequence. **No translation exists anywhere**, not in the database,
-  not in code, not in prompts.
-- **First contact:** the inscription enters the world as an event at tick 1 ("Ione found a marked stone by the
-  spring"). Witnesses form memories. The interpretation step (§2.4) then produces each person's first beliefs about
-  the stone from their own traits, with low confidence. Nobody, including the storyteller, is given a
-  suggested reading.
-- **Year 0 goals:** water, shelter and the first harvest. The storyteller is biased toward survival proposals for
-  the first 3 years.
+Townsfolk attach to houses as **clients**. A house's client count and average loyalty are its real power. Houses must
+feed and protect their clients; in crises clients can defect; some townsfolk stay unattached. When houses choose
+sides, their clients follow.
 
-## 6. Daily compute budget (PROPOSED)
+**PROPOSED rules (rules.yaml `clients`):** each tick a house feeds its clients from its stores (loyalty rises a
+little if it can, falls if it can't); feasts and rites raise loyalty and draw in some of the unattached; being
+accused or slighted in public lowers it; below a loyalty floor a share of clients leave to the unattached.
+Recorded per tick in `house_clients` (count, loyalty, gained, lost). **Not yet in v0:** clients following their
+house into a conflict (needs alliances and sides, §6).
 
-The pretrained instruct model is the same family as the editor (Qwen2.5-1.5B on CPU), at about 20 seconds a call.
-That allows about 170 calls in ~57 minutes. Dreams come from our own run 4 model (about 2 seconds each), which
-doesn't count against the pretrained-model call budget.
+## 5. Dreaming (LOCKED)
 
-| Step | Calls per tick | Calls per day | ~Minutes |
-|---|---:|---:|---:|
-| Dreams (run 4, 25 per tick) | (100 small) | (100) | ~4 |
-| Interpretations | 10 | 40 | 13 |
-| Storyteller proposals | 4 | 16 | 6 |
-| Symbol extraction (batched) | 5 | 20 | 7 |
-| Belief formation and revision | 10 | 40 | 13 |
-| Chronicles and faction practices | 2 | 8 | 3 |
-| Creator planting reactions | n/a | ~10 a week | 2 |
-| Reserve (retries, genesis, spikes) | 9 | 36 | 12 |
-| **Total** | **~40** | **~160** | **~60** |
+Every named person dreams each season (**run 5 model**, the voice chosen by temperament). Most dreams are
+forgotten; some are shared; **only shared dreams are interpreted**. Forgotten dreams are still stored and feed
+symbols and the Sky. There are occasional townsfolk **rumour dreams** of unknown origin.
 
-The time advance, memory retrieval, validation, recording and belief spread are all plain code.
+**PROPOSED:**
+- **Temperaments and voices:** mystic → `<dream>`, romantic → `<poem>`, traditionalist → `<myth>`, sage → `<wisdom>`,
+  pragmatist → `<chronicle>`, skeptic → `<tale>`; 20% of the time any voice.
+- **Seeds:** 60% of dreams begin from an image in the dreamer's own memories (the gold ring, the harbour at night,
+  two stars, the western gate) or from their house's land.
+- **Remembering:** chance by temperament (mystic 0.85 … skeptic 0.12) × vividness (length, variety, whether the
+  model ended it itself).
+- **Sharing:** a remembered dream is told to someone close (a relationship or a housemate), more often by the warm
+  and by mystics. Absent people (the lovers) have no one in Corva to tell.
+- **Interpreting:** the most salient shared dreams (vivid, full of the Flight's images, dreamed by principals or
+  mystics), up to 8 a season, are interpreted by the dreamer through the instruct model. The result is a belief
+  (reading, confidence, and optionally a stance toward a house) and perhaps an intention. The listener takes up the
+  reading at a lower confidence.
 
-## 7. Vital signs, and how to read the proposal log (PROPOSED)
+## 6. Generational tension (LOCKED)
 
-Logged every tick:
-- population (named and crowd), births, deaths, food stores
-- crowd mood
-- number of beliefs; **belief diversity** per subject (how widely interpretations differ); mean confidence
-- faction count and sizes; polarisation (share of conflicting belief pairs between factions)
-- new symbols, and the top 5 symbols by frequency
-- memory drift (share of memories distorted)
-- proposal acceptance rate, by kind
-- reach of each planting
+The Flight's fallout should echo for generations. **Inter-house events** (insults, debts, broken oaths, marriages,
+betrayals) are permanent facts in the event log, tagged with the houses they touch. **How one house feels about
+another is the aggregate of its members' beliefs about those events**: inherited by children, fading slowly,
+reopened when new events touch old wounds. Wars emerge from grievances, scarcity, clients and alliances, and a
+spark. They are never scripted.
 
-**Reading the storyteller log:**
-- **Healthy:** 40–70% of proposals accepted, with varied rejection reasons.
-- **Over 85% accepted:** the rules are too loose, or the storyteller is playing safe. The world will get bland.
-- **Under 30% accepted, the same reason repeating:** the storyteller misunderstands a rule. Fix its prompt, not
-  the rule.
-- **Frequent "asserts a meaning" rejections:** the storyteller is drifting into narrating. Tighten its prompt.
-- **Belief diversity falling toward one view per subject:** a monoculture. That's interesting, but worth watching.
-- **No new symbols for many days:** dreams are stagnating. Reconsider the model, the tags or the memory seeds.
+**PROPOSED mechanics (rules.yaml `beliefs`):**
+- A belief may carry `about_house` and a `stance` (−1..1). The view `house_feelings` is the confidence-weighted
+  mean stance of a house's members toward another house. It is computed, never stored.
+- Each inter-house event gives the target house's members a belief toward the actor's house (hearsay
+  confidence) and the actor a belief toward the target, with stances by kind (accusation −0.6, gift +0.4…).
+- **Fading:** inter-house beliefs lose 3% confidence a season. **Reopening:** a new event between the same two houses
+  lifts their members' old negative beliefs about each other. **Inheritance:** children hold their parents'
+  inter-house beliefs at 60% (applied at genesis; at birth later).
+- Genesis seeds some older grievances (**PROPOSED**, marked in the event facts): Solenne lost the council seat to
+  Corvane (−62); Valerius was given the fleet (−30); Severin judged for Marcellan against Cassian (−11); the council
+  fined a Veyra herder for grazing Theren groves (−5).
 
-## 8. Open questions for Daniel
+## 7. Legends (LOCKED)
 
-1. Should the founders' homeland exist anywhere (a name, a sea they crossed), or only in their conflicting memories?
-2. Can the creator see interpretations as they form, or only weekly summaries? Seeing everything may tempt you
-   to steer.
-3. Can a belief change the world indirectly (people *act* on beliefs, e.g. building at the stone), or should
-   belief-driven actions be limited in early years?
-4. Should anyone ever be able to *learn to read* the inscription, i.e. get a translation that is itself only a
-   belief? Or is it unreadable forever?
-5. Does the crowd dream, in aggregate (a "dream of the town" each season), or only the 25?
-6. Can named people leave Corva or found a second settlement, and do strangers arrive other than through your
-   plantings?
-7. Is the storyteller one voice, or several with different tastes (harsh / gentle / strange) taking turns?
-8. Should Phase 1.5's morning wallpaper show one inhabitant's dream from the night, and whose?
-9. Where does the simulation run daily: a scheduled cloud session, Kaggle CPU, or your laptop?
+Stories become **legends, retold differently by each house**. Legends a character knows, in their house's version,
+are **retrieved into the storyteller's context**, so past stories inspire, warn and shape future choices. Similar
+events can recur.
+
+**PROPOSED:** `legends` holds attributed tellings (house, title, text, the events they grew from). Genesis gives
+each house its own version of the founding (all **PROPOSED**), plus the city's. The storyteller sees up to 2 per
+house. **Not yet in v0:** turning the Flight itself into legends (a yearly step: each house retells the year's
+biggest events in its own version, from its members' beliefs).
+
+## 8. Data model (Supabase; v0 mirrors it in local SQLite)
+
+Applied: `20261117_world_schema.sql` (people, relationships, townsfolk, places, objects, events, dreams, symbols,
+memories, beliefs, factions, chronicles, storyteller_proposals, creator_plantings, vital_signs) and
+`20261118_houses.sql` (backup first: `data/backups/supabase_20261118T1343Z`):
+
+| New | Holds (facts only) |
+|---|---|
+| `houses` | name, claim (one hereditary right), land, seat, head, stores, proposed |
+| `people` + | tier (principal / side), dream_temperament, absent, proposed |
+| `house_members` | house, person, role (head / heir / spouse / child / kin / fosterling / servant / retainer), joined, left |
+| `lineage` | parent, child, kind (blood / adoptive / fostered). A missing row is an unknown parent |
+| `house_clients` | per tick: house (or NULL = unattached), count, loyalty, gained, lost |
+| `legends` | house (whose version), title, text, events it grew from |
+| `beliefs` + | about_house, stance: the material of house feelings |
+| `events` + | houses touched; `dreams` + recalled, shared_with; `storyteller_proposals` + house |
+| view `house_feelings` | per pair of houses: confidence-weighted mean stance |
+| `sealed_facts` | truths only the engine may read (row level security on, no policy) |
+
+**PROPOSED, sandbox only so far:** relationship kinds `betrothed` and `lover`, and `memories.private` (marks the
+private truths). They go to Supabase when the sandbox does.
+
+## 9. The seasonal tick (PROPOSED; v0 runs all of it)
+
+1. **Advance:** land yields by season, members and clients eat; whether each house could feed its clients.
+2. **Dream:** every named person (and 2 rumour dreams), run 5, voice by temperament, seeds from memories.
+3. **Recall and share:** most dreams forgotten (still stored); remembered ones become memories; some are told.
+4. **Interpret:** only shared dreams, the most salient first (≤ 8): belief, stance, intention.
+5. **Propose:** one storyteller call per house (Qwen2.5-1.5B-Instruct, CPU). Context: the house's claim, land,
+   stores, clients, members who can act, who is missing, its legends, its feelings toward others, its principals'
+   beliefs and intentions, recent events. Up to 2 actions from a closed vocabulary, as JSON.
+6. **Validate:** the engine checks each proposal (§10) and rolls the outcome; every attempt is logged.
+7. **Record:** outcomes become events, in template text.
+8. **Update:** beliefs from events (stances toward houses), old wounds reopened, fading, client loyalty and
+   defections.
+9. **Vital signs** (§12).
+10. **Report:** the season's chronicle from several viewpoints, and the log.
+
+**Not yet in v0:** ageing, births, deaths and marriages; promotion; symbol extraction; belief spread beyond the
+houses involved; factions; creator plantings; yearly legends. All are designed above and come next.
+
+## 10. Validation (PROPOSED; parameters in `config/rules.yaml`)
+
+- **Rejected (logged, not an event), with the rule broken:** unreadable reply; asserts a meaning; unknown kind;
+  no such person, place or house; actor dead, absent or a child; actor not of the proposing house; already acting
+  this season; a house aiming at itself; cannot afford the cost; a question to someone absent.
+- **Possible: roll.** Chance = the kind's base × the season's factor (searches and trade are harder in winter) ±
+  the actor's relevant trait (pride for accusations, piety for rites, warmth for gifts…); alliances and marriage
+  offers also depend on how the target house feels. Success, partial, or failure: a failure is still an event.
+- **Searches** consult the sealed location: the wrong place always yields "no trace"; the right place yields a
+  trace only rarely (`search_find_chance`), and that event is sealed in reports.
+- **Strangeness budget:** about 2 rare natural events a year (not yet exercised in v0).
+
+## 11. World engine v0: the offline sandbox
+
+`python -m world.run_season --fresh` runs genesis, then one season. It uses a local SQLite file
+(`data/world/sandbox.db`, git-ignored) with the same tables as Supabase. It does not touch Supabase, the
+wallpaper, the 3D world or the daily job.
+
+| File | What it does |
+|---|---|
+| `world/genesis.py` | Corva on Day 1, from the seed story; placeholders marked PROPOSED; the sealed location |
+| `world/tick.py` | One seasonal tick, steps 1–9 |
+| `world/report.py` | `docs/chronicle_season<N>.md` (in-world) and `docs/season<N>_log.md` (proposals, runtime, vital signs) |
+| `world/backup_supabase.py` | Backs up every Supabase table before a migration |
+| `config/rules.yaml` | Every rule parameter |
+
+## 12. Vital signs, and how to read the proposal log (PROPOSED)
+
+Logged every tick: population by tier; dreams dreamed, remembered, shared and interpreted; beliefs; how many
+different readings of the Flight there are and their **diversity**; proposals by outcome; **acceptance rate** and
+rejection reasons; clients per house (count and loyalty); the coldest and warmest feelings between houses; runtime
+and model calls per step.
+
+- **Healthy:** 40–70% accepted, with varied rejection reasons.
+- **Over 85% accepted:** the rules are too loose, or the storyteller is playing safe.
+- **Under 30% accepted with one reason repeating:** fix the storyteller's prompt, not the rule.
+- **Many "asserts a meaning" rejections:** the storyteller is narrating. Tighten its prompt.
+- **Flight belief diversity falling toward one view:** a consensus forming. Interesting, but worth watching.
+
+## 13. Daily budget (PROPOSED)
+
+Measured in v0 (one season) and projected to 4 seasons a day: see `docs/season1_log.md`. Run 5 dreams cost about
+4 s each (about 100 a season). Instruct-model calls cost about 20–30 s each: about 8 interpretations, 10
+storyteller calls and 5 chronicle passages a season.
+
+## 14. Open questions for Danny
+
+1. **Discovery of the lovers:** should a search ever be able to find them, and if so, how should it surface to you,
+   given that the location is sealed from you?
+2. **The lovers' own dreams** are dreamed and stored, but they have nobody to tell. Should they ever reach Corva
+   (as rumour dreams, say)?
+3. **Promotion triggers:** is "touched by events twice in a year" right?
+4. **Clients in conflict:** when two houses clash, should clients be able to switch to the winning side mid-season,
+   or only at season's end?
+5. **Placeholders:** the 7 heads and their families, the claims as worded, the older grievances and the founding
+   legends are yours to rewrite.
+6. **Ageing, births and deaths** come next: one year per day means a principal ages fast. Are generations meant to
+   turn over within a few weeks?
+7. Where does the daily run happen once it leaves the sandbox: a scheduled cloud session, Kaggle CPU, or your laptop?
