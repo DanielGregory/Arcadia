@@ -9,7 +9,7 @@ Full rebuild (run it now and then; it re-draws the whole sky):
   2. embed each one on the CPU (engine/memory/embed.py, all-MiniLM-L6-v2)
   3. extract its symbols (engine/memory/symbols.py)
   4. UMAP the embeddings into the 2D sky and name the constellations (engine/memory/sky.py)
-  5. upsert memory_dreams / memory_symbols / memory_dream_symbols / memory_constellations
+  5. upsert the world tables dreams / symbols / symbol_occurrences, and sky_constellations
 
 Daily (add_dreams, called by daily/morning.py after the wallpaper is published):
 each new dream arrives already embedded (the Kaggle job did it) and is placed
@@ -63,20 +63,30 @@ def delete_all(sb: Supabase, table: str, column: str) -> None:
 
 
 def upload_symbols(sb: Supabase, dream_symbols: dict[str, dict[str, int]]) -> None:
-    """Upsert each dream's symbols, then recompute the symbol totals from all of them."""
-    rows = [{"dream_id": d, "symbol": s, "mentions": n} for d, syms in dream_symbols.items() for s, n in syms.items()]
-    names = {r["symbol"] for r in rows}
-    # Symbols first (the link table references them), with placeholder totals.
-    existing = {r["name"]: r for r in select(sb, "memory_symbols?select=*")} if not sb.dry_run else {}
-    sb.upsert("memory_symbols", [{"name": n, "first_seen": existing.get(n, {}).get("first_seen")
-                                  or next(r["dream_id"] for r in rows if r["symbol"] == n)} for n in sorted(names)])
-    sb.upsert("memory_dream_symbols", rows)
-    links = select(sb, "memory_dream_symbols?select=symbol,mentions") if not sb.dry_run else rows
+    """Upsert each dream's symbols (world tables `symbols` and `symbol_occurrences`), then recompute
+    each symbol's totals (frequency = mentions, dreams = dreams it appears in)."""
+    rows = [(d, s, n) for d, syms in dream_symbols.items() for s, n in syms.items()]
+    labels = sorted({s for _, s, _ in rows})
+    first = {}
+    for d, s, _ in rows:
+        first.setdefault(s, d)
+    if sb.dry_run:
+        print(f"  would upsert {len(labels)} symbols and {len(rows)} occurrences")
+        return
+    known = {r["label"]: r for r in select(sb, "symbols?select=id,label,first_seen_dream")}
+    new = [{"label": s, "first_seen_dream": first[s]} for s in labels if s not in known]
+    if new:
+        sb.upsert("symbols", new, on_conflict="label")
+        known = {r["label"]: r for r in select(sb, "symbols?select=id,label,first_seen_dream")}
+    sb.upsert("symbol_occurrences", [{"symbol_id": known[s]["id"], "dream_id": d, "mentions": n} for d, s, n in rows],
+              on_conflict="symbol_id,dream_id")
+    links = select(sb, "symbol_occurrences?select=symbol_id,mentions&dream_id=not.is.null")
     dreams, mentions = Counter(), Counter()
     for r in links:
-        dreams[r["symbol"]] += 1
-        mentions[r["symbol"]] += r["mentions"]
-    sb.upsert("memory_symbols", [{"name": n, "dreams": dreams[n], "mentions": mentions[n]} for n in dreams])
+        dreams[r["symbol_id"]] += 1
+        mentions[r["symbol_id"]] += r["mentions"]
+    sb.upsert("symbols", [{"label": r["label"], "dreams": dreams[r["id"]], "frequency": mentions[r["id"]]}
+                          for r in known.values()], on_conflict="label")
 
 
 def rebuild(dry_run: bool) -> None:
@@ -102,10 +112,10 @@ def rebuild(dry_run: bool) -> None:
     rows = [{**{k: d.get(k) for k in DREAM_COLUMNS}, "embedding": to_pg(v), "sky_x": float(p[0]), "sky_y": float(p[1]),
              "constellation": int(c)} for d, v, p, c in zip(dreams, vecs, xy, labels)]
     for i in range(0, len(rows), 100):
-        sb.upsert("memory_dreams", rows[i:i + 100])
+        sb.upsert("dreams", rows[i:i + 100])
     upload_symbols(sb, {d["id"]: s for d, s in zip(dreams, symbols)})
-    delete_all(sb, "memory_constellations", "id")
-    sb.upsert("memory_constellations", constellations)
+    delete_all(sb, "sky_constellations", "id")
+    sb.upsert("sky_constellations", constellations)
     print("dry run: nothing uploaded" if dry_run else f"uploaded {len(rows)} dreams to the memory")
 
 
@@ -120,7 +130,7 @@ def add_dreams(dreams: list[dict], sb: Supabase | None = None) -> None:
         near = rpc(sb, "match_dreams", {"query_embedding": to_pg(d["embedding"]), "match_count": 6})
         near = [n for n in near if n["id"] != d["id"]]
         if near:
-            pos = {r["id"]: r for r in select(sb, "memory_dreams?select=id,sky_x,sky_y,constellation&id=in.("
+            pos = {r["id"]: r for r in select(sb, "dreams?select=id,sky_x,sky_y,constellation&id=in.("
                                                   + ",".join(f'"{n["id"]}"' for n in near) + ")")}
             for n in near:
                 n.update(pos.get(n["id"], {}))
@@ -128,7 +138,7 @@ def add_dreams(dreams: list[dict], sb: Supabase | None = None) -> None:
         rows.append({**{key: d.get(key) for key in DREAM_COLUMNS}, "embedding": to_pg(d["embedding"]),
                      "sky_x": x, "sky_y": y, "constellation": c})
         syms[d["id"]] = d.get("symbols") or extract(d.get("remembered") or d["text"])
-    sb.upsert("memory_dreams", rows)
+    sb.upsert("dreams", rows)
     upload_symbols(sb, syms)
     print(f"  memory: added {len(rows)} dreams to the sky")
 

@@ -231,9 +231,11 @@ const sky = { dreams: [], cons: [], syms: {}, selected: null, pts: [], edges: []
 
 async function loadSky() {
   const [dreams, cons, links] = await Promise.all([
-    api("memory_dreams?select=id,run,kind,tag,prompt,text,remembered,day,sky_x,sky_y,constellation&order=id", { headers: { Prefer: "" } }),
-    api("memory_constellations?select=*&order=id", { headers: { Prefer: "" } }),
-    api("memory_dream_symbols?select=dream_id,symbol,mentions", { headers: { Prefer: "" } }),
+    api("dreams?select=id,run,kind,tag,prompt,text,remembered,day,sky_x,sky_y,constellation&order=id", { headers: { Prefer: "" } }),
+    api("sky_constellations?select=*&order=id", { headers: { Prefer: "" } }),
+    // occurrences of a symbol in a dream, with the symbol's label joined in
+    api("symbol_occurrences?select=dream_id,mentions,symbols(label)&dream_id=not.is.null", { headers: { Prefer: "" } })
+      .then(rows => rows.map(r => ({ dream_id: r.dream_id, symbol: r.symbols.label, mentions: r.mentions }))),
   ]);
   sky.dreams = dreams.filter(d => d.sky_x != null);
   sky.cons = cons;
@@ -436,7 +438,7 @@ async function mark(id, value) {
   const old = d.mark;
   d.mark = d.mark === value ? null : value;  // tapping the active button again clears it
   renderDreams();
-  try { await api(`dreams?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ mark: d.mark }) }); }
+  try { await api(`review_dreams?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ mark: d.mark }) }); }
   catch (e) { d.mark = old; renderDreams(); toast("Couldn't save: " + e.message); }
 }
 
@@ -444,7 +446,7 @@ async function saveNote(id, value, statusEl) {
   const d = state.dreams.find(x => x.id === id);
   if ((d.note || "") === value) return;
   try {
-    await api(`dreams?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ note: value || null }) });
+    await api(`review_dreams?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ note: value || null }) });
     d.note = value; if (statusEl) { statusEl.textContent = "Note saved"; setTimeout(() => (statusEl.textContent = ""), 2000); }
   } catch (e) { toast("Couldn't save the note: " + e.message); }
 }
@@ -495,7 +497,7 @@ document.querySelector("main").addEventListener("focusout", e => {
   try {
     [state.images, state.dreams] = await Promise.all([
       api("images?select=id,kind,prompt,seed,meta,dream_id,picked&order=id", { headers: { Prefer: "" } }),
-      api("dreams?select=*&order=id", { headers: { Prefer: "" } }),
+      api("review_dreams?select=*&order=id", { headers: { Prefer: "" } }),
     ]);
     renderCorva(); renderDreams(); renderWallpapers();
   } catch (e) {

@@ -10,7 +10,7 @@ What goes where:
     out/wallpapers/*.png          -> wallpapers/
   Table "images": one row per uploaded image (kind, prompt, seed, the full
     metadata JSON, and the dream it shows, if any).
-  Table "dreams": the read-test dreams (out/read_test/run2.json, and run3.json
+  Table "review_dreams": the read-test dreams (out/read_test/run2.json, and run3.json
     once it exists), plus the priming-test dreams that have a painting or a
     wallpaper, linked to it.
 
@@ -71,7 +71,7 @@ class Supabase:
                                        "cache-control": "max-age=300"}, timeout=120)
         r.raise_for_status()
 
-    def upsert(self, table: str, rows: list[dict]) -> None:
+    def upsert(self, table: str, rows: list[dict], on_conflict: str | None = None) -> None:
         if not rows:
             return
         if self.dry_run:
@@ -79,7 +79,8 @@ class Supabase:
             return
         # merge-duplicates: insert new rows, update the given columns of existing ones.
         # mark/note/picked are never in `rows`, so the gallery's choices survive re-runs.
-        r = self.session.post(f"{self.url}/rest/v1/{table}", json=rows, timeout=60,
+        target = f"?on_conflict={on_conflict}" if on_conflict else ""  # match on a unique column other than the key
+        r = self.session.post(f"{self.url}/rest/v1/{table}{target}", json=rows, timeout=60,
                               headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
         if r.status_code >= 400:
             sys.exit(f"upsert into {table} failed: {r.status_code} {r.text}")
@@ -162,7 +163,7 @@ def main() -> None:
           f"wallpapers) and {len(dreams)} dreams")
 
     # Dreams first, because images reference them.
-    sb.upsert("dreams", list(dreams.values()))
+    sb.upsert("review_dreams", list(dreams.values()))
     for img in images:
         sb.upload(img["_local"], img["id"])
         print(f"  uploaded {img['id']}" if not args.dry_run else "", end="\n" if not args.dry_run else "")
