@@ -336,6 +336,11 @@ def interpret(con, R, shared, llm, clock, year, season):
     except Exception:  # noqa: BLE001  (no sentence-transformers: the duplicate check is skipped, and said so in the log)
         pass
     seen_vecs = []
+    if embed_fn:   # readings of the last seasons count too: the same reading twice in a row is just as dull
+        prev = [b["interpretation"] for b in rows(con, "select distinct interpretation from beliefs where subject_type = 'dream' "
+                                                       "and source_type = 'own_dream' order by id desc limit 16")]
+        if prev:
+            seen_vecs = list(embed_fn(prev))
     out = []
     for d in chosen:
         p = one(con, "select * from people where id = ?", d["person"]["id"])
@@ -669,7 +674,12 @@ def validate_and_record(con, R, items, year, season, tick, r):
             own_target = (target is not None and tkind == "person" and actor is not None and
                           (target["id"] == actor.get("id") or (family in HOSTILE and target["house_id"] == h["id"])))
             stood_in = None
-            if actor and not own_target and not group_key and V["one_action_per_actor"] and actor["id"] in acted and actor["house_id"] == h["id"]:
+            if actor and not own_target and group_key and group_key in acted:
+                # the house (or its clients) already acted together this season: a free member carries this one out
+                sub = stand_in(con, R, h, acted, {target["id"]} if tkind == "person" and target else set(), year)
+                if sub:
+                    stood_in, actor, group_key = actor["name"] + " (as a group)", sub, None
+            elif actor and not own_target and not group_key and V["one_action_per_actor"] and actor["id"] in acted and actor["house_id"] == h["id"]:
                 # one action per person per season: someone else of the house carries it out, or the house as a group
                 sub = stand_in(con, R, h, acted, {target["id"]} if tkind == "person" and target else set(), year)
                 if sub:
