@@ -42,8 +42,8 @@ STORY_SEX = {"Marius": "m", "Livia": "f", "Lucan": "m", "Galen": "m", "Tiberon":
              "Brenna": "f", "Quintus": "m", "Ysolde": "f", "Silvan": "m", "Philo": "m", "Dion": "m", "Hesper": "m"}
 
 STYLE = ("oil painting portrait, head and shoulders, three-quarter view, an inhabitant of an ancient island city of "
-         "oars and sails, soft warm window light from the left, deep umber background, visible brushstrokes and canvas "
-         "texture, muted earthen palette with one strong colour in the clothing, the quiet dignity of an old master portrait")
+         "oars and sails, soft warm window light from the left, dark plain background, visible brushstrokes and canvas "
+         "texture, the clothing in vivid saturated colour against the dark ground, the quiet dignity of an old master portrait")
 NEGATIVE = ("photo, photograph, 3d render, cartoon, anime, modern clothes, glasses, text, letters, watermark, frame, "
             "two people, deformed face, extra eyes, blurry")
 DRESS = {   # by house: the strong colour and the clothing (PROPOSED)
@@ -73,7 +73,9 @@ def age_words(age: int, sex: str) -> str:
     if age < 18:
         return f"a young {'girl' if sex == 'f' else 'boy'} of about {age}"
     if age < 30:
-        return f"a young {noun} of about {age}"
+        return f"a young {noun} of about {age}, youthful smooth skin"
+    if age < 40:
+        return f"a {noun} of about {age}, in the prime of life, no grey hair"
     if age < 50:
         return f"a {noun} of about {age}"
     if age < 65:
@@ -96,8 +98,8 @@ def prompts(con) -> list[dict]:
         what = "" if any(k in what for k in ("said", "swore", "believes", "fled", "took ")) else what
         what = what.removeprefix("his ").removeprefix("her ")
         of_house = "" if p["house"] in what else f", of House {p['house']}"
-        prompt = (f"{age_words(age, sex)}" + (f" with {hair} hair" if hair else "") + (f", {what}" if what else "")
-                  + f"{of_house}, wearing {DRESS[p['house']]}, a {p['dream_temperament']} temperament in the eyes")
+        prompt = (f"{age_words(age, sex)}" + (f" with {hair} hair" if hair else "") + f", wearing {DRESS[p['house']]}"
+                  + (f", {what}" if what else "") + f"{of_house}, a {p['dream_temperament']} temperament in the eyes")
         out.append({"id": p["id"], "name": p["name"], "sex": sex, "prompt": prompt, "style": STYLE, "negative": NEGATIVE,
                     "seed": 1000 + p["id"]})
     return out
