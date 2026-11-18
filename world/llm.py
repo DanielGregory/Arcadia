@@ -53,17 +53,18 @@ class Instruct:
         self._tdata = None
         self.load_seconds = time.time() - t
 
-    def _generate(self, system: str, user: str, max_new_tokens: int, allowed=None) -> str:
+    def _generate(self, system: str, user: str, max_new_tokens: int, allowed=None, repetition_penalty: float = 1.0) -> str:
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         prompt = self.tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = self.tok(prompt, return_tensors="pt")
         kw = {"prefix_allowed_tokens_fn": allowed} if allowed else {}
         with torch.no_grad():
-            out = self.model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, repetition_penalty=1.0, **kw)
+            out = self.model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, repetition_penalty=repetition_penalty, **kw)
         return self.tok.decode(out[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True).strip()
 
-    def chat(self, system: str, user: str, max_new_tokens: int = 200) -> str:
-        return self._generate(system, user, max_new_tokens)
+    def chat(self, system: str, user: str, max_new_tokens: int = 200, repetition_penalty: float = 1.0) -> str:
+        """Plain text. A repetition penalty above 1 (e.g. 1.12) keeps long prose from going round in circles."""
+        return self._generate(system, user, max_new_tokens, repetition_penalty=repetition_penalty)
 
     def json(self, system: str, user: str, schema: dict, max_new_tokens: int = 300):
         """A reply that matches the schema (dict), or None if even the forgiving parse fails."""

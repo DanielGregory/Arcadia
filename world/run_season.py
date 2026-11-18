@@ -63,7 +63,7 @@ def main() -> None:
     chron = None
     if season == "winter" or args.chronicle:      # one chronicle a year (runtime): at the year's end, or when asked
         with clock.step("chronicle (once a year)"):
-            chron = report.write_year_chronicle(con, llm, year, season, clock, complete=(season == "winter"))
+            chron = report.write_year_chronicle(con, llm, year, season, clock, complete=(season == "winter"), R=R)
     raw_failures = [(it["house"]["name"], it["raw"]) for it in items if it["proposal"] is None]
     con.commit()
     log = report.write_log(con, year, season, tick, stats, interp, raw_failures)

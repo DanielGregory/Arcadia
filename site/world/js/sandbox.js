@@ -18,28 +18,13 @@
 import * as THREE from "../vendor/three.module.min.js";
 import { heightAt } from "./world/terrain.js";
 
-const SUPABASE_URL = "https://dbrtvwhslxkdpmuawrgd.supabase.co";
-const SUPABASE_KEY = "sb_publishable_NVNYh69hEq2uJKfWOvlAkg_9RCInRey";
+import { loadWorld, personHtml } from "../../js/sandbox-data.js";
 
-async function table(name, query = "select=*") {
-  const out = [];
-  for (let from = 0; ; from += 1000) {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${name}?${query}`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, Range: `${from}-${from + 999}` } });
-    if (!r.ok) throw new Error(`${name}: ${r.status}`);
-    const page = await r.json();
-    out.push(...page);
-    if (page.length < 1000) return out;
-  }
-}
-
+// Everything the island needs from the sandbox, through the shared reader (site/js/sandbox-data.js), which the
+// Codex uses too: the same tables, the same helpers, the same character panel.
 export async function loadSandbox() {
-  const [world, places, houses, people, events, beliefs, dreams] = await Promise.all([
-    table("sandbox_world"), table("sandbox_places"), table("sandbox_houses"), table("sandbox_people"),
-    table("sandbox_events", "select=*&order=id"), table("sandbox_beliefs", "select=*&order=id"),
-    table("sandbox_dreams", "select=id,year,season,dreamer_id,text,retelling,recalled,discussed&order=id"),
-  ]);
-  return { world: world[0], places, houses, people, events, beliefs, dreams };
+  const W = await loadWorld();
+  return { W, world: W.now, places: W.places, houses: W.houses, people: W.people, events: W.events, beliefs: W.beliefs, dreams: W.dreams };
 }
 
 // --- the season: light and foliage -------------------------------------------------------------
@@ -138,7 +123,7 @@ const EVENT_LOOK = {
 
 // --- the whole sandbox layer -----------------------------------------------------------------------
 export function makeSandbox(data, { onFly } = {}) {
-  const { world, places, houses, people, events, beliefs, dreams } = data;
+  const { W, world, places, houses, people, events, beliefs, dreams } = data;
   const group = new THREE.Group();
   const placeById = new Map(places.map(p => [p.id, p]));
   const houseById = new Map(houses.map(h => [h.id, h]));
@@ -256,24 +241,14 @@ export function makeSandbox(data, { onFly } = {}) {
   const show = html => { panel.innerHTML = `<button class="close" aria-label="Close">×</button>${html}`; panel.hidden = false;
                          panel.querySelector(".close").onclick = () => (panel.hidden = true); };
 
+  // the full character panel (shared with the Codex entry): portrait, house, family, patron, recent actions,
+  // public beliefs, every dream (with its painting if one was made), and a link to the Codex
   function showPerson(p) {
-    const h = houseById.get(p.house_id), pl = placeById.get(p.place_id);
-    const mine = dreams.filter(d => d.dreamer_id === p.id);
-    const dream = mine[mine.length - 1];
-    const fb = flight ? beliefs.filter(b => b.holder_id === p.id && b.subject_type === "event" && String(b.subject_id) === String(flight.id))
-                              .sort((a, b) => b.confidence - a.confidence) : [];
-    show(`
-      <p class="who"><i style="background:${esc(h?.color)}"></i>${esc(p.name)}</p>
-      <p class="sub">${h ? "House " + esc(h.name) : "no house"}${p.role ? " · " + esc(p.role) : ""}${p.tier ? " · " + esc(p.tier) : ""}
-         ${p.proposed ? " · <em>placeholder (proposed)</em>" : ""}</p>
-      <p class="sub">Now at ${esc(pl?.name || "?")}</p>
-      <h4>Latest dream${dream ? ` <small>${esc(dream.season)}, year ${dream.year}${dream.recalled ? "" : " · forgotten on waking"}</small>` : ""}</h4>
-      ${dream ? `<p class="dream">${esc(dream.retelling || dream.text.slice(0, 420) + (dream.text.length > 420 ? "…" : ""))}</p>
-                 ${dream.retelling ? `<p class="sub">(as they tell it; the dream itself was stranger)</p>` : ""}`
-              : `<p class="sub">No dream yet.</p>`}
-      <h4>What they believe about the Flight</h4>
-      ${fb.length ? fb.map(b => `<p class="belief"><span>${Math.round(b.confidence * 100)}%</span>${esc(b.interpretation)}</p>`).join("")
-                  : `<p class="sub">Nothing they hold to.</p>`}`);
+    show(personHtml(W, p, { codexLink: true, maxDreams: 24 }));
+    panel.querySelectorAll("[data-person]").forEach(a => a.addEventListener("click", ev => {
+      const q = W.person(a.dataset.person);
+      if (q && !q.absent && lit.some(l => l.p.id === q.id)) { ev.preventDefault(); showPerson(q); }   // stay on the island if they're here
+    }));
   }
   function showHouse(h) {
     const members = people.filter(p => p.house_id === h.id);
@@ -283,7 +258,8 @@ export function makeSandbox(data, { onFly } = {}) {
       <p class="sub">${esc(h.claim)}${h.proposed ? " · <em>placeholder family (proposed)</em>" : ""}</p>
       <p class="sub">${esc(h.land)}</p>
       <p class="sub">Head: ${esc(head?.name || "?")} · ${members.length} in the house · food ${Math.round(h.food)}</p>
-      <p class="sub"><em>Where the estate is drawn is PROPOSED: a guess to be moved.</em></p>`);
+      <p class="sub"><em>Where the estate is drawn is PROPOSED: a guess to be moved.</em></p>
+      <p class="sub"><a href="/codex/?world=sandbox#h${h.id}">Codex entry ↗</a></p>`);
     onFly?.({ x: h.estate_x, z: h.estate_z, dist: Math.max(260, (h.estate_radius || 20) * 4), el: 0.45 });
   }
   function showEvent(e, pl) {

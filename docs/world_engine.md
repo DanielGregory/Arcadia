@@ -217,6 +217,27 @@ private truths). They go to Supabase when the sandbox does.
   season (`world/state.py`); then the sandbox snapshot is published and the reports pushed. It runs in a dedicated
   cloud session created with the repo attached (the morning wallpaper too), so both can push to main.
 
+## 8d. The Codex, the character panel, chroniclers and portraits (Danny's decisions, PROPOSED details)
+
+- **The Codex** (`/codex/?world=sandbox`): houses (colour, a placeholder crest, head, seat, hereditary claim, family
+  tree, clients and loyalty, feelings toward every other house), a searchable index of people (name, house, age,
+  role, relationships, recent actions), and places, symbols (images recurring in dreams) and legends, all filling
+  in as the world grows. Read-only from the `sandbox_*` tables, which never hold private memories or sealed facts;
+  only public ties are published (spouse, betrothed, kin, friend, rival, teacher: not "lover").
+- **The character panel** on the 3D island: tapping a lantern opens the same view as the Codex entry (portrait,
+  house, family, patron for those who serve a house, recent actions, public beliefs, every dream with its painting
+  if one exists) and links to the Codex. One shared reader: `site/js/sandbox-data.js`.
+- **Chroniclers** replace the neutral chronicle: three named people of the city from different houses
+  (`rules.yaml chroniclers`: Iola Aurelian, scribe of the sea temple; Aldric Severin, eldest of the judges; Basil
+  Marcellan, merchant of the counting house; all PROPOSED) each write the year from their own house's beliefs about
+  the Flight, its feelings toward the others and its legend, from the engine's record of events only. Their
+  histories are claims, stored as theirs (`chronicles`, kind `chronicle`, with author and title), never facts; the
+  engine's neutral record of each season is in the season log. The Chronicle tab has a selector for whose history
+  to read.
+- **Portraits** (`world/portraits.py`, Kaggle SDXL): one painted portrait per principal, one fixed style, the
+  house's colours and dress, each person's own seed; stored on the person's record (`people.portrait`, a path in
+  the public bucket under `sandbox/portraits/`). Sex is read from the first name (`people.sex`, PROPOSED).
+
 ## 9. The seasonal tick (PROPOSED; v0 runs all of it)
 
 1. **Advance:** land yields by season, members and clients eat; whether each house could feed its clients.

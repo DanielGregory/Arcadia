@@ -153,3 +153,13 @@ clients:
   defect_below: 0.35          # below this loyalty, some clients leave
   defect_rate: 0.2            # share of clients who leave when they do
   join_from_unattached: 0.06  # a feast or rite draws in this share of the unattached
+
+# The year's chroniclers (PROPOSED: three people of the city, from different houses). Each writes the year as
+# their house sees it, with its loyalties, grudges and beliefs about the Flight. Their histories are claims,
+# never facts (stored in chronicles, kind 'chronicle', with their author). Change who and how freely.
+chroniclers:
+  - {name: "Iola Aurelian", title: "scribe of the sea temple", voice: "devout and watchful; sees the will of the sea in everything, and the temple's standing above all"}
+  - {name: "Aldric Severin", title: "eldest of the judges", voice: "grave, measured, fond of precedent; weighs every house against the law, and trusts none of them fully"}
+  - {name: "Basil Marcellan", title: "merchant of the counting house on the quay", voice: "shrewd and wry; counts every quarrel in coin, cargo and favours owed, and admires whoever profits"}
+chronicle_words: [220, 300]
+

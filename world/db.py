@@ -92,7 +92,7 @@ create table if not exists chronicles (
 
 # Columns added later (to older sandboxes on connect): people.portrait (a path in the public bucket) and
 # people.sex (PROPOSED: read from the first name; see world/portraits.py)
-LATER_COLUMNS = {"people": [("portrait", "text"), ("sex", "text")]}
+LATER_COLUMNS = {"people": [("portrait", "text"), ("sex", "text")], "chronicles": [("title", "text")]}
 
 
 def connect(path: Path = DB_PATH) -> sqlite3.Connection:

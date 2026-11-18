@@ -41,7 +41,9 @@ from world.placements import ESTATES, place_positions  # noqa: E402
 TABLES = [("sandbox_places", "id"), ("sandbox_houses", "id"), ("sandbox_people", "id"), ("sandbox_events", "id"),
           ("sandbox_beliefs", "id"), ("sandbox_dreams", "id"), ("sandbox_house_clients", "id"),
           ("sandbox_chronicles", "id"), ("sandbox_house_feelings", "from_house"), ("sandbox_vital_signs", "year"),
+          ("sandbox_lineage", "id"), ("sandbox_relationships", "id"), ("sandbox_legends", "id"), ("sandbox_symbols", "symbol"),
           ("sandbox_world", "id")]
+PUBLIC_TIES = ("spouse", "betrothed", "kin", "friend", "rival", "teacher")   # never 'lover' (the Codex shows only public ties)
 
 
 # --- the secret, guarded ---------------------------------------------------------------------------------
@@ -96,10 +98,12 @@ def build(con) -> dict[str, list[dict]]:
                        "estate_x": at[0] if at else None, "estate_z": at[1] if at else None,
                        "estate_radius": e.get("r"), "estate_proposed": True})
 
+    from world.portraits import sex_of
     people = [{**p, "alive": bool(p["alive"]), "absent": bool(p["absent"]), "proposed": bool(p["proposed"]),
-               "place_id": None if p["absent"] else p["place_id"]}
+               "place_id": None if p["absent"] else p["place_id"], "sex": p["sex"] or sex_of(p["name"])}
               for p in rows(con, "select p.id, p.name, p.tier, m.house_id, m.role, p.place_id, p.alive, p.absent, p.proposed, "
-                                 "p.dream_temperament from people p left join house_members m on m.person_id = p.id and m.left_year is null")]
+                                 "p.dream_temperament, p.born_year, p.note, p.sex, p.portrait from people p "
+                                 "left join house_members m on m.person_id = p.id and m.left_year is null")]
     house_of = {p["id"]: p["house_id"] for p in people}
 
     events = [{**e, "actors": json.loads(e["actors"]), "houses": json.loads(e["houses"])}
@@ -133,16 +137,22 @@ def build(con) -> dict[str, list[dict]]:
     clients = rows(con, "select id, year, season, house_id, count, loyalty, gained, lost from house_clients")
 
     chronicles = []
-    for c in rows(con, "select id, year, season, author_id, kind, text from chronicles"):
+    for c in rows(con, "select id, year, season, author_id, kind, text, title from chronicles"):
         if leaks(c["author_id"], c["text"]):
             held_back += 1
             continue
         chronicles.append(c)
-    # the season's whole chronicle (the markdown the engine wrote), as the newest entry
-    md = ROOT / f"docs/chronicle_season{clock['tick']}.md"
-    if md.exists():
-        chronicles.append({"id": 1_000_000 + clock["tick"], "year": clock["year"], "season": clock["season"],
-                           "author_id": None, "kind": "chronicle", "text": md.read_text(encoding="utf-8")})
+    # before the chroniclers (seasons 1 to 3): each season's or year's whole chronicle, as an unsigned entry
+    have = {(c["year"], c["kind"]) for c in chronicles if c["kind"] == "chronicle"}
+    for md in sorted((ROOT / "docs").glob("chronicle_*.md")):
+        y = None
+        if md.stem.startswith("chronicle_year"):
+            y = int(md.stem.removeprefix("chronicle_year"))
+        elif md.stem.startswith("chronicle_season"):
+            y = {1: 0, 2: 1, 3: 1}.get(int(md.stem.removeprefix("chronicle_season")))
+        if y is not None and (y, "chronicle") not in have:
+            chronicles.append({"id": 1_000_000 + len(chronicles), "year": y, "season": None, "author_id": None, "kind": "chronicle",
+                               "title": "The engine's chronicle (before the chroniclers)", "text": md.read_text(encoding="utf-8")})
 
     feelings = [{**f, "feeling": round(f["feeling"], 3)} for f in rows(
         con, "select m.house_id from_house, b.about_house to_house, sum(b.stance * b.confidence) / sum(b.confidence) feeling, "
@@ -151,10 +161,24 @@ def build(con) -> dict[str, list[dict]]:
 
     vitals = [{**v, "stats": json.loads(v["stats"])} for v in rows(con, "select year, season, stats from vital_signs")]
 
+    # for the Codex: family lines, public ties, the houses' legends, and the images that recur in dreams
+    lineage = rows(con, "select id, parent_id, child_id, kind from lineage")
+    ties = [r for r in rows(con, "select id, person_a, person_b, kind, strength from relationships") if r["kind"] in PUBLIC_TIES]
+    legends = [{**l, "proposed": bool(l["proposed"])} for l in rows(con, "select id, house_id, title, text, proposed from legends")]
+    from engine.memory.symbols import extract
+    seen_sym = {}
+    for d in dreams:
+        for sym in extract(d["text"]):
+            e = seen_sym.setdefault(sym, {"symbol": sym, "dreams": 0, "dream_ids": [], "first_year": d["year"], "first_season": d["season"]})
+            e["dreams"] += 1
+            e["dream_ids"].append(d["id"])
+    symbols = sorted(seen_sym.values(), key=lambda e: -e["dreams"])
+
     print(f"held back {held_back} item(s) that would have named the sealed place")
     return {"sandbox_places": places, "sandbox_houses": houses, "sandbox_people": people, "sandbox_events": events,
             "sandbox_beliefs": beliefs, "sandbox_dreams": out_dreams, "sandbox_house_clients": clients,
             "sandbox_chronicles": chronicles, "sandbox_house_feelings": feelings, "sandbox_vital_signs": vitals,
+            "sandbox_lineage": lineage, "sandbox_relationships": ties, "sandbox_legends": legends, "sandbox_symbols": symbols,
             "sandbox_world": [{"id": 1, "year": clock["year"], "season": clock["season"], "tick": clock["tick"]}]}
 
 

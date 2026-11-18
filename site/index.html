@@ -119,7 +119,7 @@
 </head>
 <body>
 <header>
-  <h1>Arcadia · review <a href="/world/" style="float:right;letter-spacing:.15em;color:var(--gold);text-decoration:none">World ↗</a></h1>
+  <h1>Arcadia · review <a href="/world/" style="float:right;letter-spacing:.15em;color:var(--gold);text-decoration:none">World ↗</a><a href="/codex/?world=sandbox" style="float:right;letter-spacing:.15em;color:var(--gold);text-decoration:none;margin-right:14px">Codex ↗</a></h1>
   <nav role="tablist">
     <button role="tab" data-tab="today" aria-selected="true">Today</button>
     <button role="tab" data-tab="sky" aria-selected="false">Sky</button>
@@ -510,14 +510,24 @@ async function loadChronicle() {
     api("sandbox_world?select=*", { headers: { Prefer: "" } }), q("sandbox_houses?select=*&order=id"), q("sandbox_people?select=*&order=id"),
     q("sandbox_events?select=id,kind,year,season&order=id"), q("sandbox_beliefs?select=holder_id,subject_type,subject_id,interpretation,confidence&subject_type=eq.event&order=id"),
     q("sandbox_house_feelings?select=*&order=from_house"), q("sandbox_house_clients?select=*&order=id"),
-    q("sandbox_chronicles?select=*&kind=eq.chronicle&order=id"),
+    q("sandbox_chronicles?select=*&kind=eq.chronicle&order=id"),   // chroniclers' histories (and the older unsigned ones)
     api("sandbox_previews?select=*&order=id.desc&limit=1", { headers: { Prefer: "" } }).catch(() => []),
   ]);
   const W = world[0];
   if (!W) { el.innerHTML = `<p class="empty">The sandbox hasn't been published yet (python -m world.publish).</p>`; return; }
   const H = Object.fromEntries(houses.map(h => [h.id, h]));
   const dot = h => `<span class="dot" style="background:${esc(h?.color)}"></span>`;
-  const latest = chron[chron.length - 1];
+  // whose history to read: the chroniclers of the latest year written (each from their own house), newest first;
+  // before the chroniclers there was one unsigned chronicle a season
+  const years = [...new Set(chron.map(c => c.year))].sort((a, b) => b - a);
+  const yearOf = years[0];
+  const writers = chron.filter(c => c.year === yearOf);
+  const byTitle = new Map();
+  for (const c of writers) byTitle.set(c.title || "The chronicle", c);   // the newest entry of each chronicler wins
+  const versions = [...byTitle.values()].sort((a, b) => (a.author_id == null) - (b.author_id == null));
+  let pick = 0;
+  try { const saved = localStorage.getItem("arcadia-chronicler"); const i = versions.findIndex(v => v.title === saved); if (i >= 0) pick = i; } catch (_) {}
+  const latest = versions[pick];
 
   // who believes what about the Flight: each person's strongest reading of "why", and of "where"
   const flight = events.find(e => e.kind === "departure");
@@ -569,7 +579,11 @@ async function loadChronicle() {
       <div class="body"><div class="meta">Wallpaper preview (not production): tomorrow's wallpaper if it came from the engine's most-discussed dream</div>
       <p class="text" style="margin-top:4px">A dream of ${esc(pv.dreamer)}, House ${esc(pv.house)} · Arcadia, ${esc(pv.season)} of year ${pv.year}</p>
       ${pv.status !== "done" ? `<p class="meta">${esc(pv.status)}${pv.error ? ": " + esc(pv.error) : ""}</p>` : ""}</div></article>` : ""}
-    <article class="card"><div class="body"><div class="chron clamped" id="chronText">${latest ? mdToHtml(latest.text) : "<p class='empty'>No chronicle yet.</p>"}</div>
+    <article class="card"><div class="body">
+      <p class="label" style="margin-top:0">Whose history to read <span style="text-transform:none;letter-spacing:0">· year ${yearOf ?? ""}</span></p>
+      <div class="chips" id="chroniclers" style="margin-bottom:10px">${versions.map((v, i) => `<button class="chip ${i === pick ? "on" : ""}" data-v="${i}">${esc((v.title || "The chronicle").split(",")[0])}</button>`).join("")}</div>
+      <p class="meta" id="chronWho">${latest ? esc(latest.title || "") + (latest.author_id ? " · their house's claims, not facts" : "") : ""}</p>
+      <div class="chron clamped" id="chronText">${latest ? mdToHtml(latest.text) : "<p class='empty'>No chronicle yet.</p>"}</div>
       <button class="more" id="chronMore">Read the whole chronicle</button></div></article>
     <article class="card"><div class="body"><p class="label" style="margin-top:0">Who believes what about the Flight</p>
       <p class="meta">People in each house holding each reading (confidence ≥ 20%; one person can hold a “why” and a “where”). Darker: held more firmly.</p>
@@ -581,6 +595,13 @@ async function loadChronicle() {
     <article class="card"><div class="body"><p class="label" style="margin-top:0">Clients and loyalty</p>
       <div class="tbl-wrap"><table class="grid"><thead><tr><th>House</th><th>Clients</th><th>Loyalty</th><th>Gained</th><th>Lost</th></tr></thead><tbody>${clientRows}</tbody></table></div></div></article>`;
   document.getElementById("chronMore")?.addEventListener("click", e => { document.getElementById("chronText").classList.remove("clamped"); e.target.remove(); });
+  el.querySelectorAll("#chroniclers [data-v]").forEach(b => b.addEventListener("click", () => {
+    const v = versions[Number(b.dataset.v)];
+    try { localStorage.setItem("arcadia-chronicler", v.title); } catch (_) {}
+    el.querySelectorAll("#chroniclers .chip").forEach(x => x.classList.toggle("on", x === b));
+    document.getElementById("chronWho").textContent = (v.title || "") + (v.author_id ? " · their house's claims, not facts" : "");
+    document.getElementById("chronText").innerHTML = mdToHtml(v.text);
+  }));
   el.querySelector("[data-view]")?.addEventListener("click", e => e.target.dataset.view && openViewer(e.target.dataset.view));
 }
 

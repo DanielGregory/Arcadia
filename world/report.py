@@ -180,28 +180,102 @@ def season_section(con, year, season) -> list[str]:
     return lines
 
 
-def write_year_chronicle(con, llm, year, upto_season, clock, complete: bool) -> str:
-    """docs/chronicle_year<Y>.md: every season of the year so far (templated), then the year's accounts and town talk
-    (the model calls). complete=False: written before the year is out (marked so)."""
+CHRONICLER_SYSTEM = (
+    "You are {name}, {title}, of House {house}, in Corva, an old island city ruled by ten noble houses, in an age of oars "
+    "and sails. You keep a chronicle, and you are writing the history of {span}. Your manner: {voice}. Write {lo} to {hi} "
+    "words of plain, grave prose, like an old chronicle; say \"I\" for yourself and \"we\" or \"my house\" for House "
+    "{house}. Do not list every event: choose the four to six that matter most to your house and tell them as one story, "
+    "with your judgement of each, taken ONLY from the record you are given (never invent an event, a person or a title). "
+    "Tell it the way your house sees it: praise its friends, suspect its rivals, explain events in its favour, and hold to "
+    "its beliefs about the Flight. Never mention numbers of believers, scores or this briefing. You may be wrong, and you "
+    "never know where Livia Corvane and Soren of "
+    "the Harbor are. Corva is its own world: no modern things, and no Athens, Rome, Egypt or other real places, peoples or "
+    "gods. The family ties you are given are for reference only: never list them. Do not begin with the date.")
+
+
+def house_view(con, house_id):
+    """What a house believes and feels, for its chronicler: its members' readings of the Flight (most held first),
+    its feelings toward the other houses, and its own legend."""
+    flight = one(con, "select id from events where kind = 'departure'")
+    views = rows(con, "select b.interpretation, count(*) n, avg(b.confidence) c from beliefs b join house_members m on m.person_id = b.holder_id "
+                      "where m.house_id = ? and b.subject_type = 'event' and b.subject_id = ? group by b.interpretation "
+                      "order by n desc, c desc limit 4", house_id, str(flight["id"])) if flight else []
+    feel = rows(con, "select hh.name, sum(b.stance * b.confidence) / sum(b.confidence) f from beliefs b join house_members m "
+                     "on m.person_id = b.holder_id join houses hh on hh.id = b.about_house where m.house_id = ? and b.stance is not null "
+                     "and b.about_house != ? group by hh.name order by f", house_id, house_id)
+    legend = one(con, "select title, text from legends where house_id = ?", house_id)
+    return views, feel, legend
+
+
+def chronicler_history(con, llm, c, year, evs, span, R, clock) -> dict | None:
+    """One chronicler's history of the year: their house's claims, stored as theirs (chronicles, kind 'chronicle')."""
+    from world import anachronism
+    from world.tick import true_ties
+    p = one(con, "select p.*, h.name house, h.id house_id from people p join house_members m on m.person_id = p.id "
+                 "join houses h on h.id = m.house_id where p.name = ? and p.alive = 1 and p.absent = 0", c["name"])
+    if not p:
+        return None
+    views, feel, legend = house_view(con, p["house_id"])
     order = ["spring", "summer", "autumn", "winter"]
-    seasons = [x["season"] for x in rows(con, "select distinct season from events where year = ? union select distinct season from dreams "
-                                            "where year = ?", year, year)]
-    seasons = [x for x in order if x in seasons and order.index(x) <= order.index(upto_season)]
+    record = []
+    for se in order:
+        lines = [event_line(e) for e in evs if e["season"] == se and not e["sealed"]]
+        if lines:
+            record.append(f"{se.title()}: " + " ".join(lines))
+    told = rows(con, "select m.text, q.name from memories m join people q on q.id = m.person_id where m.year = ? and "
+                     "m.text like '(as told)%' and m.told_by is null order by m.vividness desc limit 3", year)
+    ties = true_ties(con, [p["id"]] + [a for e in evs for a in json.loads(e["actors"])])
+    lo, hi = R.get("chronicle_words", [220, 300])
+    system = CHRONICLER_SYSTEM.format(name=p["name"], title=c["title"], house=p["house"], span=span, voice=c["voice"], lo=lo, hi=hi)
+    def word(f):
+        return ("hates" if f < -0.6 else "distrusts" if f < -0.25 else "is wary of" if f < -0.05 else
+                "is fond of" if f > 0.4 else "leans toward" if f > 0.1 else "is indifferent to")
+    held = ["Most of us believe", "Some of us say", "A few say", "One or two say"]
+    user = ("The record of the year (what happened; the engine's own account):\n" + "\n".join(record or ["Little of note."]) + "\n\n"
+            f"What House {p['house']} believes about the Flight: "
+            + (" ".join(f"{held[min(i, 3)]}: {v['interpretation']}" for i, v in enumerate(views)) or "nothing settled.") + "\n"
+            + f"House {p['house']} " + ("; ".join(f"{word(f['f'])} House {f['name']}" for f in feel if abs(f["f"]) > 0.05) or "has no strong feelings")
+            + ".\n"
+            + (f"The legend our house tells: {legend['title']}: {legend['text']}\n" if legend else "")
+            + ("Dreams people told this year: " + " / ".join(f"{t['name']}: {t['text'][len('(as told) '):][:160]}" for t in told) + "\n" if told else "")
+            + "Reference only (never repeat): family ties: " + "; ".join(ties[:20]) + ".")
+    text, cut = "", 0
+    for attempt in range(2):
+        clock.calls += 1
+        text = finish(llm.chat(system, user, max_new_tokens=int(hi * 1.6), repetition_penalty=1.12))
+        text, cut = drop_ties(text)
+        bad = anachronism.find(text)
+        if not bad and cut <= 1:
+            break
+        user += ("\n(Write it again without " + (", ".join(bad) + " (Corva has no such things or places)" if bad else "")
+                 + (" and " if bad and cut > 1 else "") + ("listing family ties" if cut > 1 else "") + ".)")
+    text = anachronism.strip(text) if anachronism.find(text) else text
+    from world.db import insert
+    title = f"{p['name']}, {c['title']}, of House {p['house']}"
+    insert(con, "chronicles", year=year, season=evs[-1]["season"] if evs else "winter", author_id=p["id"],
+           events=[e["id"] for e in evs if not e["sealed"]], text=text, kind="chronicle", title=title)
+    ACCOUNT_CUTS.append((p["name"], cut))
+    return {"title": title, "text": text, "house": p["house"]}
+
+
+def write_year_chronicle(con, llm, year, upto_season, clock, complete: bool, R=None) -> str:
+    """docs/chronicle_year<Y>.md: the year as each of the chroniclers wrote it (rules.yaml chroniclers). Their histories
+    are their houses' claims, side by side; the engine's own record of events is in the season logs."""
+    from world.tick import load_rules
+    R = R or load_rules()
+    order = ["spring", "summer", "autumn", "winter"]
     evs = year_events(con, year, upto_season)
-    span = "this year" if complete else f"this year so far ({', '.join(seasons)})"
-    lines = [f"# The Chronicle of Corva: Year {year}" + ("" if complete else f" (so far: {', '.join(x.title() for x in seasons)})"), "",
-             "*The world engine's sandbox (offline). Written in-world, one chronicle a year. For each season, the record is the "
-             "engine's own account (facts, from templates). The accounts at the end are what particular people of Corva made of "
-             "the year: their words, their beliefs, possibly wrong.*", ""]
-    for se in seasons:
-        lines += season_section(con, year, se)
-    lines += ["## Accounts of the year", ""]
+    seasons = [x for x in order if any(e["season"] == x for e in evs)] or [upto_season]
+    span = "the year" if complete else f"the year so far ({' and '.join(seasons)})"
+    lines = [f"# The Chronicles of Corva: Year {year}" + ("" if complete else f" (so far: {', '.join(x.title() for x in seasons)})"), "",
+             "*The world engine's sandbox (offline). Each year is written by the city's chroniclers, each from their own house: "
+             "its loyalties, its grudges, its beliefs about the Flight. These are their claims, not facts, and they disagree. "
+             "What actually happened is the engine's record, in the season logs.*", ""]
     ACCOUNT_CUTS.clear()
-    last = seasons[-1] if seasons else upto_season
-    for p in pick_viewpoints_year(con, year, evs):
-        text = account(con, llm, p, year, last, clock, evs=evs, span=span)
-        lines += [f"### {p['name']}, of House {p['house']}", "", text.strip(), ""]
-    lines += ["### What the town was saying", "", town_talk(con, llm, year, last, clock, evs=evs).strip(), ""]
+    for c in R.get("chroniclers", []):
+        h = chronicler_history(con, llm, c, year, evs, span, R, clock)
+        if h:
+            lines += [f"## As {h['title']} wrote it", "", h["text"].strip(), ""]
     path = ROOT / f"docs/chronicle_year{year}.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return str(path.relative_to(ROOT))
@@ -231,6 +305,10 @@ def write_log(con, year, season, tick, stats, interp, raw_failures, budget_secon
              "The engine's side of the season: what drove people, what each house set out to do, what the storyteller "
              "proposed and what the world made of it, how long each step took, and the vital signs. (Never shown here: "
              "private truths, the sealed location, sealed events.)", ""]
+    # the record: what happened (the neutral account lives here now; the chronicles are the chroniclers')
+    lines += ["## The record (the engine's own account of the season)", ""]
+    lines += [f"- {event_line(e)}" for e in season_events(con, year, season)] or ["- Nothing was recorded."]
+    lines += [""]
     # drives
     lines += ["## Drives this season (principals in Corva)", "", "| Person | House | Drives |", "|---|---|---|"]
     for d in rows(con, "select p.name, h.name house, group_concat(d.text, '; ') drives from drives d join people p on p.id = d.person_id "
@@ -320,7 +398,7 @@ def write_log(con, year, season, tick, stats, interp, raw_failures, budget_secon
         lines.append(f"| {r['step']} | {r['seconds']:.0f} | {r['calls']} | {per_day(r) / 60:.1f} min | {per_day(r) / budget_seconds:.0%} |")
     lines.append(f"| **total** | **{total:.0f}** | **{sum(r['calls'] for r in rt)}** | **{day_total / 60:.0f} min** | **{day_total / budget_seconds:.0%}** |")
     if ACCOUNT_CUTS:
-        lines += ["", "Background ties cut from accounts (sentences): " + ", ".join(f"{a} {n}" for a, n in ACCOUNT_CUTS) + "."]
+        lines += ["", "Background ties cut from the chronicles (sentences): " + ", ".join(f"{a} {n}" for a, n in ACCOUNT_CUTS) + "."]
     lines += ["", "## Vital signs", "", "```json", json.dumps({k: v for k, v in stats.items() if k != "runtime"}, indent=1), "```", ""]
     path = ROOT / f"docs/season{tick}_log.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

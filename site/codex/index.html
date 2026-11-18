@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Corva Codex</title>
+<style>
+  /* The Codex: the world engine's sandbox as a reference book. Read-only (sandbox_* tables). */
+  :root {
+    --bg: #f5f0e6; --card: #fffdf8; --ink: #2a2620; --muted: #776d5f; --line: #e3d9c6;
+    --gold: #b8862b; --gold-soft: #f3e3bd; --warm: #3f7d4f; --cold: #a8483a; --shadow: 0 1px 2px rgba(60,45,20,.08), 0 4px 14px rgba(60,45,20,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15130f; --card: #1f1c17; --ink: #ece4d4; --muted: #a59a88; --line: #343028;
+      --gold: #d9a94a; --gold-soft: #3a2f18; --warm: #7cc28d; --cold: #e08a78; --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15130f; --card: #1f1c17; --ink: #ece4d4; --muted: #a59a88; --line: #343028;
+    --gold: #d9a94a; --gold-soft: #3a2f18; --warm: #7cc28d; --cold: #e08a78; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 16px/1.55 Georgia, "Times New Roman", serif; -webkit-text-size-adjust: 100%; padding-bottom: env(safe-area-inset-bottom); }
+  a { color: var(--gold); text-decoration: none; } a:hover { text-decoration: underline; }
+  header { position: sticky; top: 0; z-index: 10; background: var(--bg); padding: max(12px, env(safe-area-inset-top)) 16px 0; border-bottom: 1px solid var(--line); }
+  h1 { font: 600 13px/1 Georgia, serif; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); margin: 4px 0 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+  h1 .links { margin-left: auto; letter-spacing: .12em; }
+  nav { display: flex; gap: 2px; overflow-x: auto; }
+  nav a { flex: 1; text-align: center; font: 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 10px 6px 12px; color: var(--muted);
+          border-bottom: 2px solid transparent; white-space: nowrap; text-decoration: none; }
+  nav a.on { color: var(--ink); border-bottom-color: var(--gold); font-weight: 600; }
+  main { max-width: 820px; margin: 0 auto; padding: 16px; }
+  .note { font-size: 13px; color: var(--muted); font-family: -apple-system, sans-serif; margin: 0 0 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  .row { display: flex; gap: 14px; align-items: flex-start; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  h2 { font-size: 22px; margin: 0 0 4px; } h3 { font-size: 17px; margin: 0 0 4px; }
+  h4 { font: 600 11px/1 -apple-system, sans-serif; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 16px 0 8px; }
+  h4 small { letter-spacing: 0; text-transform: none; font-weight: 400; }
+  .sub { color: var(--muted); font-size: 14px; margin: 2px 0; }
+  .who { font-size: 20px; margin: 0 0 2px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
+  ul.links { margin: 0; padding-left: 18px; } ul.links li { margin: 2px 0; } ul.links small { color: var(--muted); }
+  .belief { margin: 4px 0; } .belief span { display: inline-block; min-width: 42px; color: var(--gold); font: 12px -apple-system, sans-serif; }
+  .portrait { border-radius: 8px; flex: none; object-fit: cover; background: #2b2219; }
+  .person-head { display: flex; gap: 14px; align-items: flex-start; }
+  .dreams { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .dream-card { margin: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); }
+  .dream-card img { display: block; width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+  .dream-card figcaption { padding: 8px 10px; font-style: italic; font-size: 14px; }
+  .dream-card small { display: block; font: 12px -apple-system, sans-serif; color: var(--muted); font-style: normal; margin-bottom: 3px; }
+  .feel { display: inline-block; font: 12px -apple-system, sans-serif; padding: 2px 7px; border-radius: 99px; margin: 2px 3px 2px 0; color: #fff; }
+  .bar { display: inline-block; width: 90px; height: 7px; border-radius: 99px; background: var(--line); overflow: hidden; vertical-align: 1px; }
+  .bar b { display: block; height: 100%; background: var(--warm); }
+  .tree, .tree ul { list-style: none; margin: 0; padding-left: 16px; } .tree { padding-left: 0; }
+  .tree li { margin: 3px 0; position: relative; } .tree ul li::before { content: "└ "; color: var(--muted); }
+  .tree .dead { color: var(--muted); text-decoration: line-through; }
+  input[type=search] { width: 100%; font: 16px -apple-system, sans-serif; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+                       background: var(--card); color: var(--ink); margin-bottom: 12px; }
+  .people { display: grid; gap: 8px; }
+  .person-row { display: flex; gap: 12px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
+  .person-row:hover { border-color: var(--gold); text-decoration: none; }
+  .person-row .sub { margin: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: 14px -apple-system, sans-serif; padding: 5px 11px; border-radius: 99px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  .chip.on { background: var(--ink); color: var(--bg); }
+  .chip small { color: var(--muted); }
+  .empty { color: var(--muted); font-style: italic; text-align: center; padding: 36px 0; }
+  .legend-text { font-style: italic; }
+  @media (max-width: 520px) { .row { flex-direction: column; } }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Corva · Codex</span><span id="when"></span><span class="links"><a href="/world/?world=sandbox">Island ↗</a> · <a href="/#chronicle">Chronicles ↗</a></span></h1>
+  <nav id="nav">
+    <a href="#houses" data-s="houses">Houses</a><a href="#people" data-s="people">People</a><a href="#places" data-s="places">Places</a>
+    <a href="#symbols" data-s="symbols">Symbols</a><a href="#legends" data-s="legends">Legends</a>
+  </nav>
+</header>
+<main id="main"><p class="empty">Opening the Codex…</p></main>
+
+<script type="module">
+// The Codex of the world engine's sandbox: houses, people, places, symbols and legends, as the engine has
+// published them (sandbox_* tables, read-only). It fills in as the world grows. Private memories and sealed
+// facts are never in those tables, so they can never appear here.
+import { loadWorld, personHtml, esc } from "/js/sandbox-data.js";
+
+const main = document.getElementById("main");
+let W = null, query = "";
+
+const feelColor = v => v < 0 ? `rgba(168,72,58,${(0.35 + 0.65 * Math.min(1, -v)).toFixed(2)})` : `rgba(63,125,79,${(0.35 + 0.65 * Math.min(1, v)).toFixed(2)})`;
+
+// a house's family tree: the family drawn from its parent-child lines, spouses beside each person
+function tree(h) {
+  const members = W.membersOf(h.id);
+  const ids = new Set(members.map(m => m.id));
+  const childOf = new Set(W.lineage.filter(l => ids.has(l.parent_id) && ids.has(l.child_id)).map(l => l.child_id));
+  const shown = new Set();
+  const spouse = id => W.ties(id).filter(t => t.kind === "spouse").map(t => t.p);
+  const node = p => {
+    if (shown.has(p.id)) return "";
+    shown.add(p.id);
+    const sp = spouse(p.id).filter(s => !shown.has(s.id));
+    sp.forEach(s => shown.add(s.id));
+    const kids = [...new Set([p, ...sp].flatMap(x => W.children(x.id).map(c => c.p)))].filter(c => ids.has(c.id));
+    const name = q => `<a href="#p${q.id}" class="${q.alive === false ? "dead" : ""}">${esc(q.name)}</a>${q.absent ? " <small>(missing)</small>" : ""}`;
+    return `<li>${name(p)}${sp.length ? " ⚭ " + sp.map(name).join(", ") : ""}${p.role ? ` <small class="sub">${esc(p.role)}</small>` : ""}
+            ${kids.length ? `<ul>${kids.map(node).join("")}</ul>` : ""}</li>`;
+  };
+  const roots = members.filter(m => !childOf.has(m.id) && ["head", "spouse", "kin", "heir", "child", "fosterling"].includes(m.role))
+                       .sort((a, b) => (a.role === "head" ? -1 : b.role === "head" ? 1 : (a.born_year ?? 0) - (b.born_year ?? 0)));
+  const family = roots.map(node).join("");
+  const household = members.filter(m => !shown.has(m.id));
+  return `<ul class="tree">${family}</ul>` +
+    (household.length ? `<h4>Household</h4><ul class="links">${household.map(m => `<li><a href="#p${m.id}">${esc(m.name)}</a> <small>${esc(m.role)}</small></li>`).join("")}</ul>` : "");
+}
+
+function houseCard(h, full = false) {
+  const head = W.person(h.head_id), seat = W.place(h.seat_place_id), c = W.clientsOf(h.id);
+  const feelings = W.feelingsOf(h.id).sort((a, b) => a.feeling - b.feeling);
+  return `<article class="card" id="h${h.id}">
+    <div class="row">${W.crest(h, full ? 64 : 48)}
+      <div style="flex:1"><h2><a href="#h${h.id}" style="color:inherit">House ${esc(h.name)}</a></h2>
+        <p class="sub">Hereditary claim: <strong>${esc(h.claim)}</strong></p>
+        <p class="sub">Head: ${head ? `<a href="#p${head.id}">${esc(head.name)}</a>` : "?"} · Seat: ${esc(seat?.name || "?")}</p>
+        <p class="sub">Land: ${esc(h.land || "")}${h.proposed ? " · <em>placeholder family (proposed)</em>" : ""}</p>
+        ${c ? `<p class="sub">Clients: ${c.count} · loyalty <span class="bar"><b style="width:${Math.round((c.loyalty || 0) * 100)}%"></b></span> ${Math.round((c.loyalty || 0) * 100)}%</p>` : ""}
+        <p class="sub"><em>Crest: a placeholder.</em></p></div></div>
+    ${full ? `
+      <h4>How House ${esc(h.name)} feels toward the others <small>(from its members' beliefs; −1 cold … +1 warm)</small></h4>
+      <div>${W.houses.filter(o => o.id !== h.id).map(o => { const f = feelings.find(x => x.to_house === o.id);
+        return f ? `<span class="feel" style="background:${feelColor(f.feeling)}">${esc(o.name)} ${f.feeling > 0 ? "+" : ""}${f.feeling.toFixed(1)}</span>`
+                 : `<span class="feel" style="background:#8a826f">${esc(o.name)} ·</span>`; }).join("")}</div>
+      <h4>Family tree</h4>${tree(h)}
+      ${(() => { const l = W.legends.find(x => x.house_id === h.id); return l ? `<h4>Its legend</h4><p><strong>${esc(l.title)}.</strong> <span class="legend-text">${esc(l.text)}</span></p>` : ""; })()}`
+      : `<p class="sub"><a href="#h${h.id}">Open the house →</a></p>`}
+  </article>`;
+}
+
+function houses() { return `<p class="note">The ten landed houses of Corva, as the world engine knows them (${esc(W.nowLabel())}).</p>` + W.houses.map(h => houseCard(h)).join(""); }
+
+function people() {
+  const q = query.toLowerCase();
+  const list = W.people.filter(p => !q || [p.name, W.house(p.house_id)?.name, p.role, p.note, p.tier].join(" ").toLowerCase().includes(q))
+    .sort((a, b) => (a.tier === b.tier ? a.name.localeCompare(b.name) : a.tier === "principal" ? -1 : 1));
+  return `<input type="search" id="search" placeholder="Search by name, house, role…" value="${esc(query)}" aria-label="Search people">
+    <p class="note">${list.length} of ${W.people.length} people. Principals first.</p>
+    <div class="people">${list.map(p => { const h = W.house(p.house_id), age = W.age(p);
+      return `<a class="person-row" href="#p${p.id}">${W.portrait(p, 40)}<div><div><span class="dot" style="background:${esc(h?.color)}"></span>${esc(p.name)}</div>
+        <p class="sub">${h ? "House " + esc(h.name) : ""}${p.role ? " · " + esc(p.role) : ""}${age != null ? ` · ${age}` : ""}${p.tier === "principal" ? " · principal" : ""}${p.absent ? " · missing" : ""}</p></div></a>`; }).join("")}</div>`;
+}
+
+function personPage(id) {
+  const p = W.person(id);
+  if (!p) return `<p class="empty">No such person.</p>`;
+  const chron = W.chronicles.filter(c => c.author_id === p.id && c.kind === "chronicle");
+  return `<p class="note"><a href="#people">← People</a></p><article class="card">${personHtml(W, p, { codexLink: false, maxDreams: 40 })}
+    ${chron.length ? `<h4>Chronicles they wrote</h4><ul class="links">${chron.map(c => `<li><a href="/#chronicle">${esc(c.title || "a chronicle")}</a> <small>year ${c.year}</small></li>`).join("")}</ul>` : ""}</article>`;
+}
+
+function places() {
+  const list = W.places.slice().sort((a, b) => W.eventsAt(b.id).length - W.eventsAt(a.id).length || a.name.localeCompare(b.name));
+  return `<p class="note">Places the world engine knows. Positions on the island are PROPOSED. A place fills in as things happen there.</p>` +
+    list.map(pl => { const evs = W.eventsAt(pl.id), here = W.peopleAt(pl.id);
+      return `<article class="card"><h3>${esc(pl.name[0].toUpperCase() + pl.name.slice(1))} <small class="sub">${esc(pl.kind || "")}</small></h3>
+        ${pl.x != null ? `<p class="sub"><a href="/world/?world=sandbox&view=${Math.round(pl.x)},${Math.round(pl.z)},${Math.hypot(pl.x, pl.z) < 400 ? 260 : 1400},0.6,0.5">See it on the island ↗</a></p>` : `<p class="sub">Off the island.</p>`}
+        ${here.length ? `<p class="sub">Here now: ${here.map(p => `<a href="#p${p.id}">${esc(p.name)}</a>`).join(", ")}</p>` : ""}
+        ${evs.length ? `<ul class="links">${evs.slice(0, 6).map(e => `<li>${esc(e.text)} <small>${esc(W.when(e))}</small></li>`).join("")}</ul>` : ""}</article>`; }).join("");
+}
+
+let symbol = null;
+function symbols() {
+  if (!W.symbols.length) return `<p class="empty">No symbols yet: they appear as people dream.</p>`;
+  const s = W.symbols.find(x => x.symbol === symbol);
+  return `<p class="note">Images that recur in the dreams of Corva's people, most frequent first. Tap one to see its dreams.</p>
+    <div class="chips">${W.symbols.slice(0, 80).map(x => `<button class="chip ${x.symbol === symbol ? "on" : ""}" data-symbol="${esc(x.symbol)}">${esc(x.symbol)} <small>${x.dreams}</small></button>`).join("")}</div>
+    ${s ? `<h4>Dreams with “${esc(s.symbol)}” <small>first dreamed ${esc(s.first_season)}, year ${s.first_year}</small></h4>
+      <div class="dreams">${s.dream_ids.slice(-24).reverse().map(id => { const d = W.dream(id); if (!d) return ""; const who = W.person(d.dreamer_id);
+        return `<figure class="dream-card"><figcaption><small>${who ? `<a href="#p${who.id}">${esc(who.name)}</a>` : "a rumour of the town"} · ${esc(W.when(d))}</small>
+          <span>${esc(d.text.length > 220 ? d.text.slice(0, 220) + "…" : d.text)}</span></figcaption></figure>`; }).join("")}</div>` : ""}`;
+}
+
+function legends() {
+  return `<p class="note">The tales the houses tell of the founding: each as that house tells it. Legends are accounts, not facts, and they contradict each other.</p>` +
+    W.legends.map(l => { const h = W.house(l.house_id);
+      return `<article class="card"><div class="row">${h ? W.crest(h, 36) : ""}<div><h3>${esc(l.title)}</h3>
+        <p class="sub">${h ? `As <a href="#h${h.id}">House ${esc(h.name)}</a> tells it` : "As all of Corva tells it"}${l.proposed ? " · proposed" : ""}</p>
+        <p class="legend-text">${esc(l.text)}</p></div></div></article>`; }).join("");
+}
+
+function route() {
+  if (!W) return;
+  const hash = location.hash.slice(1) || "houses";
+  let section = hash, html;
+  if (/^p\d+$/.test(hash)) { section = "people"; html = personPage(Number(hash.slice(1))); }
+  else if (/^h\d+$/.test(hash)) { section = "houses"; const h = W.house(Number(hash.slice(1))); html = h ? `<p class="note"><a href="#houses">← Houses</a></p>` + houseCard(h, true) : `<p class="empty">No such house.</p>`; }
+  else html = { houses, people, places, symbols, legends }[hash]?.() ?? houses();
+  main.innerHTML = html;
+  document.querySelectorAll("#nav a").forEach(a => a.classList.toggle("on", a.dataset.s === section));
+  const s = document.getElementById("search");
+  if (s) { s.addEventListener("input", () => { query = s.value; const at = s.selectionStart; route(); const n = document.getElementById("search"); n.focus(); n.setSelectionRange(at, at); }); }
+  main.querySelectorAll("[data-symbol]").forEach(b => b.addEventListener("click", () => { symbol = symbol === b.dataset.symbol ? null : b.dataset.symbol; route(); }));
+  if (!s) window.scrollTo(0, 0);
+}
+addEventListener("hashchange", route);
+
+try {
+  W = await loadWorld();
+  document.getElementById("when").textContent = `Sandbox · ${W.nowLabel()}`;
+  route();
+} catch (e) {
+  main.innerHTML = `<p class="empty">Couldn't open the Codex: ${esc(e.message)}</p>`;
+}
+</script>
+</body>
+</html>
