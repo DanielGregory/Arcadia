@@ -37,6 +37,7 @@ world/godot/.godot/
 # Morning wallpapers: full output with images (the record is in daily/mornings/)
 out/morning/
 out/preview/
+out/portraits*/
 out/morning_run.log
 out/run5/kaggle_run.log
 out/assets_run.log
