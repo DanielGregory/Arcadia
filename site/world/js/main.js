@@ -59,48 +59,26 @@ const features = await fetch(`assets/island/features-${seed}.json`).then(r => (r
                  ?? generateFeatures(seed);
 setFeatures(features);
 const layout = addVillages(generateLayout(seed, qualityName), features.villages, seed);
-// AI-made assets (render/make_assets.py): ?ai=1 (default) or ?ai=0 for the hand-built world only;
-// ?backdrop=sdxl|corva|none picks the painted backdrop set.
+// AI-made assets (render/make_assets.py): textures by default (?ai=0 for none). The image-to-3D
+// objects of the test round lost to the modelled buildings and boats; ?aiobjects=1 still shows them.
 const useAI = params.get("ai") !== "0";
 const manifest = useAI ? await loadManifest() : null;
-const objModel = params.get("model") || "triposr";
-// Each concept was made with two seeds (11 and 12). These are the cleanest of each pair: the others
-// rebuilt the concept's grey background as a solid slab behind the object. ?temple=temple_11 etc.
-// swaps one in to compare.
-const BEST = { temple: "temple_12", ship: "ship_11", statue: "statue_12", fountain: "fountain_12" };
-const aiObj = {};
-for (const name of ["temple", "ship", "statue", "fountain"]) {
-  const have = Object.keys(manifest?.objects?.[objModel] || {});
-  const want = params.get(name) || BEST[name];
-  const pick = have.includes(want) ? want : have.find(k => k.startsWith(name));
-  aiObj[name] = pick ? await loadObject(objModel, pick) : null;
-}
+const tex = useAI ? await loadTextures(manifest) : {};
 const sky = makeSky(), sea = makeSea(shoreTexture(heightAt));
-// the AI temple replaces the hand-built summit temple (the first in the layout)
-const city = makeCity(aiObj.temple ? { ...layout, temples: layout.temples.slice(1) } : layout, Q, seed);
-const ships = makeShips(layout, aiObj.ship ? () => { const s = aiObj.ship(5.5); s.rotation.y = Math.PI / 2; return s; } : null);
+const city = makeCity(layout, Q, seed, { plaster: tex.plaster || null, detail: qualityName === "low" ? 0 : 1 });
+const ships = makeShips(layout);
 // The painted backdrops only work from stage 1's fixed viewpoint; with free flight the real
 // terrain and the distant islands take their place. ?backdrop=sdxl still shows them, to compare.
 const backdrops = useAI ? await loadBackdrops(params.get("backdrop") || "none", manifest,
                                              { paintedSky: params.get("paintedsky") === "1" }) : null;
 if (backdrops) scene.add(backdrops.group);
-if (aiObj.temple) {
-  const t = layout.temples[0];
-  const temple = aiObj.temple(11 * t.scale);
-  temple.position.set(t.x, t.y - 0.5, t.z);
-  temple.rotation.y = t.rot + Math.PI / 2;
-  scene.add(temple);
-}
-if (aiObj.statue) {   // on the quay in front of the quay temple
-  const p = at(6, -27), s = aiObj.statue(4.2);
-  s.position.set(p.x, p.y, p.z);
-  s.rotation.y = Math.PI / 2;
-  scene.add(s);
-}
-if (aiObj.fountain) {   // in a little square halfway up the town
-  const p = at(37, 6), f = aiObj.fountain(2.6);
-  f.position.set(p.x, p.y - 0.2, p.z);
-  scene.add(f);
+if (params.get("aiobjects") === "1") {
+  const BEST = { temple: "temple_12", ship: "ship_11", statue: "statue_12", fountain: "fountain_12" };
+  const have = Object.keys(manifest?.objects?.triposr || {});
+  const load = name => (have.includes(BEST[name]) ? loadObject("triposr", BEST[name]) : null);
+  const [statue, fountain] = [await load("statue"), await load("fountain")];
+  if (statue) { const p = at(6, -27), s = statue(4.2); s.position.set(p.x, p.y, p.z); s.rotation.y = Math.PI / 2; scene.add(s); }
+  if (fountain) { const p = at(37, 6), f = fountain(2.6); f.position.set(p.x, p.y - 0.2, p.z); scene.add(f); }
 }
 const smoke = makeSmoke(layout, Q.smoke);
 const lanterns = new Lanterns(layout.streets, 25, Q.lights);
@@ -115,10 +93,7 @@ terrain.update(camera.position, { sync: true });
 const shoreReady = terrain.shoreMap().then(m => sea.setIslandShore(islandShoreTexture(m)));
 if (params.get("shot") === "1") await shoreReady;
 const distant = makeDistantIslands();
-const tex = useAI ? await loadTextures(manifest) : {};
-if (tex.plaster) for (const k of ["houses", "uppers"]) city.materials[k].map = tex.plaster;
-if (tex.terracotta) city.materials.roofs.map = tex.terracotta, city.materials.roofs.color.set("#ffffff");
-if (tex.stone) for (const k of ["stairs", "walls", "blocks"]) city.materials[k].map = tex.stone;
+if (tex.stone) for (const k of ["stairs", "walls"]) { city.materials[k].map = tex.stone; city.materials[k].needsUpdate = true; }
 if (tex.hillside) {
   // A detail map (mean 0.5, doubled), faded out beyond ~400 m: further away its 24 m repeat would
   // show as a grid of squares, and at that distance it can't be seen as texture anyway.

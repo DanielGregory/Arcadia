@@ -3,6 +3,10 @@
 // 1. Kuwahara filter: for each pixel, look at the four square regions around it and take the
 //    average colour of the one that varies least. Edges stay sharp while flat areas break into
 //    soft, uniform patches: it looks like brushwork. The radius is the brush size.
+// 1b. Ambient occlusion: corners, eaves, the feet of walls and the gaps between houses get a
+//    little darker, the way soft daylight can't quite reach into them. Worked out from the depth
+//    buffer: a pixel is occluded when nearby pixels are a little nearer the camera than it is.
+//    (Off on low quality: it reads the depth eight more times per pixel.)
 // 2. Aerial perspective: using each pixel's real distance (from the depth buffer), far things fade
 //    into the colour of the sky at the horizon, cooling toward violet-blue the further they are.
 //    This is what makes painted mountains recede in layers.
@@ -22,7 +26,7 @@ const paintFS = /* glsl */`
   precision highp float;
   uniform sampler2D tScene, tDepth;
   uniform vec2 texel; uniform int radius;
-  uniform float exposure, night, near, far, hazeStart, hazeScale, glow;
+  uniform float exposure, night, near, far, hazeStart, hazeScale, glow, ao, tanHalfFov;
   uniform vec3 hazeNear, hazeFar;
   in vec2 vUv; out vec4 outColor;
   vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }
@@ -60,8 +64,23 @@ const paintFS = /* glsl */`
         if (sigma < best) { best = sigma; col = mean; }
       }
     }
-    // aerial perspective (the sky itself, at the far plane, is left alone)
     float rawDepth = texture(tDepth, vUv).r;
+    // ambient occlusion: eight samples on a small ring ~2.5 m across in the world, wherever it is
+    if (ao > 0.0 && rawDepth < 0.99999) {
+      float dc = viewDist(vUv);
+      float rad = clamp(1.25 / (dc * tanHalfFov), 0.0015, 0.05);
+      float occ = 0.0;
+      for (int k = 0; k < 8; k++) {
+        float a = float(k) * 0.7854 + 0.3;
+        float rr = rad * (0.45 + 0.55 * fract(float(k) * 0.618));
+        vec2 o = vec2(cos(a) * texel.y / texel.x, sin(a)) * rr;
+        float diff = dc - viewDist(vUv + o);
+        float thick = 0.02 * dc + 0.6;                      // how much nearer counts, growing with distance
+        occ += smoothstep(0.08 * thick, thick, diff) * (1.0 - smoothstep(thick * 3.0, thick * 6.0, diff));
+      }
+      col *= 1.0 - ao * occ / 8.0 * smoothstep(1400.0, 300.0, dc);
+    }
+    // aerial perspective (the sky itself, at the far plane, is left alone)
     if (rawDepth < 0.99999) {
       float dist = viewDist(vUv);
       float h = 1.0 - exp(-pow(max(0.0, dist - hazeStart) * hazeScale, 1.25));
@@ -110,6 +129,7 @@ export class Painter {
         texel: { value: new THREE.Vector2() }, radius: { value: quality.kuwahara },
         exposure: { value: 1 }, night: { value: 0 }, near: { value: 1 }, far: { value: 9000 },
         hazeStart: { value: 220 }, hazeScale: { value: 0.0006 }, glow: { value: quality.glow ?? 1 },
+        ao: { value: quality.ao ?? 0 }, tanHalfFov: { value: 0.35 },
         hazeNear: { value: new THREE.Color() }, hazeFar: { value: new THREE.Color() },
       },
     });
@@ -135,6 +155,7 @@ export class Painter {
     u.hazeFar.value.copy(look.hazeFar);
     u.hazeScale.value = look.hazeScale;
     u.near.value = camera.near;
+    u.tanHalfFov.value = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     u.far.value = camera.far;
     r.setRenderTarget(this.sceneRT);
     r.render(scene, camera);

@@ -1,4 +1,4 @@
-// What moves: ships rocking at anchor, smoke from chimneys, lanterns carried along the streets at
+// What moves: ships and boats rocking at anchor, smoke from chimneys, lanterns carried along the streets at
 // dusk and night, and clouds drifting over the bay.
 //
 // Stage 3 hook: lanterns follow `layout.streets`; when people come from the world tables, each
@@ -6,6 +6,7 @@
 
 import * as THREE from "../../vendor/three.module.min.js";
 import { rng } from "../world/layout.js";
+import { boatKinds } from "./boats.js";
 
 // A soft round glow drawn on a canvas, used for lanterns, smoke and clouds.
 function glowTexture(size = 64, stops = [[0, "rgba(255,255,255,1)"], [1, "rgba(255,255,255,0)"]]) {
@@ -22,47 +23,37 @@ function glowTexture(size = 64, stops = [[0, "rgba(255,255,255,1)"], [1, "rgba(2
 }
 
 // --- ships --------------------------------------------------------------------------------------
-function hullGeometry() {
-  const g = new THREE.BoxGeometry(2.4, 1.3, 9, 2, 2, 8);
-  const p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), e = Math.abs(z) / 4.5;
-    p.setX(i, x * (1 - 0.85 * e * e) * (y < 0 ? 0.55 : 1));   // pointed bow and stern, narrow keel
-    p.setY(i, y + 0.7 * e * e);                                // the sheer: ends rise
-  }
-  g.computeVertexNormals();
-  return g;
-}
-
-export function makeShips(L, makeAiShip = null) {
+// Merchant ships, galleys and fishing boats (boats.js), rocking at anchor. A ship's kind comes from
+// the layout (village harbours ask for fishing boats); otherwise the bigger ones in Corva's bay are
+// galleys and the rest merchantmen.
+export function makeShips(L) {
   const group = new THREE.Group();
-  const hull = hullGeometry(), wood = new THREE.MeshLambertMaterial({ color: "#5b3d27" });
-  const mast = new THREE.CylinderGeometry(0.12, 0.15, 10, 6).translate(0, 5, 0);
-  const sailGeo = new THREE.PlaneGeometry(6.5, 5, 6, 1);
-  const sp = sailGeo.attributes.position;
-  for (let i = 0; i < sp.count; i++) sp.setZ(i, Math.cos((sp.getX(i) / 6.5) * Math.PI) * 0.8);   // billowing
-  sailGeo.rotateY(Math.PI / 2).translate(0.4, 6.2, 0);
-  const sailMat = new THREE.MeshLambertMaterial({ color: "#eadfc4", side: THREE.DoubleSide });
+  const kinds = boatKinds();
+  const body = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const canvas = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
   const ships = L.ships.map((s, i) => {
+    const kind = s.kind || (s.size > 1.35 ? "galley" : "merchant"), K = kinds[kind];
     const ship = new THREE.Group();
-    if (makeAiShip) ship.add(makeAiShip());   // the image-to-3D ship, already the right size
-    else {
-      ship.add(new THREE.Mesh(hull, wood), new THREE.Mesh(mast, wood));
-      if (s.sail) ship.add(new THREE.Mesh(sailGeo, sailMat));
+    ship.add(new THREE.Mesh(K.body, body));
+    if (K.sail && (s.sail || kind === "fishing")) {
+      const sail = new THREE.Mesh(K.sail, canvas);
+      sail.position.set(...K.sailAt);
+      ship.add(sail);
     }
     ship.position.set(s.x, 0.15, s.z);
     ship.rotation.y = s.rot;
-    ship.scale.setScalar(s.size);
+    ship.scale.setScalar(0.85 + ((i * 0.37) % 0.3));
     ship.traverse(o => { o.castShadow = true; });
     group.add(ship);
-    return { ship, phase: i * 1.7, speed: 0.6 + (i % 5) * 0.12 };
+    return { ship, phase: i * 1.7, speed: 0.6 + (i % 5) * 0.12, small: kind === "fishing" };
   });
   return {
     group,
-    update(time) {   // rocking on the swell
+    update(time) {   // rocking on the swell (small boats more)
       for (const s of ships) {
-        s.ship.rotation.z = Math.sin(time * s.speed + s.phase) * 0.045;
-        s.ship.rotation.x = Math.sin(time * s.speed * 0.7 + s.phase * 2) * 0.025;
+        const k = s.small ? 1.8 : 1;
+        s.ship.rotation.z = Math.sin(time * s.speed + s.phase) * 0.045 * k;
+        s.ship.rotation.x = Math.sin(time * s.speed * 0.7 + s.phase * 2) * 0.025 * k;
         s.ship.position.y = 0.15 + Math.sin(time * s.speed * 1.3 + s.phase) * 0.12;
       }
     },

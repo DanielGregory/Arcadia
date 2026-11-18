@@ -1,7 +1,9 @@
 // The island's villages, rivers and roads, made from the seed. (No three.js.)
 //
-//   villages  2-4, in the hills: gentle ground, out of sight of each other, 1.7+ km from Corva,
-//             not up on the mountain. Each gets a name.
+//   villages  three on the coast and one in the hills. Like nearly every real island town, the
+//             coastal ones sit on gentle ground by the shore, best at a river mouth (fresh water,
+//             a landing for boats, trade), each with a small harbour; the hill village farms the
+//             basins. All 1.9+ km from Corva and 1.8+ km from each other. Each gets a name.
 //   rivers    from springs on the mountain's flanks down to the sea: each step goes mostly
 //             downhill, partly toward the nearest coast (so a river can't get stuck in a hollow),
 //             with a little meander. Their water height is made to fall all the way, and the
@@ -25,8 +27,8 @@ const NAMES = ["Elaia", "Ampelos", "Kryoneri", "Platanos", "Melissa", "Lithari",
 export function generateFeatures(seed = 1717) {
   setFeatures(null);                                 // work on the bare land, without old carving
   const r = rng(seed * 7 + 3);
-  const villages = placeVillages(r);
-  const rivers = traceRivers(r);
+  const rivers = traceRivers(r);                     // first, so villages can settle at river mouths
+  const villages = placeVillages(r, rivers);
   setFeatures({ villages, rivers, roads: [] });      // roads should see the river valleys
   const roads = buildRoads(villages, rivers);
   const f = { seed, villages, rivers, roads, mountain: { name: "Mount Aetos", x: PEAK.x, z: PEAK.z } };
@@ -35,30 +37,61 @@ export function generateFeatures(seed = 1717) {
 }
 
 // --- villages ------------------------------------------------------------------------------------
-function placeVillages(r) {
-  const cands = [];
-  for (let z = BOUNDS.minZ; z < BOUNDS.maxZ; z += 150) for (let x = BOUNDS.minX; x < BOUNDS.maxX; x += 150) {
+function meanSlope(x, z, reach) {
+  let slope = 0;
+  for (const [a, b] of [[0, 0], [reach, 0], [-reach, 0], [0, reach], [0, -reach]]) slope += slopeAt(x + a, z + b);
+  return slope / 5;
+}
+// The way to the sea from a point: the direction in which the land's "distance inland" falls fastest.
+function seaward(x, z) {
+  const e = 40, gx = inland(x + e, z) - inland(x - e, z), gz = inland(x, z + e) - inland(x, z - e);
+  const l = Math.hypot(gx, gz) || 1;
+  return { x: -gx / l, z: -gz / l };
+}
+
+function placeVillages(r, rivers) {
+  const mouths = rivers.filter(rv => !rv.joins).map(rv => rv.pts[rv.pts.length - 1]);
+  const coast = [], hills = [];
+  for (let z = BOUNDS.minZ; z < BOUNDS.maxZ; z += 100) for (let x = BOUNDS.minX; x < BOUNDS.maxX; x += 100) {
     const s = inland(x, z);
-    if (s < 600 || s > 3200) continue;
-    if (Math.hypot(x - CITY.x, z - CITY.z) < 1700 || Math.hypot(x - PEAK.x, z - PEAK.z) < 1100) continue;
+    if (s < 90) continue;
+    const dCity = Math.hypot(x - CITY.x, z - CITY.z);
+    if (dCity < 1900 || Math.hypot(x - PEAK.x, z - PEAK.z) < 1100) continue;
     const y = heightAt(x, z);
-    if (y < 50 || y > 420) continue;
-    // gentle over the whole village, not just at its middle
-    let slope = 0;
-    for (const [a, b] of [[0, 0], [70, 0], [-70, 0], [0, 70], [0, -70]]) slope += slopeAt(x + a, z + b);
-    slope /= 5;
-    if (slope > 0.32) continue;
-    cands.push({ x, z, y, score: -slope * 3 + y / 500 + r() * 0.35 });
+    if (s <= 380 && y > 3 && y < 70) {                        // a coastal site
+      const slope = meanSlope(x, z, 90);
+      if (slope > 0.3) continue;
+      const mouth = Math.min(...mouths.map(m => Math.hypot(m.x - x, m.z - z)), Infinity);
+      coast.push({ x, z, y, coastal: true, score: -slope * 3 + (mouth < 600 ? 1.2 * (1 - mouth / 600) : 0) + r() * 0.4 });
+    } else if (s >= 600 && s <= 3200 && y > 50 && y < 420) {  // a hill site
+      const slope = meanSlope(x, z, 70);
+      if (slope > 0.32) continue;
+      hills.push({ x, z, y, coastal: false, score: -slope * 3 + y / 500 + r() * 0.35 });
+    }
   }
-  cands.sort((a, b) => b.score - a.score);
   const out = [];
-  for (const c of cands) {
-    if (out.length >= 4) break;
-    if (out.some(v => Math.hypot(v.x - c.x, v.z - c.z) < 1600)) continue;
-    out.push(c);
-  }
-  return out.map((v, i) => ({ name: NAMES[i % NAMES.length], x: Math.round(v.x), z: Math.round(v.z), y: Math.round(v.y),
-                              r: 85 + Math.round(r() * 45) }));
+  const pick = (list, n, gap) => {
+    list.sort((a, b) => b.score - a.score);
+    for (const c of list) {
+      if (out.filter(v => v.coastal === c.coastal).length >= n) break;
+      if (out.some(v => Math.hypot(v.x - c.x, v.z - c.z) < gap)) continue;
+      out.push(c);
+    }
+  };
+  pick(coast, 3, 2000);
+  pick(hills, 1, 1800);
+  return out.map((v, i) => {
+    const vil = { name: NAMES[i % NAMES.length], x: Math.round(v.x), z: Math.round(v.z), y: Math.round(v.y),
+                  coastal: v.coastal, r: v.coastal ? 115 + Math.round(r() * 30) : 95 + Math.round(r() * 20) };
+    if (v.coastal) {
+      // the harbour: walk from the middle of the village toward the sea until the water is deep enough
+      const d = seaward(v.x, v.z);
+      let hx = v.x, hz = v.z;
+      for (let k = 0; k < 120 && heightAt(hx, hz) > -4; k++) { hx += d.x * 8; hz += d.z * 8; }
+      vil.harbour = { x: Math.round(hx), z: Math.round(hz), dx: +d.x.toFixed(3), dz: +d.z.toFixed(3) };
+    }
+    return vil;
+  });
 }
 
 // --- rivers -------------------------------------------------------------------------------------

@@ -18,6 +18,8 @@ js/world/layout.js      the city as data: houses, temples, stairs, walls, trees,
 js/world/daycycle.js    time of day -> sun, sky, light and fog colours
 js/scene/terrain.js     the ground in 640 m tiles, finer near the camera, built in workers,
                         with each near tile's trees (forests, olive groves, cypresses)
+js/scene/architecture.js houses (6 kinds x 3 sizes, lit windows, plaster) and Doric temples
+js/scene/boats.js       merchant ships, galleys and fishing boats, lofted from their lines
 js/scene/rivers.js      the rivers' flowing water
 js/scene/labels.js      place names; tap one to fly there
 tools/make_features.mjs makes assets/island/features-<seed>.json (and a map to check by eye)
@@ -27,8 +29,8 @@ js/render/painterly.js  Kuwahara oil-paint filter, aerial perspective, ACES, war
 ```
 
 The island: about 7 x 9.5 km, its centre ~3.8 km east of the city, Mount Aetos (~1,100 m) in the
-middle, rolling hills and basins round it, four villages (Elaia, Ampelos, Kryoneri, Platanos)
-joined to Corva by roads, five rivers from the mountain to the sea, forests on the middle slopes,
+middle, rolling hills and basins round it, four villages (three harbour towns at river mouths,
+Elaia, Ampelos and Kryoneri, and Platanos in the hills) joined to Corva by roads, five rivers from the mountain to the sea, forests on the middle slopes,
 olive groves round the villages. Change the terrain or the rules and run
 `node site/world/tools/make_features.mjs 1717 map.ppm` to remake the saved features. Near the city (within ~0.7-1.5 km) the hand-tuned bay of
 stage 1 is blended in, so the city and the first view are unchanged.
