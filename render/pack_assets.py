@@ -66,9 +66,14 @@ def save_web(img: Image.Image, path: Path, width: int = 1536) -> None:
 
 def backdrops(manifest: dict) -> None:
     src = SRC / "backdrops"
+    # SDXL painted whole scenes (sea, towns, its own sun), so keep only the band each layer is for:
+    # the clouds of "sky", and the mountain ridges of "far" and "mid" (their skies then cut out).
+    bands = {"sky": (0.0, 0.42), "far": (0.08, 0.60), "mid": (0.12, 0.66)}
     if src.exists():
         for name in ("sky", "far", "mid"):
             img = Image.open(src / f"{name}.png")
+            top, bottom = bands[name]
+            img = img.crop((0, round(img.height * top), img.width, round(img.height * bottom)))
             save_web(img.convert("RGB") if name == "sky" else cut_sky(img), OUT / "backdrops/sdxl" / f"{name}.png")
         manifest["backdrops"]["sdxl"] = ["sky", "far", "mid"]
         print("backdrops/sdxl: sky, far, mid")
@@ -85,7 +90,10 @@ def backdrops(manifest: dict) -> None:
 
 def textures(manifest: dict) -> None:
     src = SRC / "textures"
+    skip = {"terracotta"}   # this round's "roof tiles" came out as a heap of pebbles: keep the plain colour
     for path in sorted(src.glob("*.png")) if src.exists() else []:
+        if path.stem in skip:
+            continue
         img = Image.open(path).convert("RGB").resize((512, 512), Image.LANCZOS)
         if path.stem == "hillside":   # a detail map: the land keeps its own colours, this adds texture
             a = np.asarray(img).astype(np.float32)

@@ -30,7 +30,9 @@ function loadTexture(url, srgb = true) {
 // --- backdrops --------------------------------------------------------------------------------
 // A card is a piece of a cylinder round the city, facing inward, spanning from the east (inland,
 // behind the mountains) round to just short of the sunset in the north-north-west.
-const ARC_FROM = Math.atan2(-1, -0.25), ARC_TO = Math.atan2(0.12, -1);   // angles of (x, z) directions
+// angles are atan2(z, x): from the east (x = -1, z = -0.25) round through the north-east to just west of
+// north (x = 0.12, z = -1), stopping short of the sunset so the real sun stays in view
+const ARC_FROM = Math.atan2(-0.25, -1), ARC_TO = Math.atan2(-1, 0.12);
 function card(texture, radius, bottom, height, order) {
   let a0 = ARC_FROM, a1 = ARC_TO;
   if (a1 < a0) a1 += Math.PI * 2;
@@ -59,7 +61,11 @@ function card(texture, radius, bottom, height, order) {
         vec4 c = texture2D(map, vUv);
         float fade = fadeTop > 0.0 ? smoothstep(1.0, 1.0 - fadeTop, vUv.y) : 1.0;   // the painted sky melts into the dome
         // painted textures are sRGB; the painter expects linear light
-        gl_FragColor = vec4(pow(c.rgb, vec3(2.2)) * tint, c.a * opacity * fade);
+        // the paintings are already graded and warm: calm them a little so the painter's own grade
+        // (and glow) doesn't push them to saturated orange
+        vec3 lin = pow(c.rgb, vec3(2.2));
+        lin = mix(vec3(dot(lin, vec3(0.299, 0.587, 0.114))), lin, 0.8) * 0.82;
+        gl_FragColor = vec4(lin * tint, c.a * opacity * fade);
       }`,
   });
   const mesh = new THREE.Mesh(geo, mat);
