@@ -38,6 +38,11 @@ JOBS = {
              "output_subdir": "run3", "dest": "checkpoints/run3", "upload_review": False},
     "run4": {"notebook": "notebooks/kaggle_train_run4.ipynb", "slug": "arcadia-run4", "title": "Arcadia Run4",
              "output_subdir": "run4", "dest": "checkpoints/run4", "upload_review": False},
+    "assets": {"notebook": "notebooks/kaggle_assets.ipynb", "slug": "arcadia-assets", "title": "Arcadia Assets",
+               "output_subdir": "assets", "dest": "assets/ai", "upload_review": False},
+    "trellis": {"notebook": "notebooks/kaggle_trellis.ipynb", "slug": "arcadia-trellis", "title": "Arcadia Trellis",
+                "output_subdir": "trellis", "dest": "assets/ai/trellis", "upload_review": False,
+                "kernels": ["danieltgregory/arcadia-assets"]},
     "run5": {"notebook": "notebooks/kaggle_train_run5.ipynb", "slug": "arcadia-run5", "title": "Arcadia Run5",
              "output_subdir": "run5", "dest": "checkpoints/run5", "upload_review": False,
              "datasets": ["danieltgregory/arcadia-run5-data", "danieltgregory/arcadia-run4-model"]},
@@ -65,7 +70,7 @@ def push(job: dict, replace: dict[str, str] | None = None) -> None:
             "id": f"{USER}/{job['slug']}", "title": job["title"], "code_file": Path(job["notebook"]).name,
             "language": "python", "kernel_type": "notebook", "is_private": "true",
             "enable_gpu": "true", "enable_tpu": "false", "enable_internet": "true", "machine_shape": "NvidiaTeslaT4",
-            "dataset_sources": job.get("datasets", []), "competition_sources": [], "kernel_sources": [], "model_sources": [],
+            "dataset_sources": job.get("datasets", []), "competition_sources": [], "kernel_sources": job.get("kernels", []), "model_sources": [],
         }
         (Path(tmp) / "kernel-metadata.json").write_text(json.dumps(meta, indent=1))
         print(kaggle("kernels", "push", "-p", tmp).strip())
@@ -104,9 +109,12 @@ def download(kernel: str, job: dict) -> tuple[float, int]:
         copied = 0
         if src.exists():
             dest.mkdir(parents=True, exist_ok=True)
-            for f in src.iterdir():
-                shutil.copy2(f, dest / f.name)
-                copied += 1
+            for f in src.rglob("*"):
+                if f.is_file():
+                    target = dest / f.relative_to(src)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(f, target)
+                    copied += 1
             print(f"copied {copied} files to {dest.relative_to(ROOT)}")
         else:
             print(f"warning: the run produced no {job['output_subdir']}/ folder; check its log")
