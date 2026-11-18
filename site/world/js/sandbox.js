@@ -124,6 +124,15 @@ const EVENT_LOOK = {
   accuse: { n: 7, form: "crowd", verb: "An accusation" },
   pray: { n: 6, form: "line", torches: 1, verb: "Prayers" },
   work_land: { n: 8, form: "scatter", verb: "Work on the land" },
+  threaten: { n: 8, form: "crowd", torches: 2, verb: "Threats" },
+  investigate: { n: 4, form: "crowd", verb: "Inquiries" },
+  alliance: { n: 8, form: "ring", verb: "An alliance" },
+  marriage: { n: 10, form: "ring", torches: 2, verb: "A marriage offer" },
+  bribe: { n: 3, form: "crowd", verb: "A bribe" },
+  rumor: { n: 9, form: "scatter", verb: "Rumours" },
+  flee: { n: 2, form: "line", torches: 1, verb: "A flight" },
+  confess: { n: 4, form: "crowd", verb: "A confession" },
+  other: { n: 5, form: "crowd", verb: "" },
   default: { n: 5, form: "crowd", verb: "" },
 };
 
@@ -202,7 +211,7 @@ export function makeSandbox(data, { onFly } = {}) {
     }
     if (L.fire) fires.push(new THREE.Vector3(ox, Math.max(heightAt(ox, oz), 0.3), oz));
     labels.push({ kind: "event", x: ox, z: oz, y: Math.max(heightAt(ox, oz), 0) + 9, near: 30, far: 1800,
-                  html: `⚑ ${esc(L.verb || e.kind)}<small>${esc(pl.name)}</small>`, pick: () => showEvent(e, pl) });
+                  html: `⚑ ${esc(L.verb || e.text.split(/[,.]/)[0].slice(0, 42))}<small>${esc(pl.name)}</small>`, pick: () => showEvent(e, pl) });
   }
   if (figures.length) {
     const fm = new THREE.MeshLambertMaterial({ color: "#ffffff" });
