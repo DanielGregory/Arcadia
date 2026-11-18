@@ -44,3 +44,4 @@ out/assets_run.log
 .claude/settings.local.json
 assets/ai/
 out/*_run.log
+out/*.log
