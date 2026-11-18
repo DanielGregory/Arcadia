@@ -163,6 +163,32 @@ memories, beliefs, factions, chronicles, storyteller_proposals, creator_planting
 **PROPOSED, sandbox only so far:** relationship kinds `betrothed` and `lover`, and `memories.private` (marks the
 private truths). They go to Supabase when the sandbox does.
 
+## 8b. After the season 1 review (Danny's decisions, PROPOSED details)
+
+- **Drives** (`world/drives.py`): each principal has 1–3 active drives a season, from their situation and beliefs:
+  Danny's story drives (Marius: get Livia back; Lucan: restore his honour; Galen: torn between Soren and the peace;
+  Tiberon: resentment; Neria: fear of discovery) while their situation holds, plus drives derived from their reading
+  of the Flight, an old grievance between houses, last season's dream intention, and (for heads) the house's state
+  and aim. Stored in `drives`, per person: an aim, never a fact.
+- **Open actions:** the storyteller may propose any action. A list (search, accuse, bribe, spread a rumour, feast,
+  propose a marriage, threaten, form an alliance, pray, flee, investigate, confess) is inspiration, not a menu. The
+  engine sorts each into a family by keywords (`rules.yaml validation.kinds`) to resolve it; unmatched actions are
+  resolved as plain attempts. Repeating a family within a season lowers its chance (×0.6 each time), and the
+  storyteller is told what has already been done.
+- **Strategy:** each house call first answers a strategy question about the Flight.
+- **Actors are ids:** the actor must be a person id (`p12`) or house id (`h3`) from the list given, enforced by
+  schema-guided decoding; an unusable reply is retried once with the reason.
+- **Schema-guided JSON** (`world/llm.py`, lm-format-enforcer) for proposals and interpretations; forgiving parsing
+  only as a fallback.
+- **Continuity:** the model is given the true family ties of everyone it is shown. Accounts and chronicles may
+  contain false claims: they are stored in `chronicles` as the author's own claims, and nothing in them ever writes
+  to facts. Only validated events change the world. First-person accounts are checked for third-person slips and
+  retried once.
+- **Nothing modern:** interpretations first retell the dream in Corva's own terms ("a beast of iron that ran without
+  horses"); the retelling is what the dreamer remembers and tells. The raw dream stays in `dreams` (and the log).
+- **Models:** the storyteller and the accounts use Qwen2.5-3B-Instruct; interpretations keep the 1.5B (loaded in
+  turn: both don't fit in 15 GB together).
+
 ## 9. The seasonal tick (PROPOSED; v0 runs all of it)
 
 1. **Advance:** land yields by season, members and clients eat; whether each house could feed its clients.

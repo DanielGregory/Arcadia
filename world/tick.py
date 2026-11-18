@@ -193,14 +193,28 @@ def recall_and_share(con, R, dreams, r, year, season):
 
 
 # --- 4. interpret ---------------------------------------------------------------------------------------------
+HOUSE_NAMES = ["Corvane", "Valerius", "Theren", "Aurelian", "Marcellan", "Cassian", "Severin", "Damaris", "Veyra", "Solenne"]
 INTERPRET_SYSTEM = (
-    "You speak for one person in Corva, an old island city of ten noble houses. Corva remembers one thing above all this "
-    "season: at the autumn festival of the sea, Livia Corvane and Soren of the Harbor (raised by House Theren) vanished "
-    "together; nobody knows where. You will be given the person and a dream they had and told to someone. Say what the "
-    "dream means TO THIS PERSON, in their own voice (\"I\"), from their own beliefs and fears, in under 40 words. It is their "
-    "opinion, not a fact. Reply with ONE JSON object only: {\"interpretation\": one or two short sentences in the first person, \"confidence\": 0.0-1.0, "
-    "\"about_house\": one of Corvane, Valerius, Theren, Aurelian, Marcellan, Cassian, Severin, Damaris, Veyra, Solenne or null, "
-    "\"stance\": -1.0 (against that house) to 1.0 (for it) or null, \"intention\": something they now mean to do, or null}")
+    "You speak for one person in Corva, an old island city of ten noble houses, in an age of oars and sails, oil lamps, "
+    "bronze and stone. They know NOTHING modern: no cars, machines, offices, schools, money in dollars, telephones or the "
+    "like. Corva remembers one thing above all: at the autumn festival of the sea, Livia Corvane and Soren of the Harbor "
+    "(raised by House Theren) vanished together; nobody knows where. You are given the person and a dream they told to "
+    "someone. First retell the dream as THIS PERSON would tell it, in Corva's own terms: anything modern becomes what they "
+    "would see in it (a car might be 'a beast of iron that ran without horses'; an office 'a great hall of scribes'). Then say "
+    "what the dream means to them, in the first person, from their own beliefs and fears: their opinion, not a fact.")
+
+INTERPRET_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "retelling": {"type": "string", "maxLength": 240},
+        "interpretation": {"type": "string", "maxLength": 240},
+        "confidence": {"type": "number"},
+        "about_house": {"type": "string", "enum": HOUSE_NAMES + ["none"]},
+        "stance": {"type": "number"},
+        "intention": {"type": "string", "maxLength": 140},
+    },
+    "required": ["retelling", "interpretation", "confidence", "about_house", "stance", "intention"],
+}
 
 
 def parse_json(text: str):
@@ -232,9 +246,10 @@ def parse_json(text: str):
 def person_sketch(con, p) -> str:
     beliefs = rows(con, "select interpretation from beliefs where holder_id = ? order by confidence desc limit 4", p["id"])
     house = one(con, "select h.name, h.claim from houses h join house_members m on m.house_id = h.id where m.person_id = ?", p["id"])
+    role = one(con, "select role from house_members where person_id = ?", p["id"])["role"]
     traits = ", ".join(f"{k} {p[k]:.1f}" for k in ("openness", "caution", "warmth", "pride", "piety"))
-    return (f"{p['name']}, {p.get('note') or p['role'] if 'role' in p else ''} of House {house['name']} "
-            f"(its right: {house['claim']}). Temperament: {p['dream_temperament']}. Traits: {traits}. "
+    return (f"{p['name']}, {role} of House {house['name']} (its right: {house['claim']})"
+            f"{'; ' + p['note'] if p.get('note') else ''}. Temperament: {p['dream_temperament']}. Traits: {traits}. "
             f"Believes: " + " / ".join(b["interpretation"] for b in beliefs))
 
 
@@ -250,240 +265,324 @@ def interpret(con, R, shared, llm, clock, year, season):
     out = []
     for d in sorted(shared, key=salience, reverse=True)[: I["max_per_season"]]:
         p = one(con, "select * from people where id = ?", d["person"]["id"])
-        p["role"] = one(con, "select role from house_members where person_id = ?", p["id"])["role"]
-        user = f"The person: {person_sketch(con, p)}\n\nThe dream they had this {season} and told to " \
-               f"{one(con, 'select name from people where id = ?', d['listener'])['name']}:\n\"{d['text'][:700]}\""
+        listener = one(con, "select * from people where id = ?", d["listener"])
+        user = f"The person: {person_sketch(con, p)}\n\nThe dream they had this {season} and told to {listener['name']}:\n\"{d['text'][:700]}\""
         clock.calls += 1
-        raw = llm.chat(INTERPRET_SYSTEM, user, max_new_tokens=I["max_new_tokens"])
-        j = parse_json(raw) or {}
+        j = llm.json(INTERPRET_SYSTEM, user, INTERPRET_SCHEMA, max_new_tokens=I["max_new_tokens"]) or {}
         text = str(j.get("interpretation") or "").strip()
         if not text:
-            out.append({"dream": d, "raw": raw, "ok": False})
+            out.append({"dream": d, "raw": getattr(llm, "last_raw", ""), "ok": False})
             continue
         try:
-            conf = float(j.get("confidence") or 0.5)
+            conf = max(0.05, min(1.0, float(j.get("confidence") or 0.5)))
         except (TypeError, ValueError):
             conf = 0.5
-        about = houses.get(str(j.get("about_house") or "").strip())
-        stance = j.get("stance")
+        about = houses.get(str(j.get("about_house") or ""))
         try:
-            stance = max(-1.0, min(1.0, float(stance))) if stance is not None and about else None
+            stance = max(-1.0, min(1.0, float(j.get("stance")))) if about else None
         except (TypeError, ValueError):
             stance = None
+        retelling = str(j.get("retelling") or "").strip()
         insert(con, "beliefs", year=year, season=season, holder_id=p["id"], subject_type="dream", subject_id=d["id"],
-               interpretation=text, confidence=round(max(0.05, min(1.0, conf)), 2), source_type="own_dream",
-               about_house=about, stance=stance)
-        listener = one(con, "select * from people where id = ?", d["listener"])
+               interpretation=text, confidence=round(conf, 2), source_type="own_dream", about_house=about, stance=stance)
         lc = conf * I["listener_trust"] * (0.5 + listener["warmth"] / 2)
         insert(con, "beliefs", year=year, season=season, holder_id=listener["id"], subject_type="dream", subject_id=d["id"],
                interpretation=text, confidence=round(max(0.05, min(1.0, lc)), 2), source_type="told_by", source_person=p["id"],
                about_house=about, stance=stance * 0.7 if stance is not None else None)
-        intention = str(j.get("intention") or "").strip() or None
-        if intention and intention.lower() not in ("null", "none"):
+        if retelling:   # the dream as they remember and tell it, in Corva's terms
+            insert(con, "memories", year=year, season=season, person_id=p["id"], source_type="dream", source_id=d["id"],
+                   text=f"(as told) {retelling}", vividness=0.85)
+            insert(con, "memories", year=year, season=season, person_id=listener["id"], source_type="dream", source_id=d["id"],
+                   told_by=p["id"], text=f"(as told) {retelling}", vividness=0.6)
+        intention = str(j.get("intention") or "").strip()
+        if intention and intention.lower() not in ("null", "none", ""):
             insert(con, "memories", year=year, season=season, person_id=p["id"], source_type="dream", source_id=d["id"],
                    text=f"I mean to: {intention}", vividness=0.8)
-        out.append({"dream": d, "interpretation": text, "confidence": conf, "about": j.get("about_house"), "stance": stance,
-                    "intention": intention, "listener": listener["name"], "ok": True})
+        out.append({"dream": d, "retelling": retelling, "interpretation": text, "confidence": conf, "about": j.get("about_house"),
+                    "stance": stance, "intention": intention or None, "listener": listener["name"], "ok": True})
     return out
 
 
 # --- 5. propose ---------------------------------------------------------------------------------------------
+EXAMPLE_ACTIONS = ["search", "accuse", "bribe", "spread a rumour", "feast", "propose a marriage", "threaten",
+                   "form an alliance", "pray", "flee", "investigate", "confess"]
 STORY_SYSTEM = (
-    "You are the storyteller of Corva, an old island city of ten noble houses. You do not decide what happens: you "
-    "propose what one house might DO this season, and the world's rules decide whether it works. Propose actions by "
-    "named, adult members who are in Corva: the actor must be one of the people listed as able to act, by their exact "
-    "name (never \"House ...\" as an actor). Only these kinds: {kinds}. Places you may name: {places}. "
-    "Never say what anything means (no omens, signs, fate or gods' wishes): only what people do. "
-    "Reply with JSON only: {{\"proposals\": [{{\"kind\": ..., \"actor\": full name, \"target_house\": a house name or null, "
-    "\"target_person\": a full name or null, \"place\": a place name or null, \"why\": a short reason from the house's point "
-    "of view}}]}} with at most {n} proposals.")
+    "You are the storyteller of Corva, an old island city of ten noble houses, in an age of oars and sails. You do not "
+    "decide what happens: you propose what ONE house's people might do this season, and the world's rules decide whether "
+    "it works. First answer the strategy question about the Flight (Livia Corvane and Soren of the Harbor vanished at the "
+    "autumn festival). Then propose up to {n} actions, each by one member who can act (by their id, e.g. \"p12\") or by the "
+    "house as a whole (\"h3\"), driven by that person's drives. Any action a person of that age could take is allowed; some "
+    "ideas: {examples}. Prefer actions not already taken this season by other houses. Say only what people DO, never what "
+    "anything means (no omens, signs, fate or the will of the gods). Use the true family ties given; do not invent others.")
 
 
-def house_context(con, R, h, year, season, intentions_by_person, last_events) -> str:
+def proposal_schema(actor_ids, target_ids, place_names, n):
+    return {
+        "type": "object",
+        "properties": {
+            "strategy": {"type": "string", "maxLength": 200},
+            "proposals": {"type": "array", "minItems": 1, "maxItems": n, "items": {
+                "type": "object",
+                "properties": {
+                    "kind": {"type": "string", "maxLength": 40},
+                    "actor": {"type": "string", "enum": actor_ids},
+                    "target": {"type": "string", "enum": target_ids + ["none"]},
+                    "place": {"type": "string", "enum": place_names + ["none"]},
+                    "why": {"type": "string", "maxLength": 180},
+                },
+                "required": ["kind", "actor", "target", "place", "why"]}},
+        },
+        "required": ["strategy", "proposals"],
+    }
+
+
+def true_ties(con, ids) -> list[str]:
+    """The real relationships among (and of) the given people: what the model may say about who is whose."""
+    ids = set(ids)
+    out = []
+    for l in rows(con, "select a.name pa, b.name ch, l.kind, a.id aid, b.id bid from lineage l join people a on a.id = l.parent_id "
+                       "join people b on b.id = l.child_id"):
+        if l["aid"] in ids or l["bid"] in ids:
+            out.append(f"{l['ch']} is the {'fostered ' if l['kind'] == 'fostered' else ''}child of {l['pa']}")
+    for r in rows(con, "select a.name na, b.name nb, r.kind, a.id aid, b.id bid from relationships r join people a on a.id = r.person_a "
+                       "join people b on b.id = r.person_b where r.kind in ('spouse', 'betrothed', 'rival', 'teacher')"):
+        if r["aid"] in ids or r["bid"] in ids:
+            out.append({"spouse": f"{r['na']} and {r['nb']} are married", "betrothed": f"{r['na']} was betrothed to {r['nb']}",
+                        "rival": f"{r['na']} and {r['nb']} are rivals", "teacher": f"{r['na']} teaches {r['nb']}"}[r["kind"]])
+    for m in rows(con, "select p.name, m.role, h.name house, p.id from house_members m join people p on p.id = m.person_id "
+                       "join houses h on h.id = m.house_id where m.role in ('head', 'heir', 'servant', 'retainer', 'fosterling')"):
+        if m["id"] in ids:
+            out.append(f"{m['name']} is the {m['role']} of House {m['house']}")
+    return sorted(set(out))
+
+
+def house_context(con, R, h, year, season, drives, used_kinds, last_events, legends_n) -> tuple[str, list, list, list]:
     members = people(con, "h.id = ? and p.absent = 0", h["id"])
     adults = [m for m in members if age(m, year) >= R["population"]["adult_age"]]
     absent = rows(con, "select p.name from people p join house_members m on m.person_id = p.id where m.house_id = ? and p.absent = 1", h["id"])
     clients = latest_clients(con, h["id"])
-    legends = rows(con, "select title, text from legends where house_id = ? or house_id is null order by house_id is null limit ?",
-                   h["id"], R["storyteller"]["legends_in_context"])
+    legends = rows(con, "select title, text from legends where house_id = ? or house_id is null order by house_id is null limit ?", h["id"], legends_n)
     feel = rows(con, "select hh.name, sum(b.stance * b.confidence) / sum(b.confidence) f from beliefs b "
                      "join house_members m on m.person_id = b.holder_id join houses hh on hh.id = b.about_house "
                      "where m.house_id = ? and b.stance is not null and b.about_house != ? group by hh.name order by f", h["id"], h["id"])
-    beliefs = rows(con, "select p.name, b.interpretation, b.confidence from beliefs b join people p on p.id = b.holder_id "
-                        "join house_members m on m.person_id = p.id where m.house_id = ? and p.tier = 'principal' and p.absent = 0 "
-                        "order by b.year desc, b.confidence desc limit 6", h["id"])
-    lines = [f"House {h['name']}. Its hereditary right: {h['claim']}. Its land: {h['land']}.",
+    others = rows(con, "select id, name from houses where id != ? order by id", h["id"])
+    principals_elsewhere = rows(con, "select p.id, p.name, hh.name house from people p join house_members m on m.person_id = p.id "
+                                     "join houses hh on hh.id = m.house_id where p.tier = 'principal' and p.alive = 1 and p.absent = 0 and hh.id != ?", h["id"])
+    lines = [f"House {h['name']} (h{h['id']}). Its hereditary right: {h['claim']}. Its land: {h['land']}.",
              f"Season: {season} of year {year}. Stores: food {h['food']:.0f}, goods {h['goods']:.0f}, materials {h['materials']:.0f}. "
              f"Clients: {clients['count']} townsfolk, loyalty {clients['loyalty']:.2f}.",
-             "Members in Corva who can act: " + "; ".join(f"{m['name']} ({m['role']}, {age(m, year)})" for m in adults[:8]) + "."]
+             "Members who can act (id, name, role, age, drives this season):"]
+    for m in adults[:9]:
+        d = drives.get(m["id"])
+        lines.append(f"  p{m['id']} {m['name']} ({m['role']}, {age(m, year)})" + (": " + "; ".join(d) if d else ""))
     if absent:
-        lines.append("Missing from Corva: " + ", ".join(a["name"] for a in absent) + " (whereabouts unknown).")
+        lines.append("Missing from Corva: " + ", ".join(a["name"] for a in absent) + " (whereabouts unknown to everyone).")
+    lines.append("Other houses: " + ", ".join(f"h{o['id']} {o['name']}" for o in others) + ".")
+    lines.append("Notable people of other houses: " + ", ".join(f"p{p['id']} {p['name']} ({p['house']})" for p in principals_elsewhere) + ".")
     if legends:
         lines.append("Legends the house tells: " + " | ".join(f"{l['title']}: {l['text']}" for l in legends))
     if feel:
-        lines.append("How the house feels toward others (from -1 to 1): " + ", ".join(f"{f['name']} {f['f']:+.2f}" for f in feel))
-    if beliefs:
-        lines.append("What its people believe: " + " / ".join(f"{b['name']}: \"{b['interpretation']}\"" for b in beliefs))
-    ints = [f"{m['name']}: {intentions_by_person[m['id']]}" for m in adults if m["id"] in intentions_by_person]
-    if ints:
-        lines.append("Intentions after their dreams: " + " / ".join(ints))
+        lines.append("How the house feels toward others (-1 to 1): " + ", ".join(f"{f['name']} {f['f']:+.2f}" for f in feel))
+    ties = true_ties(con, [m["id"] for m in adults] + [p["id"] for p in principals_elsewhere])
+    lines.append("True family ties: " + "; ".join(ties[:30]) + ".")
     lines.append("Recent events in Corva: " + " ".join(last_events))
-    return "\n".join(lines)
+    if used_kinds:
+        lines.append("Already done this season by other houses: " + ", ".join(f"{k} x{n}" for k, n in used_kinds.most_common()) + ".")
+    lines.append(f"Strategy question: what is House {h['name']} trying to achieve about the Flight this season, and why?")
+    actor_ids = [f"p{m['id']}" for m in adults] + [f"h{h['id']}"]
+    target_ids = [f"h{o['id']}" for o in others] + [f"p{p['id']}" for p in principals_elsewhere] + \
+                 [f"p{m['id']}" for m in members if m["id"] not in {a["id"] for a in adults}] + [f"p{m['id']}" for m in adults]
+    places = [p["name"] for p in rows(con, "select name from places where kind != 'house'")]
+    return "\n".join(lines), actor_ids, sorted(set(target_ids)), places
 
 
-def propose(con, R, llm, clock, year, season, tick):
-    kinds = ", ".join(R["validation"]["kinds"])
-    places = ", ".join(p["name"] for p in rows(con, "select name from places where kind != 'house'"))
-    system = STORY_SYSTEM.format(kinds=kinds, places=places, n=R["storyteller"]["proposals_per_house"])
-    intentions = {}
-    for m in rows(con, "select person_id, text from memories where year = ? and season = ? and text like 'I mean to:%'", year, season):
-        intentions[m["person_id"]] = m["text"][len("I mean to: "):]
+def family_of(R, kind: str) -> str:
+    k = kind.lower()
+    for fam, spec in R["validation"]["kinds"].items():
+        if any(w in k for w in spec.get("words", [])):
+            return fam
+    return "other"
+
+
+def propose(con, R, llm, clock, year, season, tick, drives):
+    S = R["storyteller"]
+    system = STORY_SYSTEM.format(n=S["proposals_per_house"], examples=", ".join(EXAMPLE_ACTIONS))
     last_events = [e["text"] for e in rows(con, "select text from events where sealed = 0 order by id desc limit 8")][::-1]
+    used = Counter()
     out = []
     for h in rows(con, "select * from houses order by id"):
-        ctx = house_context(con, R, h, year, season, intentions, last_events)
-        clock.calls += 1
-        raw = llm.chat(system, ctx, max_new_tokens=R["storyteller"]["max_new_tokens"])
-        j = parse_json(raw)
+        ctx, actor_ids, target_ids, places = house_context(con, R, h, year, season, drives, used, last_events, S["legends_in_context"])
+        schema = proposal_schema(actor_ids, target_ids, places, S["proposals_per_house"])
+        j, note = None, ""
+        for attempt in range(1 + S["retries"]):
+            clock.calls += 1
+            j = llm.json(system, ctx + note, schema, max_new_tokens=S["max_new_tokens"])
+            props = (j or {}).get("proposals") if isinstance(j, dict) else None
+            bad = [] if not isinstance(props, list) else [p for p in props if not isinstance(p, dict) or p.get("actor") not in actor_ids]
+            if isinstance(props, list) and props and not bad:
+                break
+            note = ("\n(Your last reply could not be used: " + ("it was not complete JSON" if not isinstance(props, list) or not props
+                    else "an actor was not one of the ids listed") + ". Use only the listed ids.)")
         props = (j or {}).get("proposals") if isinstance(j, dict) else None
-        if not isinstance(props, list):
-            out.append({"house": h, "raw": raw, "proposal": None})
+        strategy = str((j or {}).get("strategy") or "") if isinstance(j, dict) else ""
+        if not isinstance(props, list) or not props:
+            out.append({"house": h, "raw": getattr(llm, "last_raw", ""), "proposal": None, "strategy": strategy})
             continue
-        for p in props[: R["storyteller"]["proposals_per_house"]]:
+        for p in props[: S["proposals_per_house"]]:
             if isinstance(p, dict):
-                out.append({"house": h, "raw": raw, "proposal": p})
+                out.append({"house": h, "raw": "", "proposal": p, "strategy": strategy})
+                used[family_of(R, str(p.get("kind") or ""))] += 1
     return out
 
 
 # --- 6. validate and 7. record ---------------------------------------------------------------------------------
-TEMPLATES = {
+TEMPLATES = {   # by family; {verb} is the storyteller's own name for the action (sanitized) for "other"
     "search": "{actor} searched {place} for Livia Corvane and Soren of the Harbor",
-    "question": "{actor} questioned {target_person}",
-    "demand": "{actor} demanded satisfaction from House {target_house}",
-    "accuse": "{actor} accused House {target_house} before the city",
+    "investigate": "{actor} made inquiries{about}",
+    "accuse": "{actor} accused {target} before the city",
+    "threaten": "{actor} threatened {target}",
+    "demand": "{actor} made demands of {target}",
+    "rumor": "{actor} spread a rumour about {target}",
+    "bribe": "{actor} paid a bribe to {target}",
     "petition": "{actor} brought a petition before the council",
-    "judge": "{actor} sat in judgment on a dispute involving House {target_house}",
+    "judge": "{actor} sat in judgment on a matter of {target}",
     "rite": "{actor} held a rite at the sea temple",
     "feast": "{actor} gave a feast for the clients of House {house}",
-    "gift": "{actor} sent a gift to House {target_house}",
-    "marriage_offer": "{actor} offered House {target_house} a marriage between the houses",
-    "alliance": "{actor} proposed an alliance to House {target_house}",
+    "gift": "{actor} sent a gift to {target}",
+    "marriage": "{actor} proposed a marriage between House {house} and {target}",
+    "alliance": "{actor} proposed an alliance to {target}",
     "trade": "{actor} sent a trading venture to {place}",
     "guard": "{actor} posted guards at {place}",
     "build": "{actor} had building work done at {place}",
     "work_land": "{actor} set House {house}'s people to work on its land",
-    "insult": "{actor} slighted House {target_house} in public",
-    "withdraw": "{actor} kept House {house} to its own affairs",
+    "insult": "{actor} slighted {target} in public",
+    "flee": "{actor} left Corva",
+    "confess": "{actor} confessed something to {target}",
+    "withdraw": "{actor} kept to {pronoun} own affairs",
+    "other": "{actor} tried to {verb}",
 }
 OUTCOME_TAIL = {"success": ".", "partial": ", with mixed results.", "failure": ", and it came to nothing."}
-TRAIT_FOR = {"search": "openness", "question": "caution", "demand": "pride", "accuse": "pride", "petition": "pride",
-             "judge": "caution", "rite": "piety", "feast": "warmth", "gift": "warmth", "marriage_offer": "warmth",
-             "alliance": "warmth", "trade": "openness", "guard": "caution", "build": "caution", "work_land": "caution",
-             "insult": "pride", "withdraw": "caution"}
-NEEDS_TARGET_HOUSE = {"demand", "accuse", "gift", "marriage_offer", "alliance", "insult", "judge"}
+TRAIT_FOR = {"search": "openness", "investigate": "caution", "accuse": "pride", "threaten": "pride", "demand": "pride",
+             "rumor": "openness", "bribe": "caution", "petition": "pride", "judge": "caution", "rite": "piety", "feast": "warmth",
+             "gift": "warmth", "marriage": "warmth", "alliance": "warmth", "trade": "openness", "guard": "caution",
+             "build": "caution", "work_land": "caution", "insult": "pride", "flee": "openness", "confess": "warmth",
+             "withdraw": "caution", "other": "openness"}
+NEEDS_TARGET = {"accuse", "threaten", "demand", "rumor", "bribe", "gift", "marriage", "alliance", "insult", "confess"}
+NEEDS_PLACE = {"search", "trade", "guard", "build"}
 
 
-def validate_and_record(con, R, items, year, season, tick, r, strangeness_used=0):
+def resolve_id(con, ref: str):
+    """'p12' -> ('person', row), 'h3' -> ('house', row), else (None, None)."""
+    ref = str(ref or "").strip().lower()
+    if ref.startswith("p") and ref[1:].isdigit():
+        r = one(con, "select p.*, m.house_id from people p join house_members m on m.person_id = p.id where p.id = ?", int(ref[1:]))
+        return ("person", r) if r else (None, None)
+    if ref.startswith("h") and ref[1:].isdigit():
+        r = one(con, "select * from houses where id = ?", int(ref[1:]))
+        return ("house", r) if r else (None, None)
+    return None, None
+
+
+def validate_and_record(con, R, items, year, season, tick, r):
     V = R["validation"]
-    houses = {h["name"].lower(): h for h in rows(con, "select * from houses")}
     places = {p["name"].lower(): p for p in rows(con, "select * from places")}
     sealed = json.loads(one(con, "select value from sealed_facts where key = 'lovers_location'")["value"])
-    acted = set()
-    results = []
+    acted, fam_count, results = set(), Counter(), []
     for it in items:
-        h, p, raw = it["house"], it["proposal"], it["raw"]
-        status, reason, rule, ev = None, None, None, None
-        payload = p or {"unparsed": raw[:400]}
-        wording = json.dumps(p, ensure_ascii=False) if p else raw[:400]
-
-        def reject(rule_name, why):
-            return "rejected", why, rule_name
-
+        h, p = it["house"], it["proposal"]
+        status = reason = rule = ev = None
+        family = None
+        payload = dict(p or {"unparsed": (it.get("raw") or "")[:400]})
+        payload["strategy"] = it.get("strategy", "")
         if p is None:
-            status, reason, rule = reject("unreadable", "the storyteller's reply was not valid JSON")
+            status, reason, rule = "rejected", "the storyteller's reply could not be used, even after a retry", "unreadable"
         else:
-            kind = str(p.get("kind") or "").strip().lower().replace(" ", "_")
-            actor_name = str(p.get("actor") or "").strip()
-            actor = one(con, "select p.*, m.house_id from people p join house_members m on m.person_id = p.id where lower(p.name) = lower(?)", actor_name)
-            tp_name = str(p.get("target_person") or "").strip()
-            tperson = one(con, "select * from people where lower(name) = lower(?)", tp_name) if tp_name and tp_name.lower() not in ("null", "none") else None
-            th_name = str(p.get("target_house") or "").strip().lower().removeprefix("house ").strip()
-            thouse = houses.get(th_name)
-            pl_name = str(p.get("place") or "").strip().lower()
-            place = places.get(pl_name) or places.get("the " + pl_name)
+            kind = str(p.get("kind") or "").strip()
+            family = family_of(R, kind)
+            payload["family"] = family
+            akind, actor = resolve_id(con, p.get("actor"))
+            tkind, target = resolve_id(con, p.get("target")) if p.get("target") not in (None, "none") else (None, None)
+            place = places.get(str(p.get("place") or "").lower()) if p.get("place") not in (None, "none") else None
+            if akind == "house":              # the house acts as a whole: its head carries it out
+                house_row = actor
+                actor = one(con, "select p.*, m.house_id from people p join house_members m on m.person_id = p.id where p.id = ?", house_row["head_id"])
             text_all = " ".join(str(v) for v in p.values())
             if any(re.search(pat, text_all, re.I) for pat in V["meaning_patterns"]):
-                status, reason, rule = reject("asserts a meaning", "the proposal says what something means (the hard rule)")
-            elif kind not in V["kinds"]:
-                status, reason, rule = reject("unknown kind", f"'{kind}' is not an action the world knows")
+                status, reason, rule = "rejected", "the proposal says what something means (the hard rule)", "asserts a meaning"
             elif not actor:
-                status, reason, rule = reject("no such person", f"nobody called '{actor_name}' lives in Corva")
+                status, reason, rule = "rejected", f"'{p.get('actor')}' is not a person or house id", "no such actor"
             elif not actor["alive"]:
-                status, reason, rule = reject("actor dead", f"{actor['name']} is dead")
+                status, reason, rule = "rejected", f"{actor['name']} is dead", "actor dead"
             elif actor["absent"]:
-                status, reason, rule = reject("actor absent", f"{actor['name']} is not in Corva")
+                status, reason, rule = "rejected", f"{actor['name']} is not in Corva", "actor absent"
             elif year - actor["born_year"] < R["population"]["adult_age"]:
-                status, reason, rule = reject("actor a child", f"{actor['name']} is too young to act")
+                status, reason, rule = "rejected", f"{actor['name']} is too young to act", "actor a child"
             elif actor["house_id"] != h["id"]:
-                status, reason, rule = reject("not of this house", f"{actor['name']} does not belong to House {h['name']}")
+                status, reason, rule = "rejected", f"{actor['name']} does not belong to House {h['name']}", "not of this house"
             elif V["one_action_per_actor"] and actor["id"] in acted:
-                status, reason, rule = reject("already acting", f"{actor['name']} already acts this season")
-            elif kind in NEEDS_TARGET_HOUSE and not thouse:
-                status, reason, rule = reject("no target house", f"a {kind} needs a house to aim at")
-            elif thouse and thouse["id"] == h["id"] and kind in NEEDS_TARGET_HOUSE:
-                status, reason, rule = reject("aimed at itself", f"a house cannot {kind} itself")
-            elif kind == "question" and (not tperson or not tperson["alive"]):
-                status, reason, rule = reject("no such person", "the person to question is not in the record")
-            elif kind == "question" and tperson["absent"]:
-                status, reason, rule = reject("target absent", f"{tperson['name']} is not in Corva to be questioned")
-            elif kind in ("search", "trade", "guard", "build") and not place:
-                status, reason, rule = reject("no such place", f"'{p.get('place')}' is not a place in the record")
+                status, reason, rule = "rejected", f"{actor['name']} already acts this season", "already acting"
+            elif family in NEEDS_TARGET and not target:
+                status, reason, rule = "rejected", f"'{kind}' needs someone to aim at", "no target"
+            elif target and tkind == "house" and target["id"] == h["id"] and family in NEEDS_TARGET:
+                status, reason, rule = "rejected", "a house cannot aim this at itself", "aimed at itself"
+            elif target and tkind == "person" and (not target["alive"] or target["absent"]):
+                status, reason, rule = "rejected", f"{target['name']} is not in Corva", "target absent"
+            elif family in NEEDS_PLACE and not place:
+                status, reason, rule = "rejected", f"'{kind}' needs a place", "no place"
             else:
-                spec = V["kinds"][kind]
-                costs = spec.get("cost", {})
-                short = [k for k, v in costs.items() if h[k] < v]
+                spec = V["kinds"][family]
+                short = [k for k, v in spec.get("cost", {}).items() if h[k] < v]
                 if short:
-                    status, reason, rule = reject("cannot afford", f"House {h['name']} lacks {', '.join(short)}")
+                    status, reason, rule = "rejected", f"House {h['name']} lacks {', '.join(short)}", "cannot afford"
                 else:
-                    for k, v in costs.items():
+                    for k, v in spec.get("cost", {}).items():
                         con.execute(f"update houses set {k} = {k} - ? where id = ?", (v, h["id"]))
                         h[k] -= v
-                    chance = spec["base"] * V["season_factor"].get(season, {}).get(kind, 1.0)
-                    chance += (actor[TRAIT_FOR[kind]] - 0.5) * 2 * V["trait_weight"] * spec["base"]
-                    if kind in ("alliance", "marriage_offer") and thouse:
+                    chance = spec["base"] * V["season_factor"].get(season, {}).get(family, 1.0)
+                    chance += (actor[TRAIT_FOR[family]] - 0.5) * 2 * V["trait_weight"] * spec["base"]
+                    thouse = target if tkind == "house" else (one(con, "select h.* from houses h join house_members m on m.house_id = h.id "
+                                                                      "where m.person_id = ?", target["id"]) if target else None)
+                    if family in ("alliance", "marriage") and thouse:
                         chance += 0.3 * feeling(con, thouse["id"], h["id"])
+                    chance *= V["repeat_penalty"] ** fam_count[family]          # the same move again this season is weaker
+                    fam_count[family] += 1
                     roll = r.random()
                     outcome = "success" if roll < chance else "partial" if roll < chance + spec["partial"] else "failure"
                     acted.add(actor["id"])
+                    facts = {"kind_named": kind, "family": family, "chance": round(chance, 2), "roll": round(roll, 2),
+                             "why_given": str(p.get("why") or "")[:200]}
                     sealed_hit = False
-                    facts = {"chance": round(chance, 2), "roll": round(roll, 2), "why_given": str(p.get("why") or "")[:200]}
-                    if kind == "search":
-                        # the rules know where the lovers are; the record only says whether a trace turned up
+                    if family == "search":
                         right = place["id"] == sealed["place_id"]
                         found = right and outcome == "success" and r.random() < V["search_find_chance"] / spec["base"]
-                        if found:
-                            sealed_hit = True
-                            facts["found"] = "a trace"
-                        else:
-                            outcome = "failure" if outcome == "success" else outcome
-                            facts["found"] = "no trace"
-                    fill = {"actor": actor["name"], "house": h["name"], "target_house": thouse["name"] if thouse else "",
-                            "target_person": tperson["name"] if tperson else "", "place": place["name"] if place else "Corva"}
-                    text = TEMPLATES[kind].format(**fill) + (" and found no trace of them." if kind == "search" and not sealed_hit
-                                                             else " and found a trace of them." if sealed_hit else OUTCOME_TAIL[outcome])
-                    involved = [h["id"]] + ([thouse["id"]] if thouse else [])
-                    ev = insert(con, "events", year=year, season=season, kind=kind, place_id=place["id"] if place else None,
-                                actors=[actor["id"]] + ([tperson["id"]] if tperson else []), houses=involved,
+                        sealed_hit = found
+                        facts["found"] = "a trace" if found else "no trace"
+                        if not found and outcome == "success":
+                            outcome = "failure"
+                    target_name = (f"House {target['name']}" if tkind == "house" else target["name"]) if target else "Corva"
+                    verb = re.sub(r"[^a-z ]", "", kind.lower()).strip()[:40] or "act"
+                    about = f" about {target_name}" if target else (f" at {place['name']}" if place else "")
+                    text = TEMPLATES[family].format(actor=actor["name"], house=h["name"], target=target_name, about=about,
+                                                    place=place["name"] if place else "Corva", verb=verb,
+                                                    pronoun="the house's" if akind == "house" else "their")
+                    if family == "search":
+                        text += " and found a trace of them." if sealed_hit else " and found no trace of them."
+                    else:
+                        text += OUTCOME_TAIL[outcome]
+                    involved = [h["id"]] + ([thouse["id"]] if thouse and thouse["id"] != h["id"] else [])
+                    ev = insert(con, "events", year=year, season=season, kind=family, place_id=place["id"] if place else None,
+                                actors=[actor["id"]] + ([target["id"]] if tkind == "person" else []), houses=involved,
                                 outcome=outcome, facts=facts, text=text, sealed=1 if sealed_hit else 0)
                     status = {"success": "accepted", "partial": "partial", "failure": "failed"}[outcome]
-                    reason = f"rolled {roll:.2f} against {chance:.2f}" + ("" if kind != "search" else "; searched")
-                    effects(con, R, kind, outcome, h, thouse, actor, tperson, ev, year, season)
+                    reason = f"rolled {roll:.2f} against {chance:.2f}"
+                    effects(con, R, family, outcome, h, thouse, actor, target if tkind == "person" else None, ev, year, season, r)
         pid = insert(con, "storyteller_proposals", year=year, season=season, tick=tick, house_id=h["id"],
-                     kind=str((p or {}).get("kind") or "?"), payload=payload, wording=wording, status=status,
-                     reason=reason, rule_broken=rule, event_id=ev)
+                     kind=str((p or {}).get("kind") or "?"), payload=payload, wording=json.dumps(p or {}, ensure_ascii=False),
+                     status=status, reason=reason, rule_broken=rule, event_id=ev)
         if ev:
             con.execute("update events set proposal_id = ? where id = ?", (pid, ev))
-        results.append({"house": h["name"], "proposal": p, "status": status, "reason": reason, "rule": rule, "event": ev})
+        results.append({"house": h["name"], "proposal": p, "family": family, "status": status, "reason": reason, "rule": rule,
+                        "event": ev, "strategy": it.get("strategy", "")})
     return results
 
 
@@ -497,25 +596,26 @@ def feeling(con, house_from, house_to) -> float:
 STANCE_TEXT = {
     "demand": ("House {a} made demands of us.", "House {t} owes us."),
     "accuse": ("House {a} accused us before the whole city.", "House {t} is guilty, and we said so."),
+    "threaten": ("House {a} threatened us.", "House {t} needed a warning."),
+    "rumor": ("House {a} spreads lies about us.", "The city should know what House {t} is."),
+    "bribe": ("House {a} paid us well.", "House {t} can be bought."),
     "insult": ("House {a} slighted us in public.", "House {t} deserved the slight."),
     "gift": ("House {a} honoured us with a gift.", "We showed House {t} our goodwill."),
     "alliance": ("House {a} offered us their hand.", "We offered House {t} our hand."),
-    "marriage_offer": ("House {a} offered a marriage between our houses.", "We offered House {t} a marriage."),
+    "marriage": ("House {a} offered a marriage between our houses.", "We offered House {t} a marriage."),
     "judge": ("The judges of {a} sat over our affairs.", "We judged a matter of House {t}."),
-    "question": ("House {a} questioned one of ours as if we were guilty.", "We pressed House {t} for the truth."),
+    "investigate": ("House {a} pries into our affairs as if we were guilty.", "We pressed House {t} for the truth."),
 }
 
 
-def effects(con, R, kind, outcome, h, thouse, actor, tperson, ev, year, season):
+def effects(con, R, family, outcome, h, thouse, actor, tperson, ev, year, season, r):
     B, Cl = R["beliefs"], R["clients"]
     weight = {"success": 1.0, "partial": 0.6, "failure": 0.3}[outcome]
-    target_house = thouse
-    if kind == "question" and tperson:
-        target_house = one(con, "select h.* from houses h join house_members m on m.house_id = h.id where m.person_id = ?", tperson["id"])
-    if kind in R["beliefs"]["stance"] and target_house and target_house["id"] != h["id"]:
-        s = R["beliefs"]["stance"][kind]
-        t_text, a_text = STANCE_TEXT[kind]
-        for m in rows(con, "select p.id, p.born_year from people p join house_members m on m.person_id = p.id where m.house_id = ? and p.alive = 1 and p.absent = 0", target_house["id"]):
+    if family in B["stance"] and thouse and thouse["id"] != h["id"]:
+        s = B["stance"][family]
+        t_text, a_text = STANCE_TEXT[family]
+        for m in rows(con, "select p.id, p.born_year from people p join house_members m on m.person_id = p.id "
+                           "where m.house_id = ? and p.alive = 1 and p.absent = 0", thouse["id"]):
             if year - m["born_year"] < 10:
                 continue
             conf = B["witness_confidence"] if tperson and m["id"] == tperson["id"] else B["hearsay_confidence"]
@@ -524,29 +624,41 @@ def effects(con, R, kind, outcome, h, thouse, actor, tperson, ev, year, season):
                    about_house=h["id"], stance=s["target_to_actor"])
         if s["actor_to_target"]:
             insert(con, "beliefs", year=year, season=season, holder_id=actor["id"], subject_type="event", subject_id=str(ev),
-                   interpretation=a_text.format(t=target_house["name"]), confidence=B["witness_confidence"], source_type="witnessed",
-                   about_house=target_house["id"], stance=s["actor_to_target"])
-        # old wounds reopen: earlier beliefs between these two houses come back to mind
-        for a_id, b_id in ((h["id"], target_house["id"]), (target_house["id"], h["id"])):
+                   interpretation=a_text.format(t=thouse["name"]), confidence=B["witness_confidence"], source_type="witnessed",
+                   about_house=thouse["id"], stance=s["actor_to_target"])
+        for a_id, b_id in ((h["id"], thouse["id"]), (thouse["id"], h["id"])):   # old wounds reopen
             con.execute("update beliefs set confidence = min(1.0, confidence + ?) where about_house = ? and holder_id in "
-                        "(select person_id from house_members where house_id = ?) and stance < 0",
-                        (B["reopen_boost"] * weight, b_id, a_id))
-        if kind in ("accuse", "insult") and outcome != "failure":
-            add_loyalty(con, target_house["id"], Cl["scandal_loyalty"] * weight)
-    if kind == "feast" and outcome != "failure":
+                        "(select person_id from house_members where house_id = ?) and stance < 0", (B["reopen_boost"] * weight, b_id, a_id))
+        if family in ("accuse", "insult", "rumor") and outcome != "failure":
+            add_loyalty(con, thouse["id"], Cl["scandal_loyalty"] * weight)
+    if family == "feast" and outcome != "failure":
         add_loyalty(con, h["id"], Cl["feast_loyalty"] * weight)
         draw_unattached(con, h["id"], Cl["join_from_unattached"] * weight)
-    if kind == "rite" and outcome != "failure":
+    if family == "rite" and outcome != "failure":
         add_loyalty(con, h["id"], Cl["rite_loyalty"] * weight)
         draw_unattached(con, h["id"], Cl["join_from_unattached"] * weight * 0.5)
-    if kind == "work_land" and outcome != "failure":
+    if family == "work_land" and outcome != "failure":
         con.execute("update houses set food = food + ? where id = ?", (3 * weight, h["id"]))
-    if kind == "trade" and outcome != "failure":
+    if family == "trade" and outcome != "failure":
         con.execute("update houses set goods = goods + ? where id = ?", (3 * weight, h["id"]))
-    if kind == "build" and outcome != "failure":
+    if family == "build" and outcome != "failure":
         add_loyalty(con, h["id"], 0.02 * weight)
-    if kind == "gift" and thouse and outcome != "failure":
-        con.execute("update houses set goods = goods + 2 where id = ?", (thouse["id"],))
+    if family in ("gift", "bribe") and thouse and outcome != "failure":
+        con.execute("update houses set goods = goods + ? where id = ?", (2 if family == "gift" else 3, thouse["id"]))
+    if family == "flee" and outcome == "success":
+        # they leave Corva; where they go is not recorded (nobody saw)
+        con.execute("update people set absent = 1, place_id = null where id = ?", (actor["id"],))
+    if family == "confess" and tperson and outcome != "failure":
+        # what they confess passes privately: their private memories become the listener's (never printed)
+        for m in rows(con, "select * from memories where person_id = ? and private = 1", actor["id"]):
+            insert(con, "memories", year=year, season=season, person_id=tperson["id"], source_type="told_by", source_id=m["source_id"],
+                   told_by=actor["id"], text=m["text"], vividness=0.9 * weight, private=1)
+    if family == "investigate" and tperson and outcome == "success":
+        # pressing someone who holds a private truth: sometimes they let something slip (privately, to the investigator)
+        for m in rows(con, "select * from memories where person_id = ? and private = 1", tperson["id"]):
+            if r.random() < 0.35:
+                insert(con, "memories", year=year, season=season, person_id=actor["id"], source_type="told_by", source_id=m["source_id"],
+                       told_by=tperson["id"], text=m["text"], vividness=0.7, private=1)
 
 
 PENDING = {}   # house id -> {"loyalty": delta, "gained": n, "lost": n}; applied once at the end of the tick
@@ -609,6 +721,9 @@ def vital_signs(con, year, season, dreams, remembered, shared, interp, results, 
         "beliefs": one(con, "select count(*) n from beliefs")["n"],
         "flight_views": len(views), "flight_belief_diversity": round(diversity, 2),
         "proposals": dict(status), "acceptance_rate": round((status["accepted"] + status["partial"]) / max(1, len(results)), 2),
+        "action_types_proposed": dict(Counter(x["family"] for x in results if x["family"])),
+        "action_types_resolved": dict(Counter(x["family"] for x in results if x["event"])),
+        "action_names_proposed": dict(Counter(str((x["proposal"] or {}).get("kind", "")).lower() for x in results if x["proposal"])),
         "rejection_reasons": dict(Counter(x["rule"] for x in results if x["rule"])),
         "clients": clients,
         "coldest_feelings": sorted(({"from": f["a"], "to": f["b"], "feeling": round(f["f"], 2)} for f in feelings), key=lambda x: x["feeling"])[:6],

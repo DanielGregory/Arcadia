@@ -14,6 +14,7 @@ import random
 import time
 
 from world import report, tick as T
+from world.drives import compute_drives
 from world.db import DB_PATH, connect
 from world.genesis import genesis
 
@@ -38,13 +39,18 @@ def main() -> None:
         dreams = T.dream_all(con, R, year, season, clock, r)
     with clock.step("recall and sharing"):
         remembered, shared = T.recall_and_share(con, R, dreams, r, year, season)
-    with clock.step("load instruct model"):
-        from engine.remember import Rememberer
-        llm = Rememberer(R["storyteller"]["model"])
+    with clock.step("drives"):
+        drives = compute_drives(con, year, season)
+    from world.llm import Instruct
+    with clock.step("load interpreter (1.5B)"):
+        small = Instruct(R["interpretation"]["model"])
     with clock.step("interpretations"):
-        interp = T.interpret(con, R, shared, llm, clock, year, season)
+        interp = T.interpret(con, R, shared, small, clock, year, season)
+    small.free()
+    with clock.step("load storyteller (3B)"):
+        llm = Instruct(R["storyteller"]["model"])
     with clock.step("storyteller proposals"):
-        items = T.propose(con, R, llm, clock, year, season, tick)
+        items = T.propose(con, R, llm, clock, year, season, tick, drives)
     with clock.step("validation and events"):
         results = T.validate_and_record(con, R, items, year, season, tick, r)
     with clock.step("beliefs, feelings, clients"):

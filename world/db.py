@@ -5,9 +5,10 @@ job. Its tables have the same names and columns as the Supabase ones (supabase/m
 20261117_world_schema.sql and 20261118_houses.sql), so a later version can write there instead.
 Lists (actors, houses...) are stored as JSON text; seasons as text.
 
-Two small additions here that Supabase doesn't have yet (PROPOSED):
+Small additions here that Supabase doesn't have yet (PROPOSED):
   relationships.kind also allows 'betrothed' and 'lover';
-  memories.private marks character-only memories (the private truths): reports never print them.
+  memories.private marks character-only memories (the private truths): reports never print them;
+  drives (each principal's aims for the season) and chronicles.kind ('account' / 'talk').
 """
 
 from __future__ import annotations
@@ -79,10 +80,20 @@ create table sealed_facts (key text primary key, value text not null);
 create table runtimes (year int, season text, step text, seconds real, calls int);
 """
 
+# Added for season 2 (created on connect if missing, so older sandboxes get them too)
+LATER = """
+create table if not exists drives (
+  id integer primary key, year int not null, season text not null, person_id int not null, text text not null, source text);
+create table if not exists chronicles (
+  id integer primary key, year int not null, season text not null, author_id int, events text not null default '[]',
+  text text not null, kind text);
+"""
+
 
 def connect(path: Path = DB_PATH) -> sqlite3.Connection:
     con = sqlite3.connect(path)
     con.row_factory = sqlite3.Row
+    con.executescript(LATER)
     return con
 
 
@@ -91,8 +102,9 @@ def create(path: Path = DB_PATH) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         path.unlink()
-    con = connect(path)
-    con.executescript(SCHEMA)
+    con = sqlite3.connect(path)
+    con.row_factory = sqlite3.Row
+    con.executescript(SCHEMA + LATER)
     return con
 
 
