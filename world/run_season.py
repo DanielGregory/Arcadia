@@ -3,7 +3,8 @@
     python -m world.run_season --fresh      # genesis from the seed story, then one seasonal tick
     python -m world.run_season              # one more tick on the existing sandbox
 
-Writes data/world/sandbox.db (git-ignored), docs/chronicle_season<N>.md and docs/season<N>_log.md.
+Writes data/world/sandbox.db (git-ignored), docs/season<N>_log.md every season, and the year's chronicle
+docs/chronicle_year<Y>.md at the end of each year (winter), or sooner with --chronicle (marked "so far").
 Touches nothing else: not Supabase, not the wallpaper, not the 3D world, not the daily job.
 """
 
@@ -23,6 +24,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--fresh", action="store_true", help="start again from genesis")
     ap.add_argument("--seed", type=int, default=1717)
+    ap.add_argument("--chronicle", action="store_true", help="write the year's chronicle now, even if the year is not over")
     args = ap.parse_args()
     t0 = time.time()
     if args.fresh or not DB_PATH.exists():
@@ -43,7 +45,7 @@ def main() -> None:
         drives = compute_drives(con, year, season)
     from world.llm import Instruct
     with clock.step("load interpreter (1.5B)"):
-        small = Instruct(R["interpretation"]["model"])
+        small = Instruct(R["interpretation"]["model"], dtype=R["interpretation"].get("dtype", "float32"))
     with clock.step("interpretations"):
         interp = T.interpret(con, R, shared, small, clock, year, season)
     small.free()
@@ -58,13 +60,15 @@ def main() -> None:
         T.fade_beliefs(con, R)
     stats = T.vital_signs(con, year, season, dreams, remembered, shared, interp, results, clock)
     con.commit()
-    with clock.step("chronicle"):
-        chron = report.write_chronicle(con, llm, year, season, tick, clock)
+    chron = None
+    if season == "winter" or args.chronicle:      # one chronicle a year (runtime): at the year's end, or when asked
+        with clock.step("chronicle (once a year)"):
+            chron = report.write_year_chronicle(con, llm, year, season, clock, complete=(season == "winter"))
     raw_failures = [(it["house"]["name"], it["raw"]) for it in items if it["proposal"] is None]
     con.commit()
     log = report.write_log(con, year, season, tick, stats, interp, raw_failures)
     con.commit()
-    print(f"done in {time.time() - t0:.0f} s: {chron}, {log}")
+    print(f"done in {time.time() - t0:.0f} s: {chron or '(no chronicle this season)'}, {log}")
 
 
 if __name__ == "__main__":

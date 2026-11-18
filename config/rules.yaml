@@ -15,7 +15,8 @@ population:                   # targets for genesis
 
 dreaming:
   model: checkpoints/run5/best.pt
-  max_tokens: 140
+  max_tokens: 140             # principals' dreams
+  side_max_tokens: 120        # side characters' and rumor dreams (shorter, for runtime)
   settings: {temperature: 0.9, top_p: 0.9, repetition_penalty: 1.1}
   # the voice (source tag) each temperament dreams in; random_tag_chance of the time, any voice
   tag:
@@ -41,11 +42,16 @@ dreaming:
   share_warmth: 0.4
   share_mystic_bonus: 0.4
   rumor_dreams: 2             # townsfolk "rumor dreams" of unknown origin per season
+  pass_on: 0.3                # a hearer passes a told dream on with this chance x (0.5 + vividness) ...
+  pass_on_max: 3              # ... at most this many more times
 
 interpretation:
   model: Qwen/Qwen2.5-1.5B-Instruct
-  max_per_season: 8           # shared dreams interpreted (the most salient first)
+  max_per_season: 4           # only the most-shared dreams are interpreted (told to the most people; then the most salient)
   max_new_tokens: 220
+  dtype: bfloat16             # twice as fast as float32 on this CPU, half the memory
+  retries: 2                  # asked again when the reply is unreadable, out of this world, or a near-copy of another reading
+  duplicate_similarity: 0.88  # cosine similarity (all-MiniLM-L6-v2) above which two readings count as the same
   listener_trust: 0.7         # a listener takes the teller's reading at confidence x trust x (0.5 + warmth/2)
 
 storyteller:

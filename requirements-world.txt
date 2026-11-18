@@ -1,0 +1,15 @@
+# The world engine (world/): what its nightly run needs on a CPU machine, on top of nothing else.
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch==2.15.0  (CPU wheel: much smaller)
+#   pip install -r requirements-world.txt
+torch==2.15.0
+transformers==5.23.0
+accelerate==1.16.0
+tiktoken==0.14.0
+numpy==2.4.6
+PyYAML==6.0.3
+requests==2.34.2
+huggingface_hub==2.4.0
+lm-format-enforcer==0.11.3
+sentence-transformers==6.3.0
+umap-learn==0.6.0
+scikit-learn==1.9.1

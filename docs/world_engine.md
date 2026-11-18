@@ -189,6 +189,34 @@ private truths). They go to Supabase when the sandbox does.
 - **Models:** the storyteller and the accounts use Qwen2.5-3B-Instruct; interpretations keep the 1.5B (loaded in
   turn: both don't fit in 15 GB together).
 
+## 8c. After the season 2 review (Danny's decisions, PROPOSED details)
+
+- **One action per person a season.** A house's second action is carried out by someone else of the house: the
+  storyteller is told so, and if it names someone who already acts, the engine hands the action to a free member
+  (the heir first, then side characters before principals). A house may also act as a group: the family together
+  (`h3`) or its clients (`c3`), one group action each, using no one's turn (traits: the adults' average; clients
+  middling). Only when nobody is free is a proposal rejected (`already acting`).
+- **No one acts against themselves**, and a hostile act (accuse, threaten, demand, rumour, insult) is never turned on
+  one's own house's people (`aimed at self`, `aimed at own house`).
+- **Background is reference only.** Family ties are given to the account writer so it gets nobody wrong, and marked
+  "never repeat"; any sentence that still restates a tie (who is whose child, married, head of...) is cut, and an
+  account that needed more than one cut is asked again.
+- **Interpretations.** Only the most-shared dreams are read (a told dream is passed on as gossip, up to 3 more
+  hearers; the most-told first, 4 a season). Each reading is checked and asked again, up to twice: out-of-world words
+  (modern things, and real-world peoples, places and gods: `world/anachronism.py`; what survives the retries is cut
+  sentence by sentence) and near-copies of another reading this season (all-MiniLM-L6-v2, cosine > 0.88: asked
+  again as this person's temperament and house would read it). The interpreter is shown their house's cold and warm
+  feelings, their own beliefs about the Flight and their drives, and told that a Valerius and a Theren read the same
+  dream differently. The log shows which way each house's readings leaned.
+- **Runtime.** One chronicle a YEAR (`docs/chronicle_year<Y>.md`: each season's record and told dreams, templated;
+  accounts and town talk once, at the end of winter). Side characters' dreams are capped at 120 tokens (principals
+  140). Both instruct models run in bfloat16 (native on this CPU: twice as fast, half the memory).
+- **The nightly run** (`world/run_day.py`), about 3:30 AM Central with a 2-hour ceiling: the year's remaining
+  seasons, each in its own process, started only if it would finish inside the ceiling at the slowest pace seen;
+  the state (this SQLite file, sealed facts included) lives in the private model repo and is pushed after every
+  season (`world/state.py`); then the sandbox snapshot is published and the reports pushed. It runs in a dedicated
+  cloud session created with the repo attached (the morning wallpaper too), so both can push to main.
+
 ## 9. The seasonal tick (PROPOSED; v0 runs all of it)
 
 1. **Advance:** land yields by season, members and clients eat; whether each house could feed its clients.
@@ -248,6 +276,9 @@ and model calls per step.
 - **Flight belief diversity falling toward one view:** a consensus forming. Interesting, but worth watching.
 
 ## 13. Daily budget (PROPOSED)
+
+Since season 3: a 2-hour ceiling, run at about 3:30 AM Central (section 8c); each season log projects its own
+steps to a day (x4) plus the year's chronicle once. Before that:
 
 Measured in v0 (one season) and projected to 4 seasons a day: see `docs/season1_log.md`. Run 5 dreams cost about
 4 s each (about 100 a season). Instruct-model calls cost about 20–30 s each: about 8 interpretations, 10

@@ -1,11 +1,14 @@
-"""The season's reports: an in-world chronicle from several viewpoints, and the engine's log.
+"""The reports: an in-world chronicle of each YEAR from several viewpoints, and the engine's log of each season.
 
-docs/chronicle_season<N>.md  in-world. The record of what happened (event text, from templates), then
-                             accounts written in the first person by people of different houses,
-                             each from only what that person saw or heard and their own beliefs, and
-                             the dreams that were told and what their dreamers made of them.
+docs/chronicle_year<Y>.md    in-world, one per year (since season 3; seasons 1 and 2 had one each). For every
+                             season of the year: the record of what happened (event text, from templates)
+                             and the dreams that were told, with what their dreamers made of them. Then,
+                             once a year, accounts written in the first person by people of different
+                             houses, each from only what that person saw or heard and their own beliefs,
+                             and what the town was saying. (The model calls are once a year: runtime.)
 docs/season<N>_log.md        the engine's side: every storyteller proposal (accepted, partial, failed,
-                             rejected, with the reason or the rule broken), runtime per step, vital signs.
+                             rejected, with the reason or the rule broken), interpretations with their
+                             checks and which way each house's readings leaned, runtime, vital signs.
 
 Never printed: private memories (the private truths), the sealed location, and any event the rules
 sealed (a search that found a trace). Accounts are written from public beliefs and events only.
@@ -24,7 +27,8 @@ VOICE_SYSTEM = (
     "of a season. Write ONLY in the first person (\"I\", \"my house\"), 110 to 150 words, plain and concrete, in the "
     "manner of an older age (no modern words). Say what you did or saw, what you heard, and what you think it means for "
     "you and your house. Use ONLY the facts you are given: do not invent people, houses, titles, family ties or events, "
-    "and use the true family ties given (never invent a wife, husband, son or brother). Never write your own name and "
+    "and never invent a wife, husband, son or brother. The family ties you are given are REFERENCE ONLY, so that you do "
+    "not get anyone wrong: never repeat them, list them or explain who is whose child. Never write your own name and "
     "never call yourself \"he\" or \"she\": you are always \"I\". Corva knows nothing modern; if a dream held strange "
     "things, describe them as you would. Your opinions are your own and may be wrong. Do not begin with the date.")
 TOWN_SYSTEM = (
@@ -71,46 +75,76 @@ def pick_viewpoints(con, year, season, n=4):
     return out
 
 
-def account(con, llm, p, year, season, clock):
-    evs = season_events(con, year, season)
+TIE_SENTENCE = re.compile(
+    r"\b(is|are|was|were)\s+(the\s+|my\s+|his\s+|her\s+|their\s+|our\s+)?(fostered\s+|eldest\s+|youngest\s+)?(child|children|son|daughter|married|wife|husband|head|heir|servant|retainer|"
+    r"fosterling|betrothed|rivals?)\b|\b(teaches|'s child|'s children)\b", re.I)
+
+
+def drop_ties(text: str) -> tuple[str, int]:
+    """Background facts are reference only: cut any sentence that just restates who is whose (child of, married to,
+    head of...). Returns the text and how many sentences were cut."""
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    kept = [x for x in parts if not TIE_SENTENCE.search(x)]
+    return " ".join(kept).strip(), len(parts) - len(kept)
+
+
+def year_events(con, year, upto_season=None):
+    order = ["spring", "summer", "autumn", "winter"]
+    evs = rows(con, "select * from events where year = ? order by id", year)
+    if upto_season:
+        evs = [e for e in evs if order.index(e["season"]) <= order.index(upto_season)] if upto_season in order else evs
+    return evs
+
+
+def account(con, llm, p, year, season, clock, evs=None, span=None):
+    """One person's first-person account. evs: the events it covers (default: this season's); span: how to name the time."""
+    evs = evs if evs is not None else season_events(con, year, season)
+    span = span or f"this {season}"
     seen = [event_line(e) for e in evs if not e["sealed"] and (p["id"] in json.loads(e["actors"]) or
             one(con, "select house_id from house_members where person_id = ?", p["id"])["house_id"] in json.loads(e["houses"]))]
     heard = [event_line(e) for e in evs if not e["sealed"] and event_line(e) not in seen][:5]
     beliefs = rows(con, "select interpretation from beliefs where holder_id = ? order by year desc, confidence desc limit 4", p["id"])
     dream = one(con, "select m.text, b.interpretation from memories m left join beliefs b on b.subject_id = m.source_id and b.holder_id = m.person_id "
-                     "where m.person_id = ? and m.year = ? and m.season = ? and m.text like '(as told)%' order by m.id limit 1", p["id"], year, season)
+                     "where m.person_id = ? and m.year = ? and m.text like '(as told)%' order by m.id desc limit 1", p["id"], year)
     from world.tick import true_ties
     mentioned = [p["id"]] + [a for e in evs for a in json.loads(e["actors"])]
     ties = true_ties(con, mentioned)
     user = (f"You are {p['name']} of House {p['house']}, {year - p['born_year']} years old: {p['note'] or 'a member of the house'}.\n"
-            f"It is the end of the first {season} since Livia Corvane and Soren of the Harbor vanished at the autumn festival of the sea.\n"
-            f"What you and your house did, or had done to you, this {season}: " + (" ".join(seen) or "nothing of note.") + "\n"
+            f"It is the end of {span}, year {year} since the autumn Livia Corvane and Soren of the Harbor vanished at the festival of the sea.\n"
+            f"What you and your house did, or had done to you, {span}: " + (" ".join(seen) or "nothing of note.") + "\n"
             f"What you heard of elsewhere in the city: " + (" ".join(heard) or "little.") + "\n"
             f"What you believe: " + " / ".join(b["interpretation"] for b in beliefs) + "\n" +
-            (f"A dream you remember from this {season}, as you tell it: \"{dream['text'][len('(as told) '):][:300]}\"" +
+            (f"A dream you remember from {span}, as you tell it: \"{dream['text'][len('(as told) '):][:300]}\"" +
              (f" (what you made of it: {dream['interpretation']})" if dream["interpretation"] else "") + "\n" if dream else "") +
-            "True family ties of the people above: " + "; ".join(ties[:20]) + ".")
+            "Reference only (never repeat these): family ties of the people above: " + "; ".join(ties[:20]) + ".")
     first = p["name"].split()[0]
     text = ""
+    cut = 0
     for attempt in range(2):
         clock.calls += 1
         text = finish(llm.chat(VOICE_SYSTEM, user, max_new_tokens=360))
+        text, cut = drop_ties(text)
         third = re.search(rf"\b{re.escape(first)}\b", text) or re.search(r"^(He|She) ", text, re.M)
-        if not third:
+        if not third and cut <= 1:
             break
-        user += f"\n(Rewrite entirely in the first person: you are {first}, so say \"I\", never \"{first}\" or \"he\" / \"she\".)"
+        user += (f"\n(Rewrite entirely in the first person: you are {first}, so say \"I\", never \"{first}\" or \"he\" / \"she\"."
+                 if third else "\n(Rewrite without listing who is whose child, wife or heir: those ties are only for reference.)")
     # stored as this author's own account: their claims, never facts about the world
     from world.db import insert
     insert(con, "chronicles", year=year, season=season, author_id=p["id"], events=[e["id"] for e in evs if not e["sealed"]],
            text=text, kind="account")
+    ACCOUNT_CUTS.append((p["name"], cut))
     return text
 
 
-def town_talk(con, llm, year, season, clock):
-    evs = [event_line(e) for e in season_events(con, year, season) if not e["sealed"]]
-    rumors = rows(con, "select text from dreams where kind = 'rumor' and year = ? and season = ?", year, season)
-    told = rows(con, "select text from memories where year = ? and season = ? and text like '(as told)%' and told_by is not null limit 3", year, season)
-    user = ("What happened this season: " + " ".join(evs[:10]) + "\n"
+ACCOUNT_CUTS = []   # (author, tie sentences cut from their final account), for the log
+
+
+def town_talk(con, llm, year, season, clock, evs=None):
+    evs = [event_line(e) for e in (evs if evs is not None else season_events(con, year, season)) if not e["sealed"]]
+    rumors = rows(con, "select text from dreams where kind = 'rumor' and year = ? order by id desc limit 2", year)
+    told = rows(con, "select text from memories where year = ? and text like '(as told)%' and told_by is not null order by id desc limit 3", year)
+    user = ("What happened lately: " + " ".join(evs[-12:]) + "\n"
             "Old talk still going round: Soren carried her off; no, she went willingly; the Therens arranged it; a sailor saw a "
             "boat sailing east; a merchant says the northern road; old Philo saw two figures at the western gate.\n"
             "Dreams going round the town, nobody knows whose: " + " / ".join(f"\"{r['text'][:160]}\"" for r in rumors) + "\n" +
@@ -122,39 +156,76 @@ def town_talk(con, llm, year, season, clock):
     return text
 
 
-def write_chronicle(con, llm, year, season, tick, clock) -> str:
+def season_section(con, year, season) -> list[str]:
+    """The templated part of a season (no model calls): the record of events and the dreams that were told."""
     evs = season_events(con, year, season)
-    lines = [f"# The Chronicle of Corva: {season.title()}, Year {year}", "",
-             "*Season " + str(tick) + " of the world engine's sandbox (offline). Written in-world. The record below is the "
-             "engine's own account (facts, from templates). The accounts after it are what particular people of Corva "
-             "made of the season: their words, their beliefs, possibly wrong.*", "",
-             "## The record", ""]
+    lines = [f"## {season.title()}", "", "### The record", ""]
     lines += [f"- {event_line(e)}" for e in evs] or ["- Nothing was recorded."]
-    lines += ["", "## Accounts", ""]
-    for p in pick_viewpoints(con, year, season):
-        text = account(con, llm, p, year, season, clock)
-        lines += [f"### {p['name']}, of House {p['house']}", "", text.strip(), ""]
-    lines += ["### What the town was saying", "", town_talk(con, llm, year, season, clock).strip(), ""]
     told = rows(con, "select d.id, d.tag, p.name dreamer, h.name house, b.interpretation, b.confidence, d.shared_with, m2.text retold "
                      "from dreams d join people p on p.id = d.dreamer_id join house_members m on m.person_id = p.id join houses h on h.id = m.house_id "
                      "join beliefs b on b.subject_id = d.id and b.holder_id = d.dreamer_id and b.source_type = 'own_dream' "
                      "left join memories m2 on m2.source_id = d.id and m2.person_id = d.dreamer_id and m2.text like '(as told)%' "
                      "where d.year = ? and d.season = ? and p.absent = 0 order by b.confidence desc", year, season)
     n_told = one(con, "select count(*) n from dreams where year = ? and season = ? and shared_with != '[]'", year, season)["n"]
-    lines += ["## Dreams that were told", "",
+    lines += ["", "### Dreams that were told", "",
               f"*Everyone dreamed. Most dreams were forgotten by morning; {n_told} were remembered and told to someone, and the "
-              "most striking of those were taken to heart. Each is given as the dreamer told it, with what they made of it.*", ""]
+              "most talked-about were taken to heart. Each is given as the dreamer told it, with what they made of it.*", ""]
     for d in told:
-        listener = one(con, "select name from people where id = ?", json.loads(d["shared_with"])[0])["name"]
-        lines += [f"**{d['dreamer']}** (House {d['house']}) told {listener}:", "",
+        heard = json.loads(d["shared_with"])
+        names = [one(con, "select name from people where id = ?", i)["name"] for i in heard]
+        whom = names[0] + (f", and from them it went round to {', '.join(names[1:])}" if len(names) > 1 else "")
+        lines += [f"**{d['dreamer']}** (House {d['house']}) told {whom}:", "",
                   f"> {(d['retold'] or '')[len('(as told) '):] or '(no retelling)'}", "",
                   f"What {d['dreamer'].split()[0]} made of it ({d['confidence']:.0%} sure): *{d['interpretation']}*", ""]
-    path = ROOT / f"docs/chronicle_season{tick}.md"
+    return lines
+
+
+def write_year_chronicle(con, llm, year, upto_season, clock, complete: bool) -> str:
+    """docs/chronicle_year<Y>.md: every season of the year so far (templated), then the year's accounts and town talk
+    (the model calls). complete=False: written before the year is out (marked so)."""
+    order = ["spring", "summer", "autumn", "winter"]
+    seasons = [x["season"] for x in rows(con, "select distinct season from events where year = ? union select distinct season from dreams "
+                                            "where year = ?", year, year)]
+    seasons = [x for x in order if x in seasons and order.index(x) <= order.index(upto_season)]
+    evs = year_events(con, year, upto_season)
+    span = "this year" if complete else f"this year so far ({', '.join(seasons)})"
+    lines = [f"# The Chronicle of Corva: Year {year}" + ("" if complete else f" (so far: {', '.join(x.title() for x in seasons)})"), "",
+             "*The world engine's sandbox (offline). Written in-world, one chronicle a year. For each season, the record is the "
+             "engine's own account (facts, from templates). The accounts at the end are what particular people of Corva made of "
+             "the year: their words, their beliefs, possibly wrong.*", ""]
+    for se in seasons:
+        lines += season_section(con, year, se)
+    lines += ["## Accounts of the year", ""]
+    ACCOUNT_CUTS.clear()
+    last = seasons[-1] if seasons else upto_season
+    for p in pick_viewpoints_year(con, year, evs):
+        text = account(con, llm, p, year, last, clock, evs=evs, span=span)
+        lines += [f"### {p['name']}, of House {p['house']}", "", text.strip(), ""]
+    lines += ["### What the town was saying", "", town_talk(con, llm, year, last, clock, evs=evs).strip(), ""]
+    path = ROOT / f"docs/chronicle_year{year}.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return str(path.relative_to(ROOT))
 
 
-def write_log(con, year, season, tick, stats, interp, raw_failures, budget_seconds=3600) -> str:
+def pick_viewpoints_year(con, year, evs, n=4):
+    touched = [a for e in evs for a in json.loads(e["actors"])]
+    cands = rows(con, "select p.*, h.name house from people p join house_members m on m.person_id = p.id join houses h on h.id = m.house_id "
+                      "where p.alive = 1 and p.absent = 0 and p.tier = 'principal' and (? - p.born_year) >= 16", year)
+    cands.sort(key=lambda p: (-touched.count(p["id"]), p["id"]))
+    out, houses = [], set()
+    for p in cands:
+        if p["house"] not in houses:
+            out.append(p)
+            houses.add(p["house"])
+        if len(out) == n:
+            break
+    return out
+
+
+YEAR_CHRONICLE_ESTIMATE = 300   # seconds: 4 accounts + town talk, once a year (season 2's chronicle step took 260 s)
+
+
+def write_log(con, year, season, tick, stats, interp, raw_failures, budget_seconds=7200) -> str:
     props = rows(con, "select s.*, h.name house from storyteller_proposals s join houses h on h.id = s.house_id where s.tick = ? order by s.id", tick)
     lines = [f"# Season {tick} log: {season}, year {year} (world engine v0, offline sandbox)", "",
              "The engine's side of the season: what drove people, what each house set out to do, what the storyteller "
@@ -194,7 +265,10 @@ def write_log(con, year, season, tick, stats, interp, raw_failures, budget_secon
             return r["name"] if r else ref
         if ref.startswith("h") and ref[1:].isdigit():
             r = one(con, "select name from houses where id = ?", int(ref[1:]))
-            return f"House {r['name']}" if r else ref
+            return f"House {r['name']} (as a family)" if r else ref
+        if ref.startswith("c") and ref[1:].isdigit():
+            r = one(con, "select name from houses where id = ?", int(ref[1:]))
+            return f"House {r['name']}'s clients" if r else ref
         return "" if ref in ("none", "None") else ref
     for s_ in props:
         p = json.loads(s_["payload"])
@@ -210,27 +284,43 @@ def write_log(con, year, season, tick, stats, interp, raw_failures, budget_secon
         lines += [f"- {h}: `{t[:200]}`" for h, t in raw_failures]
     # dreams
     lines += ["", "## Dream interpretations", "",
-              "Raw dream (the run 5 model's words) beside the dreamer's own retelling in Corva's terms, and their reading.", "",
-              "| Dreamer | Told to | Raw dream (start) | Retold | Reading | Sure | Toward | Intention |", "|---|---|---|---|---|---|---|---|"]
+              "Only the most-shared dreams are interpreted (told to the most people). Raw dream (the run 5 model's words) beside "
+              "the dreamer's own retelling in Corva's terms, their reading, and the checks it went through (each failed check "
+              "was asked again: out-of-world words, a near-copy of another reading).", "",
+              "| Dreamer (house) | Told to (people) | Raw dream (start) | Retold | Reading | Sure | Toward | Checks |", "|---|---|---|---|---|---|---|---|"]
     for i in interp:
         raw = " ".join(i["dream"]["text"].split()[:22]).replace("|", "/")
+        checks = "; ".join(i.get("checks") or []) or "passed first time"
         if not i["ok"]:
-            lines.append(f"| {i['dream']['person']['name']} | | {raw}… | *(reply unusable)* | | | | |")
+            lines.append(f"| {i['dream']['person']['name']} | | {raw}… | *(reply unusable)* | | | | {checks} |")
             continue
         if i["dream"]["person"]["absent"]:
             continue
-        toward = f"{i['about']} {i['stance']:+.1f}" if i["stance"] is not None else ""
-        lines.append(f"| {i['dream']['person']['name']} | {i['listener']} | {raw}… | {i['retelling'].replace('|', '/')} | "
-                     f"{i['interpretation'].replace('|', '/')} | {i['confidence']:.0%} | {toward} | {(i['intention'] or '').replace('|', '/')} |")
+        toward = f"{i['about']} {i['stance']:+.1f}" if i["stance"] is not None else "no house"
+        lines.append(f"| {i['dream']['person']['name']} ({i['house']}) | {i['listener']} ({i['told']}) | {raw}… | {i['retelling'].replace('|', '/')} | "
+                     f"{i['interpretation'].replace('|', '/')} | {i['confidence']:.0%} | {toward} | {checks} |")
+    if interp and not interp[0].get("dedupe", True):
+        lines += ["", "(The near-copy check was skipped: sentence-transformers is not installed.)"]
+    lines += ["", "### Interpretation lean by house", "",
+              "Which way each house's readings of dreams leaned this season (the dreamer's own reading; listeners take it up at "
+              "70% of the stance).", "", "| Interpreter's house | Readings | About no house | Toward (n, mean stance) |", "|---|---:|---:|---|"]
+    for h, L in sorted(stats.get("interpretation_lean", {}).items()):
+        toward = ", ".join(f"{t} ({v['n']}, {v['mean_stance']:+.2f})" for t, v in L["toward"].items()) or "-"
+        lines.append(f"| {h} | {L['readings']} | {L['about no house']} | {toward} |")
     # runtime against the budget
     rt = rows(con, "select step, seconds, calls from runtimes where year = ? and season = ?", year, season)
     total = sum(r["seconds"] for r in rt)
-    lines += ["", "## Runtime per step, against the 1-hour daily budget", "",
-              "One day = one year = 4 seasons. Per season, then projected to a day (x4).", "",
-              "| Step | Seconds | Model calls | Per day (x4) | Share of the 1-hour budget |", "|---|---:|---:|---:|---:|"]
+    per_day = lambda r: r["seconds"] * (1 if r["step"].startswith("chronicle") else 4)   # the chronicle is once a year
+    day_total = sum(per_day(r) for r in rt) + (0 if any(r["step"].startswith("chronicle") for r in rt) else YEAR_CHRONICLE_ESTIMATE)
+    lines += ["", f"## Runtime per step, against the {budget_seconds // 3600}-hour daily ceiling", "",
+              "One day = one year = 4 seasons. Each season step x4; the chronicle once a year"
+              + ("" if any(r["step"].startswith("chronicle") for r in rt) else f" (not written this season: estimated at {YEAR_CHRONICLE_ESTIMATE // 60} min)") + ".", "",
+              f"| Step | Seconds this season | Model calls | Per day | Share of the {budget_seconds // 3600}-hour ceiling |", "|---|---:|---:|---:|---:|"]
     for r in rt:
-        lines.append(f"| {r['step']} | {r['seconds']:.0f} | {r['calls']} | {r['seconds'] * 4 / 60:.1f} min | {r['seconds'] * 4 / budget_seconds:.0%} |")
-    lines.append(f"| **total** | **{total:.0f}** | **{sum(r['calls'] for r in rt)}** | **{total * 4 / 60:.0f} min** | **{total * 4 / budget_seconds:.0%}** |")
+        lines.append(f"| {r['step']} | {r['seconds']:.0f} | {r['calls']} | {per_day(r) / 60:.1f} min | {per_day(r) / budget_seconds:.0%} |")
+    lines.append(f"| **total** | **{total:.0f}** | **{sum(r['calls'] for r in rt)}** | **{day_total / 60:.0f} min** | **{day_total / budget_seconds:.0%}** |")
+    if ACCOUNT_CUTS:
+        lines += ["", "Background ties cut from accounts (sentences): " + ", ".join(f"{a} {n}" for a, n in ACCOUNT_CUTS) + "."]
     lines += ["", "## Vital signs", "", "```json", json.dumps({k: v for k, v in stats.items() if k != "runtime"}, indent=1), "```", ""]
     path = ROOT / f"docs/season{tick}_log.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

@@ -157,7 +157,9 @@ def dream_all(con, R, year, season, clock, r):
             options.append(OPENINGS_BY_LAND[p["land_kind"]])
             opening = r.choice(options)
         torch.manual_seed(year * 10000 + SEASONS.index(season) * 1000 + i)
-        text, closed = generate_dream(model, tok, opening, D["max_tokens"], "cpu", tag=tag, **D["settings"])
+        # principals dream at full length; side characters and the town's rumor dreams more briefly (runtime)
+        cap = D["max_tokens"] if p and p["tier"] == "principal" else D["side_max_tokens"]
+        text, closed = generate_dream(model, tok, opening, cap, "cpu", tag=tag, **D["settings"])
         text = cut_to_last_sentence(text) or text
         did = f"y{year}-{season}-{p['id'] if p else 'rumor' + str(i)}"
         v = vividness(text, closed)
@@ -199,8 +201,22 @@ def recall_and_share(con, R, dreams, r, year, season):
                          "(select house_id from house_members where person_id = ?) and q.id != ? and q.alive = 1 and q.absent = 0", p["id"], p["id"])]
             if close:
                 listener = r.choices([c["other"] for c in close], weights=[max(0.05, c["strength"]) for c in close])[0]
-                con.execute("update dreams set shared_with = ? where id = ?", (json.dumps([listener]), d["id"]))
+                told = [listener]
+                # gossip: a striking dream is passed on, each hearer telling one more person with some chance
+                # (more if the dream is vivid). A dream told round the town is "most shared".
+                for _ in range(D["pass_on_max"]):
+                    if r.random() >= D["pass_on"] * (0.5 + d["vividness"]):
+                        break
+                    nxt = rows(con, "select case when person_a = ? then person_b else person_a end other from relationships "
+                                    "where (person_a = ? or person_b = ?) and strength > 0", told[-1], told[-1], told[-1])
+                    nxt = [n["other"] for n in nxt if n["other"] not in told and n["other"] != p["id"]
+                           and one(con, "select alive, absent from people where id = ?", n["other"]) == {"alive": 1, "absent": 0}]
+                    if not nxt:
+                        break
+                    told.append(r.choice(nxt))
+                con.execute("update dreams set shared_with = ? where id = ?", (json.dumps(told), d["id"]))
                 d["listener"] = listener
+                d["told"] = told
                 shared.append(d)
     return remembered, shared
 
@@ -209,12 +225,17 @@ def recall_and_share(con, R, dreams, r, year, season):
 HOUSE_NAMES = ["Corvane", "Valerius", "Theren", "Aurelian", "Marcellan", "Cassian", "Severin", "Damaris", "Veyra", "Solenne"]
 INTERPRET_SYSTEM = (
     "You speak for one person in Corva, an old island city of ten noble houses, in an age of oars and sails, oil lamps, "
-    "bronze and stone. They know NOTHING modern: no cars, machines, offices, schools, money in dollars, telephones or the "
-    "like. Corva remembers one thing above all: at the autumn festival of the sea, Livia Corvane and Soren of the Harbor "
-    "(raised by House Theren) vanished together; nobody knows where. You are given the person and a dream they told to "
-    "someone. First retell the dream as THIS PERSON would tell it, in Corva's own terms: anything modern becomes what they "
-    "would see in it (a car might be 'a beast of iron that ran without horses'; an office 'a great hall of scribes'). Then say "
-    "what the dream means to them, in the first person, from their own beliefs and fears: their opinion, not a fact.")
+    "bronze and stone. Corva is its own world: there is no Athens, Rome, Egypt or Persia in it, no Zeus or Mars, and nothing "
+    "modern (no cars, machines that run by themselves, offices, schools, dollars, telephones, neighborhoods or front yards). "
+    "Corva remembers one thing above all: at the autumn festival of the sea, Livia Corvane and Soren of the Harbor (raised by "
+    "House Theren) vanished together; nobody knows where. You are given the person and a dream they told. First retell the "
+    "dream as THIS PERSON would tell it, in Corva's own terms: anything modern or foreign becomes what they would see in it "
+    "(a car might be 'a beast of iron that ran without horses'; Athenians 'strangers from over the sea'). Then say what the "
+    "dream means to them, in the first person. The reading must come from who they are: their house's interests, its "
+    "loyalties and grudges, their own beliefs about the Flight, their temperament. A Valerius and a Theren read the same "
+    "dream differently. It is their opinion, not a fact. about_house: the one house the dream speaks to them about, or "
+    "\"none\" (most dreams). stance: how the dream turns them toward that house, from -1 (against it) to +1 (for it); 0 if "
+    "none.")
 
 INTERPRET_SCHEMA = {
     "type": "object",
@@ -222,7 +243,7 @@ INTERPRET_SCHEMA = {
         "retelling": {"type": "string", "maxLength": 240},
         "interpretation": {"type": "string", "maxLength": 240},
         "confidence": {"type": "number"},
-        "about_house": {"type": "string", "enum": HOUSE_NAMES + ["none"]},
+        "about_house": {"type": "string", "enum": ["none"] + HOUSE_NAMES},
         "stance": {"type": "number"},
         "intention": {"type": "string", "maxLength": 140},
     },
@@ -256,17 +277,49 @@ def parse_json(text: str):
     return found or None
 
 
-def person_sketch(con, p) -> str:
-    beliefs = rows(con, "select interpretation from beliefs where holder_id = ? order by confidence desc limit 4", p["id"])
-    house = one(con, "select h.name, h.claim from houses h join house_members m on m.house_id = h.id where m.person_id = ?", p["id"])
+def person_sketch(con, p, year=None, season=None) -> str:
+    """Who is reading the dream: their house and its right, how their house feels about the others, their
+    own beliefs (the Flight first), their drives this season, temperament and traits."""
+    house = one(con, "select h.id, h.name, h.claim from houses h join house_members m on m.house_id = h.id where m.person_id = ?", p["id"])
     role = one(con, "select role from house_members where person_id = ?", p["id"])["role"]
     traits = ", ".join(f"{k} {p[k]:.1f}" for k in ("openness", "caution", "warmth", "pride", "piety"))
-    return (f"{p['name']}, {role} of House {house['name']} (its right: {house['claim']})"
-            f"{'; ' + p['note'] if p.get('note') else ''}. Temperament: {p['dream_temperament']}. Traits: {traits}. "
-            f"Believes: " + " / ".join(b["interpretation"] for b in beliefs))
+    flight = one(con, "select id from events where kind = 'departure'")
+    fb = rows(con, "select interpretation, confidence from beliefs where holder_id = ? and subject_type = 'event' and subject_id = ? "
+                   "order by confidence desc limit 2", p["id"], str(flight["id"])) if flight else []
+    other = rows(con, "select interpretation from beliefs where holder_id = ? and not (subject_type = 'event' and subject_id = ?) "
+                      "order by confidence desc limit 3", p["id"], str(flight["id"]) if flight else "")
+    feel = rows(con, "select hh.name, sum(b.stance * b.confidence) / sum(b.confidence) f from beliefs b join house_members m "
+                     "on m.person_id = b.holder_id join houses hh on hh.id = b.about_house where m.house_id = ? and b.stance is not null "
+                     "and b.about_house != ? group by hh.name order by f", house["id"], house["id"])
+    drives = rows(con, "select text from drives where person_id = ? and year = ? and season = ?", p["id"], year, season) if year is not None else []
+    lines = [f"{p['name']}, {role} of House {house['name']} (its right: {house['claim']})"
+             f"{'; ' + p['note'] if p.get('note') else ''}. Temperament: {p['dream_temperament']}. Traits: {traits}."]
+    if feel:
+        cold = [f"{f['name']} ({f['f']:+.1f})" for f in feel if f["f"] < -0.2][:3]
+        warm = [f"{f['name']} ({f['f']:+.1f})" for f in feel[::-1] if f["f"] > 0.2][:2]
+        if cold:
+            lines.append("House " + house["name"] + " is cold toward: " + ", ".join(cold) + ".")
+        if warm:
+            lines.append("It is warm toward: " + ", ".join(warm) + ".")
+    if fb:
+        lines.append("About the Flight they believe: " + " / ".join(f"{b['interpretation']} ({b['confidence']:.0%} sure)" for b in fb))
+    if other:
+        lines.append("They also believe: " + " / ".join(b["interpretation"] for b in other))
+    if drives:
+        lines.append("This season they want to: " + "; ".join(d["text"] for d in drives))
+    return "\n".join(lines)
 
 
 def interpret(con, R, shared, llm, clock, year, season):
+    """The most-shared dreams of the season, each read by its dreamer (and taken up by the first listener).
+
+    Checks on every reading, each with a retry that says what was wrong:
+      * out of this world: modern words, real-world peoples, places and gods (world/anachronism.py) in the
+        retelling, reading or intention. If they survive the retries, the sentences holding them are cut;
+      * the same reading as someone else's: readings this season are compared by meaning (embeddings,
+        cosine similarity); a near-copy is asked again, as this particular person's temperament would read it.
+    """
+    from world import anachronism
     I = R["interpretation"]
     houses = {h["name"]: h["id"] for h in rows(con, "select id, name from houses")}
 
@@ -275,17 +328,58 @@ def interpret(con, R, shared, llm, clock, year, season):
         return d["vividness"] + 0.15 * sum(k in t for k in FLIGHT_IMAGES) + (0.3 if d["person"]["tier"] == "principal" else 0) \
             + (0.2 if d["temper"] == "mystic" else 0)
 
+    # only the most-shared dreams (told to the most people), the most salient first among equals
+    chosen = sorted(shared, key=lambda d: (len(d.get("told", [d.get("listener")])), salience(d)), reverse=True)[: I["max_per_season"]]
+    embed_fn = None
+    try:
+        from engine.memory.embed import embed as embed_fn
+    except Exception:  # noqa: BLE001  (no sentence-transformers: the duplicate check is skipped, and said so in the log)
+        pass
+    seen_vecs = []
     out = []
-    for d in sorted(shared, key=salience, reverse=True)[: I["max_per_season"]]:
+    for d in chosen:
         p = one(con, "select * from people where id = ?", d["person"]["id"])
         listener = one(con, "select * from people where id = ?", d["listener"])
-        user = f"The person: {person_sketch(con, p)}\n\nThe dream they had this {season} and told to {listener['name']}:\n\"{d['text'][:700]}\""
-        clock.calls += 1
-        j = llm.json(INTERPRET_SYSTEM, user, INTERPRET_SCHEMA, max_new_tokens=I["max_new_tokens"]) or {}
+        house = one(con, "select h.name from houses h join house_members m on m.house_id = h.id where m.person_id = ?", p["id"])["name"]
+        base = (f"The person:\n{person_sketch(con, p, year, season)}\n\nThe dream they had this {season} and told to "
+                f"{listener['name']}:\n\"{d['text'][:700]}\"")
+        note, j, checks = "", {}, []
+        for attempt in range(1 + I["retries"]):
+            clock.calls += 1
+            j = llm.json(INTERPRET_SYSTEM, base + note, INTERPRET_SCHEMA, max_new_tokens=I["max_new_tokens"]) or {}
+            text = str(j.get("interpretation") or "").strip()
+            if not text:
+                checks.append("unreadable")
+                note = "\n(Your last reply could not be used. Answer in the JSON asked for.)"
+                continue
+            said = " ".join(str(j.get(k) or "") for k in ("retelling", "interpretation", "intention"))
+            bad = anachronism.find(said)
+            if bad:
+                checks.append("out of this world: " + ", ".join(bad))
+                note = (f"\n(Your last reply used words that do not exist in Corva: {', '.join(bad)}. Corva has no such things, "
+                        "peoples or places. Say what this person would see instead, in Corva's own terms, or leave it out.)")
+                continue
+            if embed_fn and seen_vecs:
+                v = embed_fn([text])[0]
+                sim = max(float(v @ w) for w in seen_vecs)
+                if sim > I["duplicate_similarity"]:
+                    checks.append(f"near-copy of another reading ({sim:.2f})")
+                    note = (f"\n(Your last reading was almost the same as someone else's this season. Read the dream as THIS person "
+                            f"would: a {p['dream_temperament']} of House {house}, from their own house's interests, grudges and "
+                            f"fears, and their own belief about the Flight. Say something only they would say.)")
+                    continue
+            break
         text = str(j.get("interpretation") or "").strip()
+        retelling = str(j.get("retelling") or "").strip()
+        intention = str(j.get("intention") or "").strip()
+        if anachronism.find(" ".join((text, retelling, intention))):   # still there after the retries: cut those sentences
+            checks.append("cut sentences that were out of this world")
+            text, retelling, intention = anachronism.strip(text), anachronism.strip(retelling), anachronism.strip(intention)
         if not text:
-            out.append({"dream": d, "raw": getattr(llm, "last_raw", ""), "ok": False})
+            out.append({"dream": d, "raw": getattr(llm, "last_raw", ""), "ok": False, "checks": checks, "house": house})
             continue
+        if embed_fn:
+            seen_vecs.append(embed_fn([text])[0])
         try:
             conf = max(0.05, min(1.0, float(j.get("confidence") or 0.5)))
         except (TypeError, ValueError):
@@ -295,7 +389,6 @@ def interpret(con, R, shared, llm, clock, year, season):
             stance = max(-1.0, min(1.0, float(j.get("stance")))) if about else None
         except (TypeError, ValueError):
             stance = None
-        retelling = str(j.get("retelling") or "").strip()
         insert(con, "beliefs", year=year, season=season, holder_id=p["id"], subject_type="dream", subject_id=d["id"],
                interpretation=text, confidence=round(conf, 2), source_type="own_dream", about_house=about, stance=stance)
         lc = conf * I["listener_trust"] * (0.5 + listener["warmth"] / 2)
@@ -307,13 +400,31 @@ def interpret(con, R, shared, llm, clock, year, season):
                    text=f"(as told) {retelling}", vividness=0.85)
             insert(con, "memories", year=year, season=season, person_id=listener["id"], source_type="dream", source_id=d["id"],
                    told_by=p["id"], text=f"(as told) {retelling}", vividness=0.6)
-        intention = str(j.get("intention") or "").strip()
         if intention and intention.lower() not in ("null", "none", ""):
             insert(con, "memories", year=year, season=season, person_id=p["id"], source_type="dream", source_id=d["id"],
                    text=f"I mean to: {intention}", vividness=0.8)
-        out.append({"dream": d, "retelling": retelling, "interpretation": text, "confidence": conf, "about": j.get("about_house"),
-                    "stance": stance, "intention": intention or None, "listener": listener["name"], "ok": True})
+        out.append({"dream": d, "retelling": retelling, "interpretation": text, "confidence": conf,
+                    "about": j.get("about_house") if about else None, "stance": stance, "intention": intention or None,
+                    "listener": listener["name"], "house": house, "told": len(d.get("told", [1])), "checks": checks,
+                    "dedupe": bool(embed_fn), "ok": True})
     return out
+
+
+def lean_by_house(interp) -> dict:
+    """Which way each interpreting house's readings leaned: toward which houses, how warmly, how often 'none'."""
+    out = defaultdict(lambda: {"readings": 0, "none": 0, "toward": defaultdict(list)})
+    for it in interp:
+        if not it.get("ok"):
+            continue
+        L = out[it["house"]]
+        L["readings"] += 1
+        if it.get("about") and it.get("stance") is not None:
+            L["toward"][it["about"]].append(it["stance"])
+        else:
+            L["none"] += 1
+    return {h: {"readings": L["readings"], "about no house": L["none"],
+                "toward": {t: {"n": len(v), "mean_stance": round(sum(v) / len(v), 2)} for t, v in L["toward"].items()}}
+            for h, L in out.items()}
 
 
 # --- 5. propose ---------------------------------------------------------------------------------------------
@@ -323,8 +434,11 @@ STORY_SYSTEM = (
     "You are the storyteller of Corva, an old island city of ten noble houses, in an age of oars and sails. You do not "
     "decide what happens: you propose what ONE house's people might do this season, and the world's rules decide whether "
     "it works. First answer the strategy question about the Flight (Livia Corvane and Soren of the Harbor vanished at the "
-    "autumn festival). Then propose up to {n} actions, each by one member who can act (by their id, e.g. \"p12\") or by the "
-    "house as a whole (\"h3\"), driven by that person's drives. Any action a person of that age could take is allowed; some "
+    "autumn festival). Then propose up to {n} actions, driven by the members' drives. EACH PERSON ACTS AT MOST ONCE A SEASON: "
+    "if the house does two things, two different people carry them out (the head, the heir, a cousin, a retainer, by their "
+    "id, e.g. \"p12\"), or the house acts as a group (its id, e.g. \"h3\": the family together) or through its clients "
+    "(e.g. \"c3\": the townsfolk who owe it loyalty). Nobody acts against themselves or their own house. "
+    "Any action a person of that age could take is allowed; some "
     "ideas: {examples}. Prefer actions not already taken this season by other houses. Say only what people DO, never what "
     "anything means (no omens, signs, fate or the will of the gods). Use the true family ties given; do not invent others.")
 
@@ -390,6 +504,7 @@ def house_context(con, R, h, year, season, drives, used_kinds, last_events, lege
         lines.append(f"  p{m['id']} {m['name']} ({m['role']}, {age(m, year)})" + (": " + "; ".join(d) if d else ""))
     if absent:
         lines.append("Missing from Corva: " + ", ".join(a["name"] for a in absent) + " (whereabouts unknown to everyone).")
+    lines.append(f"Groups that can act: h{h['id']} (House {h['name']} as a family), c{h['id']} (its {clients['count']} clients).")
     lines.append("Other houses: " + ", ".join(f"h{o['id']} {o['name']}" for o in others) + ".")
     lines.append("Notable people of other houses: " + ", ".join(f"p{p['id']} {p['name']} ({p['house']})" for p in principals_elsewhere) + ".")
     if legends:
@@ -402,7 +517,7 @@ def house_context(con, R, h, year, season, drives, used_kinds, last_events, lege
     if used_kinds:
         lines.append("Already done this season by other houses: " + ", ".join(f"{k} x{n}" for k, n in used_kinds.most_common()) + ".")
     lines.append(f"Strategy question: what is House {h['name']} trying to achieve about the Flight this season, and why?")
-    actor_ids = [f"p{m['id']}" for m in adults] + [f"h{h['id']}"]
+    actor_ids = [f"p{m['id']}" for m in adults] + [f"h{h['id']}", f"c{h['id']}"]
     target_ids = [f"h{o['id']}" for o in others] + [f"p{p['id']}" for p in principals_elsewhere] + \
                  [f"p{m['id']}" for m in members if m["id"] not in {a["id"] for a in adults}] + [f"p{m['id']}" for m in adults]
     places = [p["name"] for p in rows(con, "select name from places where kind != 'house'")]
@@ -480,6 +595,7 @@ TRAIT_FOR = {"search": "openness", "investigate": "caution", "accuse": "pride", 
              "gift": "warmth", "marriage": "warmth", "alliance": "warmth", "trade": "openness", "guard": "caution",
              "build": "caution", "work_land": "caution", "insult": "pride", "flee": "openness", "confess": "warmth",
              "withdraw": "caution", "other": "openness"}
+HOSTILE = {"accuse", "threaten", "demand", "rumor", "insult"}    # never turned on one's own house
 NEEDS_TARGET = {"accuse", "threaten", "demand", "rumor", "bribe", "gift", "marriage", "alliance", "insult", "confess"}
 NEEDS_PLACE = {"search", "trade", "guard", "build"}
 
@@ -493,7 +609,33 @@ def resolve_id(con, ref: str):
     if ref.startswith("h") and ref[1:].isdigit():
         r = one(con, "select * from houses where id = ?", int(ref[1:]))
         return ("house", r) if r else (None, None)
+    if ref.startswith("c") and ref[1:].isdigit():
+        r = one(con, "select * from houses where id = ?", int(ref[1:]))
+        return ("clients", r) if r else (None, None)
     return None, None
+
+
+def group_actor(con, R, h, kind: str, year: int) -> dict:
+    """A house acting as a group (the family together, or its clients): a stand-in 'person' whose traits are
+    the average of the house's adults (clients: middling), with no id, so it uses up no one's one action."""
+    adults = [m for m in people(con, "h.id = ? and p.absent = 0 and p.alive = 1", h["id"]) if age(m, year) >= R["population"]["adult_age"]]
+    traits = {k: (sum(m[k] for m in adults) / len(adults) if adults and kind == "house" else 0.5)
+              for k in ("openness", "caution", "warmth", "pride", "piety")}
+    name = f"House {h['name']}" if kind == "house" else f"the clients of House {h['name']}"
+    return {"id": None, "name": name, "house_id": h["id"], "alive": 1, "absent": 0, "born_year": -100, "group": kind, **traits}
+
+
+def stand_in(con, R, h, busy: set, avoid: set, year: int):
+    """Someone else of the house to carry out an action whose named actor already acts this season: the heir first,
+    then other adults (side characters before principals). None if everyone able has acted."""
+    order = {"heir": 0, "member": 1, "cousin": 1, "retainer": 2, "servant": 3, "head": 4}
+    cands = [m for m in people(con, "h.id = ? and p.absent = 0 and p.alive = 1", h["id"])
+             if age(m, year) >= R["population"]["adult_age"] and m["id"] not in busy and m["id"] not in avoid]
+    if not cands:
+        return None
+    cands.sort(key=lambda m: (order.get(m["role"], 1), m["tier"] == "principal", m["id"]))
+    c = cands[0]
+    return one(con, "select p.*, m.house_id from people p join house_members m on m.person_id = p.id where p.id = ?", c["id"])
 
 
 def validate_and_record(con, R, items, year, season, tick, r):
@@ -516,9 +658,24 @@ def validate_and_record(con, R, items, year, season, tick, r):
             akind, actor = resolve_id(con, p.get("actor"))
             tkind, target = resolve_id(con, p.get("target")) if p.get("target") not in (None, "none") else (None, None)
             place = places.get(str(p.get("place") or "").lower()) if p.get("place") not in (None, "none") else None
-            if akind == "house":              # the house acts as a whole: its head carries it out
-                house_row = actor
-                actor = one(con, "select p.*, m.house_id from people p join house_members m on m.person_id = p.id where p.id = ?", house_row["head_id"])
+            group_key = None
+            if akind in ("house", "clients"):  # the house as a family, or its clients: a group action, no one's turn
+                if actor and actor["id"] != h["id"]:
+                    actor = None                 # another house's group: not this house's to command
+                else:
+                    group_key = f"{akind}:{h['id']}"
+                    actor = group_actor(con, R, h, akind, year) if actor else None
+            # nobody acts against themselves, or (in a hostile act) against their own house's people
+            own_target = (target is not None and tkind == "person" and actor is not None and
+                          (target["id"] == actor.get("id") or (family in HOSTILE and target["house_id"] == h["id"])))
+            stood_in = None
+            if actor and not own_target and not group_key and V["one_action_per_actor"] and actor["id"] in acted and actor["house_id"] == h["id"]:
+                # one action per person per season: someone else of the house carries it out, or the house as a group
+                sub = stand_in(con, R, h, acted, {target["id"]} if tkind == "person" and target else set(), year)
+                if sub:
+                    stood_in, actor = actor["name"], sub
+                elif f"house:{h['id']}" not in acted:
+                    stood_in, group_key, actor = actor["name"], f"house:{h['id']}", group_actor(con, R, h, "house", year)
             text_all = " ".join(str(v) for v in p.values())
             if any(re.search(pat, text_all, re.I) for pat in V["meaning_patterns"]):
                 status, reason, rule = "rejected", "the proposal says what something means (the hard rule)", "asserts a meaning"
@@ -532,8 +689,14 @@ def validate_and_record(con, R, items, year, season, tick, r):
                 status, reason, rule = "rejected", f"{actor['name']} is too young to act", "actor a child"
             elif actor["house_id"] != h["id"]:
                 status, reason, rule = "rejected", f"{actor['name']} does not belong to House {h['name']}", "not of this house"
-            elif V["one_action_per_actor"] and actor["id"] in acted:
-                status, reason, rule = "rejected", f"{actor['name']} already acts this season", "already acting"
+            elif own_target:
+                status, reason, rule = ("rejected", f"{actor['name']} cannot aim this at themselves", "aimed at self") \
+                    if target["id"] == actor.get("id") else \
+                    ("rejected", f"{actor['name']} cannot turn this against {target['name']}, of their own house", "aimed at own house")
+            elif target and tkind == "house" and target["id"] == h["id"] and family in NEEDS_TARGET:
+                status, reason, rule = "rejected", "a house cannot aim this at itself", "aimed at itself"
+            elif V["one_action_per_actor"] and (group_key in acted if group_key else actor["id"] in acted):
+                status, reason, rule = "rejected", f"{actor['name']} already acts this season, and nobody else of the house is free", "already acting"
             elif family in NEEDS_TARGET and not target:
                 status, reason, rule = "rejected", f"'{kind}' needs someone to aim at", "no target"
             elif target and tkind == "house" and target["id"] == h["id"] and family in NEEDS_TARGET:
@@ -561,7 +724,7 @@ def validate_and_record(con, R, items, year, season, tick, r):
                     fam_count[family] += 1
                     roll = r.random()
                     outcome = "success" if roll < chance else "partial" if roll < chance + spec["partial"] else "failure"
-                    acted.add(actor["id"])
+                    acted.add(group_key or actor["id"])
                     facts = {"kind_named": kind, "family": family, "chance": round(chance, 2), "roll": round(roll, 2),
                              "why_given": str(p.get("why") or "")[:200]}
                     sealed_hit = False
@@ -577,19 +740,23 @@ def validate_and_record(con, R, items, year, season, tick, r):
                     about = f" about {target_name}" if target else (f" at {place['name']}" if place else "")
                     text = TEMPLATES[family].format(actor=actor["name"], house=h["name"], target=target_name, about=about,
                                                     place=place["name"] if place else "Corva", verb=verb,
-                                                    pronoun="the house's" if akind == "house" else "their")
+                                                    pronoun="their own" if group_key else "their")
+                    text = text[0].upper() + text[1:]
                     if family == "search":
                         text += " and found a trace of them." if sealed_hit else " and found no trace of them."
                     else:
                         text += OUTCOME_TAIL[outcome]
                     involved = [h["id"]] + ([thouse["id"]] if thouse and thouse["id"] != h["id"] else [])
                     ev = insert(con, "events", year=year, season=season, kind=family, place_id=place["id"] if place else None,
-                                actors=[actor["id"]] + ([target["id"]] if tkind == "person" else []), houses=involved,
+                                actors=([actor["id"]] if actor["id"] else []) + ([target["id"]] if tkind == "person" else []), houses=involved,
                                 outcome=outcome, facts=facts, text=text, sealed=1 if sealed_hit else 0)
                     status = {"success": "accepted", "partial": "partial", "failure": "failed"}[outcome]
                     reason = f"rolled {roll:.2f} against {chance:.2f}"
+                    if stood_in:
+                        reason += f"; carried out by {actor['name']}, as {stood_in} already acts this season"
+                        payload["stood_in_for"] = stood_in
                     effects(con, R, family, outcome, h, thouse, actor, target if tkind == "person" else None, ev, year, season, r)
-                    move_actors(con, [actor["id"]] + ([target["id"]] if tkind == "person" else []), place)
+                    move_actors(con, ([actor["id"]] if actor["id"] else []) + ([target["id"]] if tkind == "person" else []), place)
         pid = insert(con, "storyteller_proposals", year=year, season=season, tick=tick, house_id=h["id"],
                      kind=str((p or {}).get("kind") or "?"), payload=payload, wording=json.dumps(p or {}, ensure_ascii=False),
                      status=status, reason=reason, rule_broken=rule, event_id=ev)
@@ -625,6 +792,8 @@ STANCE_TEXT = {
 def effects(con, R, family, outcome, h, thouse, actor, tperson, ev, year, season, r):
     B, Cl = R["beliefs"], R["clients"]
     weight = {"success": 1.0, "partial": 0.6, "failure": 0.3}[outcome]
+    # a group action (the house as a family, or its clients) has no single actor: its head remembers it
+    holder = actor["id"] or h["head_id"]
     if family in B["stance"] and thouse and thouse["id"] != h["id"]:
         s = B["stance"][family]
         t_text, a_text = STANCE_TEXT[family]
@@ -637,7 +806,7 @@ def effects(con, R, family, outcome, h, thouse, actor, tperson, ev, year, season
                    interpretation=t_text.format(a=h["name"]), confidence=round(conf * weight + 0.1, 2), source_type="told_by",
                    about_house=h["id"], stance=s["target_to_actor"])
         if s["actor_to_target"]:
-            insert(con, "beliefs", year=year, season=season, holder_id=actor["id"], subject_type="event", subject_id=str(ev),
+            insert(con, "beliefs", year=year, season=season, holder_id=holder, subject_type="event", subject_id=str(ev),
                    interpretation=a_text.format(t=thouse["name"]), confidence=B["witness_confidence"], source_type="witnessed",
                    about_house=thouse["id"], stance=s["actor_to_target"])
         for a_id, b_id in ((h["id"], thouse["id"]), (thouse["id"], h["id"])):   # old wounds reopen
@@ -659,6 +828,8 @@ def effects(con, R, family, outcome, h, thouse, actor, tperson, ev, year, season
         add_loyalty(con, h["id"], 0.02 * weight)
     if family in ("gift", "bribe") and thouse and outcome != "failure":
         con.execute("update houses set goods = goods + ? where id = ?", (2 if family == "gift" else 3, thouse["id"]))
+    if not actor["id"]:
+        return                           # what follows only a person can do (leave, confess, learn a secret)
     if family == "flee" and outcome == "success":
         # they leave Corva; where they go is not recorded (nobody saw)
         con.execute("update people set absent = 1, place_id = null where id = ?", (actor["id"],))
@@ -739,6 +910,10 @@ def vital_signs(con, year, season, dreams, remembered, shared, interp, results, 
         "action_types_resolved": dict(Counter(x["family"] for x in results if x["event"])),
         "action_names_proposed": dict(Counter(str((x["proposal"] or {}).get("kind", "")).lower() for x in results if x["proposal"])),
         "rejection_reasons": dict(Counter(x["rule"] for x in results if x["rule"])),
+        "carried_out_by_another_member": sum(1 for x in results if "carried out by" in (x["reason"] or "")),
+        "group_actions": sum(1 for x in results if str((x["proposal"] or {}).get("actor", "")).startswith(("h", "c"))),
+        "interpretation_lean": lean_by_house(interp),
+        "interpretation_checks": dict(Counter(c.split(":")[0].split(" (")[0] for i in interp for c in (i.get("checks") or []))),
         "clients": clients,
         "coldest_feelings": sorted(({"from": f["a"], "to": f["b"], "feeling": round(f["f"], 2)} for f in feelings), key=lambda x: x["feeling"])[:6],
         "warmest_feelings": sorted(({"from": f["a"], "to": f["b"], "feeling": round(f["f"], 2)} for f in feelings), key=lambda x: -x["feeling"])[:4],
