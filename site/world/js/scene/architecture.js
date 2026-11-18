@@ -9,8 +9,10 @@
 //   glow  a window's number (0 for everything that isn't a window). At night about half the windows
 //         light up warm; which ones is decided per house from the window's number, so neighbours
 //         differ and it never flickers.
-//   wall  1 on plastered walls: they get the weathered plaster texture, laid on by world position
-//         (so it doesn't stretch with a building's size).
+//   part  what the vertex belongs to: 0 fixed colour (stone, doors, glass), 1 wall, 2 trim
+//         (shutters, balconies), 3 roof. Each house carries its own wall, trim and roof colours
+//         (per-instance attributes, from its town's palette: city.js), applied by part; walls also
+//         get the weathered plaster texture, laid on by world position.
 //
 // Local frame: a building's front faces +x; z runs along its width; y = 0 is the ground at its
 // middle, and walls run 2.5 m below that so they meet the ground on a slope.
@@ -30,18 +32,19 @@ export const PALETTE = {
 // --- a little builder for coloured, merged geometry -----------------------------------------------
 class Parts {
   constructor() { this.list = []; this.windows = 0; }
-  // add a geometry (already placed), all one colour; opts: { glow: true, wall: true }
-  add(geo, color, { glow = false, wall = false } = {}) {
+  // add a geometry (already placed), all one colour; opts: { glow: true, part: 0..3 }
+  add(geo, color, { glow = false, part = 0, wall = false } = {}) {
+    if (wall) part = 1;
     const g = geo.index ? geo.toNonIndexed() : geo;
     g.deleteAttribute("uv");
     if (!g.attributes.normal) g.computeVertexNormals();
     const n = g.attributes.position.count;
-    const col = new Float32Array(n * 3), gl = new Float32Array(n), wl = new Float32Array(n);
+    const col = new Float32Array(n * 3), gl = new Float32Array(n), pt = new Float32Array(n);
     const id = glow ? ++this.windows : 0;
-    for (let i = 0; i < n; i++) { col[i * 3] = color.r; col[i * 3 + 1] = color.g; col[i * 3 + 2] = color.b; gl[i] = id; wl[i] = wall ? 1 : 0; }
+    for (let i = 0; i < n; i++) { col[i * 3] = color.r; col[i * 3 + 1] = color.g; col[i * 3 + 2] = color.b; gl[i] = id; pt[i] = part; }
     g.setAttribute("color", new THREE.BufferAttribute(col, 3));
     g.setAttribute("glow", new THREE.BufferAttribute(gl, 1));
-    g.setAttribute("wall", new THREE.BufferAttribute(wl, 1));
+    g.setAttribute("part", new THREE.BufferAttribute(pt, 1));
     this.list.push(g);
     return this;
   }
@@ -74,8 +77,8 @@ function openings(P, d, w, h, floors, shutter, { side = true, door = true } = {}
         continue;
       }
       P.box(d / 2 + 0.03, y0, z, 0.06, 1.15, 0.8, PALETTE.window, { glow: true });
-      P.box(d / 2 + 0.05, y0, z - 0.72, 0.05, 1.15, 0.55, shutter);    // shutters, open
-      P.box(d / 2 + 0.05, y0, z + 0.72, 0.05, 1.15, 0.55, shutter);
+      P.box(d / 2 + 0.05, y0, z - 0.72, 0.05, 1.15, 0.55, shutter, TRIM);    // shutters, open
+      P.box(d / 2 + 0.05, y0, z + 0.72, 0.05, 1.15, 0.55, shutter, TRIM);
     }
   });
   if (side && w > 4) {                                                   // one window on the side
@@ -85,42 +88,60 @@ function openings(P, d, w, h, floors, shutter, { side = true, door = true } = {}
 }
 
 // --- houses -----------------------------------------------------------------------------------------
-// kinds: cube (flat Cycladic roof with a parapet), gable and hip (terracotta tiles), two-storey
-// (with a wooden balcony), courtyard (a walled yard in front), tower (a tall merchant's house)
-export const HOUSE_KINDS = ["cube", "gable", "hip", "twostorey", "courtyard", "tower"];
+// kinds: cube (flat Cycladic roof with a parapet), gable and hip (tiled roofs), two-storey (with a
+// wooden balcony), courtyard (a walled yard in front), tower (a tall merchant's house), lshape (a
+// side wing with its own roof), stair (a flat-roofed house with an outside stair up to a roof room)
+export const HOUSE_KINDS = ["cube", "gable", "hip", "twostorey", "courtyard", "tower", "lshape", "stair"];
+const TRIM = { part: 2 }, ROOF = { part: 3 }, WHITE = new THREE.Color(1, 1, 1), RIDGE = new THREE.Color(0.8, 0.78, 0.76);
 export const HOUSE_SIZES = [{ w: 5, d: 4.5, h: 3.3 }, { w: 7, d: 5.5, h: 3.8 }, { w: 9.5, d: 7, h: 4.4 }];
 
 function house(kind, { w, d, h }, detail) {
   const P = new Parts();
   const wall = { wall: true };
-  const shutter = kind === "gable" || kind === "tower" ? PALETTE.green : PALETTE.blue;
+  const shutter = WHITE;                                                 // tinted per house (trim colour)
   let H = h, floors = 1;
   if (kind === "twostorey") { H = h + 2.9; floors = 2; }
   if (kind === "tower") { H = h + 5.5; floors = 2; w = w * 0.75; d = d * 0.85; }
-  P.box(0, -2.5, 0, d, H + 2.5, w, PALETTE.white, wall);                 // the walls (down into the slope)
+  P.box(0, -2.5, 0, d, H + 2.5, w, WHITE, wall);                          // the walls (down into the slope)
   P.box(0, -2.5, 0, d + 0.25, 0.75 + 2.5, w + 0.25, PALETTE.stone);    // a stone plinth
   openings(P, d, w, H, floors, shutter);
-  if (kind === "cube" || kind === "courtyard") {                        // flat roof, parapet, a chimney
+  if (kind === "cube" || kind === "courtyard" || kind === "stair") {    // flat roof, parapet, a chimney
     P.box(0, H, 0, d + 0.15, 0.35, w + 0.15, PALETTE.cream, wall);
     P.box(-d * 0.25, H, w * 0.3, 0.7, 1.2, 0.7, PALETTE.cream, wall);
-    if (detail > 0) P.box(d * 0.2, H + 0.35, -w * 0.25, 1.6, 0.9, 1.6, PALETTE.white, wall);   // a little room on the roof
+    if (detail > 0) P.box(d * 0.2, H + 0.35, -w * 0.25, 1.6, 0.9, 1.6, WHITE, wall);   // a little room on the roof
   } else if (kind === "gable" || kind === "twostorey") {
-    P.add(gableRoof(d, w, Math.min(2.2, d * 0.32), 0.45).translate(0, H, 0), PALETTE.terracotta);
-    P.box(0, H + Math.min(2.2, d * 0.32) - 0.05, 0, 0.35, 0.18, w + 0.95, PALETTE.tileDark);   // ridge tiles
-  } else {                                                              // hip and tower
-    P.add(hipRoof(d, w, Math.min(2.4, Math.max(d, w) * 0.3), 0.45).translate(0, H, 0), PALETTE.terracotta);
+    P.add(gableRoof(d, w, Math.min(2.2, d * 0.32), 0.45).translate(0, H, 0), WHITE, ROOF);
+    P.box(0, H + Math.min(2.2, d * 0.32) - 0.05, 0, 0.35, 0.18, w + 0.95, RIDGE, ROOF);   // ridge tiles
+  } else {                                                              // hip, tower and lshape
+    P.add(hipRoof(d, w, Math.min(2.4, Math.max(d, w) * 0.3), 0.45).translate(0, H, 0), WHITE, ROOF);
+  }
+  if (kind === "lshape") {                                              // a lower wing to one side, gabled
+    const ww = w * 0.55, wd = d * 0.9, wh = H * 0.8, wz = w / 2 + ww / 2 - 0.2;
+    P.box(-d * 0.05, -2.5, wz, wd, wh + 2.5, ww, WHITE, wall);
+    P.box(-d * 0.05, -2.5, wz, wd + 0.25, 0.75 + 2.5, ww + 0.25, PALETTE.stone);
+    P.add(gableRoof(wd, ww, Math.min(1.8, wd * 0.3), 0.4).translate(-d * 0.05, wh, wz), WHITE, ROOF);
+    P.box(wd / 2 - d * 0.05 + 0.03, 0.9, wz, 0.06, 1.1, 0.8, PALETTE.window, { glow: true });
+  }
+  if (kind === "stair") {                                               // an outside stair up the side to a roof room
+    const steps = 8;
+    for (let k = 0; k < steps; k++) {
+      const y = (k / steps) * H;
+      P.box(d / 2 - 0.8 - (k * (d - 1.6)) / steps, -0.5, w / 2 + 0.6, (d - 1.6) / steps + 0.05, y + 0.5 + H / steps, 1.1, WHITE, wall);
+    }
+    P.box(-d * 0.15, H + 0.35, w * 0.15, d * 0.55, 2.3, w * 0.5, WHITE, wall);
+    P.box(-d * 0.15 + d * 0.275 + 0.03, H + 0.35, w * 0.15, 0.06, 1.9, 0.9, PALETTE.door);
   }
   if (kind === "twostorey") {                                           // a balcony across the front
     P.box(d / 2 + 0.7, H / 2 + 0.25, 0, 1.4, 0.15, w * 0.8, PALETTE.wood);
-    if (detail > 0) for (let k = 0; k <= 6; k++) P.box(d / 2 + 1.35, H / 2 + 0.4, -w * 0.4 + (k * w * 0.8) / 6, 0.07, 0.9, 0.07, PALETTE.wood);
-    P.box(d / 2 + 1.35, H / 2 + 1.25, 0, 0.08, 0.08, w * 0.8, PALETTE.wood);
+    if (detail > 0) for (let k = 0; k <= 6; k++) P.box(d / 2 + 1.35, H / 2 + 0.4, -w * 0.4 + (k * w * 0.8) / 6, 0.07, 0.9, 0.07, WHITE, TRIM);
+    P.box(d / 2 + 1.35, H / 2 + 1.25, 0, 0.08, 0.08, w * 0.8, WHITE, TRIM);
   }
   if (kind === "courtyard") {                                           // a walled yard with a gate
     const yd = 4.5;
-    P.box(d / 2 + yd / 2, -2.5, w / 2 - 0.15, yd, 2.5 + 1.8, 0.3, PALETTE.white, wall);
-    P.box(d / 2 + yd / 2, -2.5, -w / 2 + 0.15, yd, 2.5 + 1.8, 0.3, PALETTE.white, wall);
-    P.box(d / 2 + yd - 0.15, -2.5, w * 0.3, 0.3, 2.5 + 1.8, w * 0.4, PALETTE.white, wall);
-    P.box(d / 2 + yd - 0.15, -2.5, -w * 0.3, 0.3, 2.5 + 1.8, w * 0.4, PALETTE.white, wall);
+    P.box(d / 2 + yd / 2, -2.5, w / 2 - 0.15, yd, 2.5 + 1.8, 0.3, WHITE, wall);
+    P.box(d / 2 + yd / 2, -2.5, -w / 2 + 0.15, yd, 2.5 + 1.8, 0.3, WHITE, wall);
+    P.box(d / 2 + yd - 0.15, -2.5, w * 0.3, 0.3, 2.5 + 1.8, w * 0.4, WHITE, wall);
+    P.box(d / 2 + yd - 0.15, -2.5, -w * 0.3, 0.3, 2.5 + 1.8, w * 0.4, WHITE, wall);
   }
   return P.build();
 }
@@ -206,18 +227,22 @@ export function templeGeometry(t, detail = 1) {
 // --- the shared material -----------------------------------------------------------------------------
 // Vertex-coloured Lambert, plus: windows that glow at night (half of them, chosen per house and per
 // window), and plaster texture on the walls laid on by world position.
-export function buildingMaterial(plaster = null) {
+// instanced = true: the houses, which carry per-instance colours (iWall, iTrim, iRoof).
+export function buildingMaterial(plaster = null, { instanced = false } = {}) {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const V = instanced;
   mat.userData.night = { value: 0 };
   mat.onBeforeCompile = shader => {
     shader.uniforms.night = mat.userData.night;
     shader.uniforms.plaster = { value: plaster };
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", `#include <common>
-        attribute float glow; attribute float wall;
+        attribute float glow; attribute float part;
+        ${V ? "attribute vec3 iWall; attribute vec3 iTrim; attribute vec3 iRoof; varying vec3 vTint;" : ""}
         varying float vGlow; varying float vWall; varying float vSeed; varying vec3 vWorldPos; varying vec3 vWorldNormal;`)
       .replace("#include <begin_vertex>", `#include <begin_vertex>
-        vGlow = glow; vWall = wall;
+        vGlow = glow; vWall = part > 0.5 && part < 1.5 ? 1.0 : 0.0;
+        ${V ? "vTint = part < 0.5 ? vec3(1.0) : part < 1.5 ? iWall : part < 2.5 ? iTrim : iRoof;" : ""}
         #ifdef USE_INSTANCING
           vSeed = float(gl_InstanceID);
           mat4 placeM = modelMatrix * instanceMatrix;
@@ -231,8 +256,10 @@ export function buildingMaterial(plaster = null) {
       .replace("#include <common>", `#include <common>
         uniform float night; ${plaster ? "uniform sampler2D plaster;" : ""}
         varying float vGlow; varying float vWall; varying float vSeed; varying vec3 vWorldPos; varying vec3 vWorldNormal;
+        ${V ? "varying vec3 vTint;" : ""}
         float hash11(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }`)
       .replace("#include <color_fragment>", `#include <color_fragment>
+        ${V ? "diffuseColor.rgb *= vTint;" : ""}
         ${plaster ? `
         if (vWall > 0.5) {
           // plaster laid on by world position: pick the two axes the wall faces across

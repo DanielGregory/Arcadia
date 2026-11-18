@@ -18,7 +18,8 @@ js/world/layout.js      the city as data: houses, temples, stairs, walls, trees,
 js/world/daycycle.js    time of day -> sun, sky, light and fog colours
 js/scene/terrain.js     the ground in 640 m tiles, finer near the camera, built in workers,
                         with each near tile's trees (forests, olive groves, cypresses)
-js/scene/architecture.js houses (6 kinds x 3 sizes, lit windows, plaster) and Doric temples
+js/scene/architecture.js houses (8 kinds x 3 sizes, lit windows, plaster) and Doric temples
+js/scene/paths.js       roads, lanes, quays, squares, a footpath to every door; bridges over rivers
 js/scene/boats.js       merchant ships, galleys and fishing boats, lofted from their lines
 js/scene/rivers.js      the rivers' flowing water
 js/scene/labels.js      place names; tap one to fly there

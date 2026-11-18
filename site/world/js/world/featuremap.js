@@ -7,7 +7,7 @@
 // pass within reach of it. A question then only looks at one cell's short list.
 
 let F = null;
-let riverIdx = null, roadIdx = null;
+let riverIdx = null, roadIdx = null, pathIdx = null;
 
 class SegmentIndex {
   constructor(lines, reach, cell = 250) {
@@ -50,6 +50,8 @@ export function setFeatures(f) {
   F = f;
   riverIdx = f && f.rivers.length ? new SegmentIndex(f.rivers, 520) : null;
   roadIdx = f && f.roads.length ? new SegmentIndex(f.roads, 60) : null;
+  // lanes, quays and footpaths (made with the village layouts, added before the ground is built)
+  pathIdx = f && f.paths && f.paths.length ? new SegmentIndex(f.paths, 12, 50) : null;
 }
 export function getFeatures() { return F; }
 
@@ -79,4 +81,12 @@ export function villageNear(x, z) {
     if (d < v.r * 2.5 && (!best || d < best.d)) best = { v, d };
   }
   return best;
+}
+
+// Is a point on a lane or footpath? Its distance past the path's edge (negative = on it), or
+// Infinity if none is near.
+export function pathClearance(x, z) {
+  if (!pathIdx) return Infinity;
+  const n = pathIdx.nearest(x, z);
+  return n ? n.d - n.seg.line.width / 2 : Infinity;
 }

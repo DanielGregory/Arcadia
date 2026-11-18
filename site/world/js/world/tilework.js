@@ -11,7 +11,7 @@
 
 import { heightAt, fbm } from "./terrain.js";
 import { groundColor, woodAt, groveAt, cityNear } from "./ground.js";
-import { roadDist, riverAt, villageNear } from "./featuremap.js";
+import { roadDist, riverAt, villageNear, pathClearance } from "./featuremap.js";
 
 export function buildTile(x0, z0, size, res) {
   const n = res + 1, step = size / res;
@@ -100,7 +100,7 @@ export function tileTrees(x0, z0, size, step, spacing) {
   // no trees in the water, on roads, in river channels, in village streets or in Corva
   const clear = (x, z, y) => {
     if (y < 2.5 || cityNear(x, z) > 0.5) return false;
-    if (roadDist(x, z) < 5.5) return false;
+    if (roadDist(x, z) < 5.5 || pathClearance(x, z) < 1.5) return false;
     const rv = riverAt(x, z);
     if (rv && rv.d < rv.w + 3) return false;
     const v = villageNear(x, z);

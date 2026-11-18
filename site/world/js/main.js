@@ -16,6 +16,7 @@ import { generateLayout, addVillages } from "./world/layout.js";
 import { generateFeatures } from "./world/features.js";
 import { setFeatures } from "./world/featuremap.js";
 import { makeRivers } from "./scene/rivers.js";
+import { makePaths } from "./scene/paths.js";
 import { makeLabels } from "./scene/labels.js";
 import { dayState, TIMES } from "./world/daycycle.js";
 import { makeSky, makeSea, shoreTexture, islandShoreTexture } from "./scene/skysea.js";
@@ -59,6 +60,9 @@ const features = await fetch(`assets/island/features-${seed}.json`).then(r => (r
                  ?? generateFeatures(seed);
 setFeatures(features);
 const layout = addVillages(generateLayout(seed, qualityName), features.villages, seed);
+// the lanes and footpaths just laid out join the features, so trees keep off them (the workers
+// building the ground get this full set)
+setFeatures({ ...features, paths: layout.paths });
 // AI-made assets (render/make_assets.py): textures by default (?ai=0 for none). The image-to-3D
 // objects of the test round lost to the modelled buildings and boats; ?aiobjects=1 still shows them.
 const useAI = params.get("ai") !== "0";
@@ -86,6 +90,8 @@ const clouds = makeClouds(qualityName === "low" ? 10 : 18, qualityName === "low"
 // the ground, in tiles; the first batch is built right away so the first frame is complete
 const terrain = new Terrain({ finest: Q.tileRes, levels: 5, treeSpacing: Q.treeSpacing, treeLevels: Q.treeLevels });
 const rivers = makeRivers(features.rivers);
+// roads, lanes, quays, squares and a footpath to every door
+const paths = makePaths([...features.roads.map(rd => ({ pts: rd.pts, width: 4.5, surface: "road" })), ...layout.paths], layout.squares);
 const land = terrain.group;
 rig.update(0, 0);
 terrain.update(camera.position, { sync: true });
@@ -108,7 +114,7 @@ if (tex.hillside) {
 }
 for (const m of Object.values(city.materials)) m.needsUpdate = true;
 terrain.material.needsUpdate = true;
-scene.add(sky.mesh, sea.mesh, land, distant, rivers.group, city.group, makeTrees(layout), ships.group,
+scene.add(sky.mesh, sea.mesh, land, distant, rivers.group, paths, city.group, makeTrees(layout), ships.group,
           smoke.points, lanterns.points, clouds.group, ...lanterns.lights);
 
 const sunLight = new THREE.DirectionalLight(0xffffff, 2);

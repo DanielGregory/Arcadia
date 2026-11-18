@@ -1,11 +1,11 @@
 // Corva's buildings (and the villages'), built from layout data with the architecture kit
-// (architecture.js): houses of six kinds in three sizes, stamped out as instances (one draw call per
+// (architecture.js): houses of eight kinds in three sizes, coloured by their town, stamped out as instances (one draw call per
 // kind and size, however many houses); a Doric temple modelled whole for each temple; the
 // stairway, and the quay walls and harbour moles.
 
 import * as THREE from "../../vendor/three.module.min.js";
 import { rng } from "../world/layout.js";
-import { houseKit, HOUSE_KINDS, HOUSE_SIZES, templeGeometry, buildingMaterial } from "./architecture.js";
+import { houseKit, HOUSE_SIZES, templeGeometry, buildingMaterial } from "./architecture.js";
 
 // Place a unit box (base at y = 0) with a transform.
 const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
@@ -15,40 +15,79 @@ function place(mesh, i, x, y, z, rot, sx, sy, sz) {
   mesh.setMatrixAt(i, m4);
 }
 
-// Which kind of house: set by the layout (villages) or picked here. Corva mixes all kinds; the
-// tall merchants' houses and walled courtyards are rarer.
-const WEIGHTS = { cube: 0.24, gable: 0.2, hip: 0.14, twostorey: 0.22, courtyard: 0.1, tower: 0.1 };
-function pickKind(r) {
+// Each town has its own character (a house's `town` comes from the layout):
+//   corva    the capital: every kind, rich houses with towers and balconies, ochre and pink washes
+//   harbour  the fishing towns: whitewashed, flat-roofed Cycladic cubes, blue and green shutters
+//   river    the valley villages: tiled gables and hips, warm ochre and cream walls, green shutters
+//   hill     the mountain village: stone-built, weathered brown-grey roofs, plain wooden shutters
+// kinds: how often each kind of house appears; walls / trims / roofs: colours to pick from.
+const C3 = hex => new THREE.Color(hex);
+const TOWNS = {
+  corva: {
+    kinds: { cube: 0.16, gable: 0.15, hip: 0.12, twostorey: 0.18, courtyard: 0.1, tower: 0.1, lshape: 0.11, stair: 0.08 },
+    walls: ["#f3ede0", "#efe4cc", "#ecd6ad", "#ecd2c0", "#f1e3c4", "#e9e2d6"], trims: ["#3f6f8f", "#4f7254", "#7a3b2e", "#5a3f2a", "#2f5f6f"],
+    roofs: ["#b0603d", "#a8573a", "#bf7350", "#9c5034"],
+  },
+  harbour: {
+    kinds: { cube: 0.4, stair: 0.2, courtyard: 0.14, twostorey: 0.1, gable: 0.08, lshape: 0.08 },
+    walls: ["#f6f3ec", "#f4f1ea", "#f2efe8", "#eef0ef", "#f1ebdc"], trims: ["#2f6fa0", "#3a86a8", "#2f5f8f", "#4f8a6a", "#a83a2e"],
+    roofs: ["#b0603d", "#a8573a"],
+  },
+  river: {
+    kinds: { gable: 0.3, hip: 0.18, twostorey: 0.18, lshape: 0.16, courtyard: 0.12, cube: 0.06 },
+    walls: ["#e8cf9e", "#ecdcb8", "#e6c79a", "#efe2c6", "#e2c6a8"], trims: ["#4f7254", "#5f7a3a", "#5a3f2a", "#7a3b2e"],
+    roofs: ["#b0603d", "#9c5034", "#a86a48", "#c07a52"],
+  },
+  hill: {
+    kinds: { gable: 0.28, hip: 0.22, courtyard: 0.18, lshape: 0.14, tower: 0.08, cube: 0.1 },
+    walls: ["#b9ab94", "#a99c88", "#c2b49c", "#b0a28c", "#9f937f"], trims: ["#5a3f2a", "#6b4e35", "#4a3a2c"],
+    roofs: ["#8a6a58", "#7d6a5e", "#94735c", "#6f6258"],
+  },
+};
+for (const t of Object.values(TOWNS)) for (const k of ["walls", "trims", "roofs"]) t[k] = t[k].map(C3);
+
+function pickKind(r, town) {
   let x = r();
-  for (const k of HOUSE_KINDS) { x -= WEIGHTS[k]; if (x <= 0) return k; }
+  for (const [k, w] of Object.entries(town.kinds)) { x -= w; if (x <= 0) return k; }
   return "cube";
 }
-// slight differences in the whitewash: white, cream, warm ochre, faded pink
-const TINTS = [[1, 1, 1], [1, 0.975, 0.92], [1, 0.95, 0.84], [1, 0.95, 0.92], [0.98, 0.98, 0.97]].map(c => new THREE.Color(...c));
+const pickOf = (r, list) => list[Math.floor(r() * list.length)];
 
 // options: { plaster: texture for the walls, detail: 0 (phones) or 1 }
 export function makeCity(L, quality, seed = 1717, { plaster = null, detail = 1 } = {}) {
   const r = rng(seed + 1);
   const group = new THREE.Group();
   const lambert = c => new THREE.MeshLambertMaterial({ color: c });
-  const material = buildingMaterial(plaster);
+  const material = buildingMaterial(plaster);                        // temples
+  const houseMat = buildingMaterial(plaster, { instanced: true });   // houses, with their own colours
 
   // --- houses: sort them into kind x size, then one instanced mesh for each -------------------
+  // Each house keeps its own proportions (a little wider or deeper, taller or lower than the
+  // model), a slight turn off the line, and its town's colours for walls, shutters and roof.
   const kit = houseKit(detail);
   const buckets = {};
   for (const h of L.houses) {
-    const kind = h.style || pickKind(r);
+    const town = TOWNS[h.town || "corva"];
+    const kind = h.style && kit[h.style] && (!h.town || town.kinds[h.style]) ? h.style : pickKind(r, town);
     const area = h.w * h.d, size = area < 28 ? 0 : area < 46 ? 1 : 2;
-    const S = HOUSE_SIZES[size], scale = THREE.MathUtils.clamp(Math.sqrt(area / (S.w * S.d)), 0.85, 1.2);
-    (buckets[`${kind}:${size}`] ||= []).push({ h, scale, tint: TINTS[Math.floor(r() * TINTS.length)] });
+    const S = HOUSE_SIZES[size], base = THREE.MathUtils.clamp(Math.sqrt(area / (S.w * S.d)), 0.85, 1.2);
+    // a weathered house now and then: its colours a little darker
+    const age = r() < 0.2 ? 0.86 + r() * 0.08 : 1;
+    (buckets[`${kind}:${size}`] ||= []).push({
+      h, sx: base * (0.88 + r() * 0.26), sy: base * (0.9 + r() * 0.25), sz: base * (0.88 + r() * 0.26), turn: (r() - 0.5) * 0.12,
+      wall: pickOf(r, town.walls).clone().multiplyScalar(age), trim: pickOf(r, town.trims), roof: pickOf(r, town.roofs).clone().multiplyScalar(0.92 + r() * 0.12),
+    });
   }
   for (const [key, list] of Object.entries(buckets)) {
     const [kind, size] = key.split(":");
-    const mesh = new THREE.InstancedMesh(kit[kind][size], material, list.length);
-    list.forEach(({ h, scale, tint }, i) => {
-      place(mesh, i, h.x, h.y, h.z, h.rot, scale, scale, scale);
-      mesh.setColorAt(i, tint);
-    });
+    const geo = kit[kind][size].clone();
+    const iWall = new Float32Array(list.length * 3), iTrim = new Float32Array(list.length * 3), iRoof = new Float32Array(list.length * 3);
+    list.forEach((b, i) => { b.wall.toArray(iWall, i * 3); b.trim.toArray(iTrim, i * 3); b.roof.toArray(iRoof, i * 3); });
+    geo.setAttribute("iWall", new THREE.InstancedBufferAttribute(iWall, 3));
+    geo.setAttribute("iTrim", new THREE.InstancedBufferAttribute(iTrim, 3));
+    geo.setAttribute("iRoof", new THREE.InstancedBufferAttribute(iRoof, 3));
+    const mesh = new THREE.InstancedMesh(geo, houseMat, list.length);
+    list.forEach(({ h, sx, sy, sz, turn }, i) => place(mesh, i, h.x, h.y, h.z, h.rot + turn, sx, sy, sz));
     mesh.castShadow = mesh.receiveShadow = true;
     mesh.computeBoundingSphere();
     group.add(mesh);
@@ -75,8 +114,8 @@ export function makeCity(L, quality, seed = 1717, { plaster = null, detail = 1 }
   return {
     group,
     // the materials, so AI textures can be laid on them (aiassets.js)
-    materials: { houses: material, stairs: stairs.material, walls: walls.material },
-    update(state) { material.userData.night.value = state.night; },   // windows glow as night falls
+    materials: { houses: houseMat, temples: material, stairs: stairs.material, walls: walls.material },
+    update(state) { material.userData.night.value = houseMat.userData.night.value = state.night; },   // windows glow as night falls
   };
 }
 

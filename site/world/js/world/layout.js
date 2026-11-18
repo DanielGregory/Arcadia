@@ -12,7 +12,7 @@
 //              ships: [{x, z, rot, size, sail}], chimneys: [{x, y, z}], streets: [[{x, y, z}...]...] }
 
 import { coastX, heightAt, inland, slopeAt, fbm } from "./terrain.js";
-import { riverAt, roadDist } from "./featuremap.js";
+import { riverAt, roadDist, getFeatures } from "./featuremap.js";
 
 export function rng(seed) {  // mulberry32: small, fast, repeatable
   let a = seed >>> 0;
@@ -152,22 +152,44 @@ export function generateLayout(seed = 1717, quality = "medium") {
     L.ships.push({ x, z, rot: moored ? facing(z) + Math.PI / 2 : r() * Math.PI * 2, size: 0.8 + r() * 0.8,
                    sail: !moored || r() < 0.3 });
   }
+  // Corva's streets (below each terrace) are paved; the stairway (the first street) has its own steps
+  L.paths = L.streets.slice(1).map(st => ({ pts: st.map(p => ({ x: p.x, z: p.z })), width: 3.4, surface: "paving" }));
+  L.squares = [];
+  L.grid = grid;
   return L;
 }
 
 // --- villages ------------------------------------------------------------------------------------
-// Each village of the island's features (features.js) is laid out the way real ones grew: lanes
-// winding out from a square (one of them down to the harbour on the coast), crossed by a ring lane
-// or two, with houses lining both sides of every lane, fronts to the lane. A small temple stands on
-// the uphill side of the square. Coastal villages also get a row of houses along the waterfront, a
-// quay, a stone mole curving out to shelter the harbour, and fishing boats (and a trader) moored
-// inside it. Everything goes into the same layout lists as Corva's, so the same builders draw it.
-const VILLAGE_KINDS = [["cube", 0.3], ["gable", 0.25], ["hip", 0.14], ["twostorey", 0.13], ["courtyard", 0.15], ["tower", 0.03]];
+// Each village of the island's features (features.js) is laid out as its kind of place grew:
+//   harbour  lanes winding out from the square, one down to the harbour, crossed by an irregular
+//            ring lane; a waterfront row, quay, mole and boats (addHarbour)
+//   river    a main street running along the river through the square, cross lanes off it
+//   hill     a compact knot of crooked lanes round the square, packed tight on the slope
+// Houses line both sides of every lane, fronts to the lane, and each is tagged with its town's
+// character (city.js picks kinds and colours from it). A small temple stands on the uphill side of
+// the square. Lanes, squares and every house's footpath are kept in L.paths and L.squares, to be
+// drawn (paths.js) and kept clear of trees.
+const TOWN_OF = { coast: "harbour", river: "river", hill: "hill" };
+
+// A lane that wanders: from (x, z) heading a, 4 m at a time, bending by `bend`, until it reaches the
+// sea (if stopAtWater) or a river.
+function wander(x, z, a, length, bend, seed, stopAtWater = true) {
+  const pts = [];
+  for (let d = 0; d < length; d += 4) {
+    pts.push({ x, z });
+    a += (fbm(x * 0.02 + seed, z * 0.02, 1) - 0.5) * bend;
+    x += Math.cos(a) * 4; z += Math.sin(a) * 4;
+    if (stopAtWater && inland(x, z) < 8) break;
+    const rv = riverAt(x, z);                       // lanes stop at the river bank (the roads have the bridges)
+    if (rv && rv.d < rv.w + 4) break;
+  }
+  return pts;
+}
 
 export function addVillages(L, villages, seed = 1717) {
   const r = rng(seed + 41);
-  const grid = new Grid();
-  const kindOf = () => { let x = r(); for (const [k, w] of VILLAGE_KINDS) { x -= w; if (x <= 0) return k; } return "cube"; };
+  const grid = L.grid || new Grid();
+  L.paths ||= []; L.squares ||= [];
   // can a house stand here? on land, not too steep, clear of rivers and the middle of roads
   const buildable = (x, z, w, d) => {
     if (!grid.free(x, z, d + 1.5, w + 1.5)) return false;
@@ -176,14 +198,16 @@ export function addVillages(L, villages, seed = 1717) {
     if (rv && rv.d < rv.w + 7) return false;
     return roadDist(x, z) > 4.5;
   };
+  let town = "corva";
   const addHouse = (x, z, frontX, frontZ, w, d) => {
     const y = heightAt(x, z), h = 3.2 + r() * 2.4;
-    L.houses.push({ x, z, y, w, d, h, rot: -Math.atan2(frontZ - z, frontX - x), style: kindOf() });
+    L.houses.push({ x, z, y, w, d, h, rot: -Math.atan2(frontZ - z, frontX - x), town });
     grid.take(x, z, d + 1.5, w + 1.5);
     if (r() < 0.22) L.chimneys.push({ x, y: y + h + 0.6, z });
   };
   L.villages = [];
   for (const v of villages) {
+    town = TOWN_OF[v.kind || (v.coastal ? "coast" : "hill")];
     const R = v.r, before = L.houses.length;
     // the temple on the uphill side of the square, facing it
     const ex = heightAt(v.x + 10, v.z) - heightAt(v.x - 10, v.z), ez = heightAt(v.x, v.z + 10) - heightAt(v.x, v.z - 10);
@@ -191,50 +215,110 @@ export function addVillages(L, villages, seed = 1717) {
     L.temples.push({ x: tx, z: tz, y: heightAt(tx, tz), w: 9, d: 13, cols: [4, 6], rot: -(upA + Math.PI), scale: 0.62 });
     grid.take(tx, tz, 18, 18);
     grid.take(v.x, v.z, 24, 24);                                   // the square stays open
+    L.squares.push({ x: v.x, z: v.z, r: 13, surface: town === "hill" ? "earth" : town === "harbour" ? "stone" : "paving" });
 
-    // the lanes: out from the square, bending as they go; one aimed at the harbour
     const lanes = [];
-    const n = v.coastal ? 7 : 5, base = v.harbour ? Math.atan2(v.harbour.dz, v.harbour.dx) : r() * 6.28;
-    for (let k = 0; k < n; k++) {
-      let a = base + (k / n) * Math.PI * 2 + (k ? (r() - 0.5) * 0.5 : 0);
-      const pts = [];
-      let x = v.x + Math.cos(a) * 14, z = v.z + Math.sin(a) * 14;
-      for (let d = 14; d < R * 1.1; d += 4) {
-        pts.push({ x, z });
-        a += (fbm(x * 0.02 + k, z * 0.02, 1) - 0.5) * 0.35;
-        x += Math.cos(a) * 4; z += Math.sin(a) * 4;
-        if (inland(x, z) < 8) break;                               // reached the water
+    if (town === "harbour") {
+      const n = 7, base = Math.atan2(v.harbour.dz, v.harbour.dx);
+      for (let k = 0; k < n; k++) {
+        const a = base + (k / n) * Math.PI * 2 + (k ? (r() - 0.5) * 0.5 : 0);
+        lanes.push(wander(v.x + Math.cos(a) * 14, v.z + Math.sin(a) * 14, a, R * 1.05, 0.35, k));
       }
-      lanes.push(pts);
-    }
-    for (const ringR of v.coastal ? [R * 0.45, R * 0.8] : [R * 0.55]) {
-      const pts = [];
-      for (let k = 0; k <= 64; k++) {
-        const a = (k / 64) * Math.PI * 2, rr = ringR * (1 + (fbm(Math.cos(a) * 2 + v.x, Math.sin(a) * 2, 2) - 0.5) * 0.25);
-        const x = v.x + Math.cos(a) * rr, z = v.z + Math.sin(a) * rr;
-        if (inland(x, z) > 8) pts.push({ x, z }); else if (pts.length) { lanes.push(pts.splice(0)); }
+      // a ring lane, broken and irregular (arcs between some of the spokes, not a full circle)
+      for (let k = 0; k < n; k++) {
+        if (r() < 0.35) continue;
+        const a0 = base + (k / n) * Math.PI * 2, a1 = a0 + (Math.PI * 2) / n, rr = R * (0.45 + r() * 0.3), pts = [];
+        for (let t = 0; t <= 8; t++) {
+          const a = a0 + ((a1 - a0) * t) / 8, q = rr * (1 + (fbm(Math.cos(a) * 3 + k, Math.sin(a) * 3, 2) - 0.5) * 0.4);
+          const x = v.x + Math.cos(a) * q, z = v.z + Math.sin(a) * q;
+          if (inland(x, z) > 8) pts.push({ x, z });
+        }
+        if (pts.length > 2) lanes.push(pts);
       }
-      if (pts.length > 2) lanes.push(pts);
+    } else if (town === "river") {
+      // which way the river runs here: along the contours of "distance from the river"
+      const e = 12, dr = (x, z) => riverAt(x, z)?.d ?? 999;
+      const gx = dr(v.x + e, v.z) - dr(v.x - e, v.z), gz = dr(v.x, v.z + e) - dr(v.x, v.z - e);
+      const along = Math.atan2(gx, -gz);
+      for (const dir of [0, Math.PI]) lanes.push(wander(v.x, v.z, along + dir, R * 1.3, 0.15, 3 + dir, false));
+      const main = [...lanes[0].slice().reverse(), ...lanes[1]];
+      lanes.length = 0;
+      lanes.push(main);
+      for (let k = 2; k < main.length - 2; k += 9) {                 // cross lanes off the main street
+        const p0 = main[k], q = main[k + 1], a = Math.atan2(q.z - p0.z, q.x - p0.x);
+        for (const side of [Math.PI / 2, -Math.PI / 2]) if (r() < 0.8) lanes.push(wander(p0.x, p0.z, a + side, R * (0.4 + r() * 0.3), 0.5, k, false));
+      }
+    } else {                                                          // hill: compact and crooked
+      const n = 5;
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * Math.PI * 2 + r() * 0.8;
+        const lane = wander(v.x + Math.cos(a) * 13, v.z + Math.sin(a) * 13, a, R * 0.85, 0.9, k * 7, false);
+        lanes.push(lane);
+        const mid = lane[Math.floor(lane.length / 2)];                // a short branch from its middle
+        if (mid) lanes.push(wander(mid.x, mid.z, a + (r() < 0.5 ? 1.2 : -1.2), R * 0.35, 0.9, k * 7 + 3, false));
+      }
     }
     // houses along both sides of each lane, fronts to the lane
+    const gap = town === "hill" ? 0.38 : town === "river" ? 0.5 : 0.6;
     for (const pts of lanes) {
       for (let i = 1; i < pts.length; i++) {
         const a = pts[i - 1], b = pts[i], dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz) || 1;
         for (const side of [1, -1]) {
-          if (r() < (v.coastal ? 0.62 : 0.6)) continue;            // gaps: gardens, yards
-          const w = 4.5 + r() * 3.5, d = 4 + r() * 2.5, off = 3 + d / 2 + r() * 0.8;
+          if (r() < gap) continue;                                    // gaps: gardens, yards
+          const w = 4.5 + r() * 3.5, d = 4 + r() * 2.5, off = 2.8 + d / 2 + r() * 0.8;
           const x = b.x + (-dz / len) * side * off, z = b.z + (dx / len) * side * off;
-          if (Math.hypot(x - v.x, z - v.z) > R * 1.15) continue;
+          if (Math.hypot(x - v.x, z - v.z) > R * 1.3) continue;
           if (buildable(x, z, w, d)) addHouse(x, z, b.x, b.z, w, d);
         }
       }
+      if (pts.length > 1) L.paths.push({ pts, width: town === "harbour" ? 2.6 : 2.8, surface: town === "harbour" ? "stone" : "earth" });
       if (pts.length > 4 && L.streets.length < 60) L.streets.push(pts.map(p => ({ x: p.x, y: heightAt(p.x, p.z) + 1.1, z: p.z })));
     }
 
     if (v.harbour) addHarbour(L, v, r, grid, buildable, addHouse);
-    L.villages.push({ name: v.name, x: v.x, z: v.z, y: heightAt(v.x, v.z), coastal: !!v.coastal, houses: L.houses.length - before });
+    L.villages.push({ name: v.name, x: v.x, z: v.z, y: heightAt(v.x, v.z), kind: v.kind, town, houses: L.houses.length - before });
   }
+  addFootpaths(L);
   return L;
+}
+
+// A footpath from every house's door to the nearest lane or street, if one is within ~45 m; houses
+// out in the country (farms) get a track to the nearest road instead, if one is within ~350 m.
+function addFootpaths(L) {
+  const lanes = L.paths.slice();
+  const cell = 50, cells = new Map();
+  lanes.forEach((ln, li) => ln.pts.forEach((p, pi) => {
+    if (pi === 0) return;
+    const k = `${Math.floor(p.x / cell)},${Math.floor(p.z / cell)}`;
+    (cells.get(k) || cells.set(k, []).get(k)).push([li, pi]);
+  }));
+  const nearestLane = (x, z) => {
+    let best = null, bd = 45;
+    const cx = Math.floor(x / cell), cz = Math.floor(z / cell);
+    for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) for (const [li, pi] of cells.get(`${cx + i},${cz + j}`) || []) {
+      const a = lanes[li].pts[pi - 1], b = lanes[li].pts[pi], dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / L2)), px = a.x + dx * t, pz = a.z + dz * t;
+      const d = Math.hypot(px - x, pz - z);
+      if (d < bd) { bd = d; best = { x: px, z: pz }; }
+    }
+    return best;
+  };
+  const roadPts = (getFeatures()?.roads || []).flatMap(rd => rd.pts);
+  for (const h of L.houses) {
+    const fx = Math.cos(h.rot), fz = -Math.sin(h.rot);                // the house's front
+    const door = { x: h.x + fx * (h.d / 2 + 0.6), z: h.z + fz * (h.d / 2 + 0.6) };
+    const to = nearestLane(door.x, door.z);
+    if (to) {
+      if (Math.hypot(to.x - door.x, to.z - door.z) > 1.2) L.paths.push({ pts: [door, to], width: 1.3, surface: "earth" });
+      continue;
+    }
+    // a farm track to the nearest road, gently curved
+    let best = null, bd = 350;
+    for (const p of roadPts) { const d = Math.hypot(p.x - door.x, p.z - door.z); if (d < bd) { bd = d; best = p; } }
+    if (!best) continue;
+    const mid = { x: (door.x + best.x) / 2 + (best.z - door.z) * 0.15, z: (door.z + best.z) / 2 - (best.x - door.x) * 0.15 };
+    L.paths.push({ pts: [door, mid, { x: best.x, z: best.z }], width: 1.8, surface: "earth" });
+  }
 }
 
 // A coastal village's waterfront: houses facing the sea, a quay wall along the shore, a mole of
@@ -246,6 +330,7 @@ function addHarbour(L, v, r, grid, buildable, addHouse) {
   for (let k = 0; k < 200 && heightAt(sx, sz) > 0.6; k++) { sx += dx * 3; sz += dz * 3; }
   const along = { x: -dz, z: dx };                                // the shoreline's direction
   // the waterfront: a row of houses a little back from the water, looking out to sea, and the quay
+  const quay = [];
   for (let t = -v.r; t <= v.r; t += 7 + r() * 3) {
     const qx = sx + along.x * t, qz = sz + along.z * t;
     // find the shore here, then step back inland
@@ -253,9 +338,11 @@ function addHarbour(L, v, r, grid, buildable, addHouse) {
     for (let k = 0; k < 40 && heightAt(x, z) < 1; k++) { x -= dx * 2; z -= dz * 2; }
     for (let k = 0; k < 40 && heightAt(x, z) > 1; k++) { x += dx * 2; z += dz * 2; }
     L.walls.push({ x: x + dx, z: z + dz, y: 0, len: 7.5, rot: Math.atan2(along.x, along.z), h: 1.3 });
+    quay.push({ x: x - dx * 3, z: z - dz * 3 });                    // the quayside walk, just behind the wall
     const hx = x - dx * 13, hz = z - dz * 13, w = 5 + r() * 3, d = 4.5 + r() * 2;
     if (r() < 0.85 && buildable(hx, hz, w, d)) addHouse(hx, hz, x + dx * 10, z + dz * 10, w, d);
   }
+  if (quay.length > 2) L.paths.push({ pts: quay, width: 4.5, surface: "stone" });
   // the mole: out from the shore, bending to one side to wrap round the harbour
   let mx = sx + along.x * v.r * 0.55, mz = sz + along.z * v.r * 0.55, a = Math.atan2(dz, dx);
   const turn = -Math.sign(r() - 0.5 || 1) * 0.022;
