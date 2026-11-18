@@ -37,6 +37,26 @@
   .place.mountain { color: var(--muted); }
   #fps { position: fixed; top: max(14px, env(safe-area-inset-top)); right: 16px; font: 12px ui-monospace, monospace;
          color: var(--ink); background: var(--glass); padding: 4px 8px; border-radius: 8px; z-index: 10; }
+  /* sandbox mode (?world=sandbox): estate and event labels, the person panel */
+  .sb-label { position: absolute; left: 0; top: 0; pointer-events: auto; cursor: pointer; font: italic 12px Georgia, serif;
+              color: var(--ink); background: rgba(30, 22, 14, .5); border: 1px solid var(--line); border-radius: 8px;
+              padding: 3px 8px; white-space: nowrap; text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+  .sb-label small { display: block; font-size: 10px; color: var(--muted); letter-spacing: .06em; }
+  .sb-label i, #sbPanel .who i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .sb-label.event { background: rgba(80, 30, 14, .55); font-style: normal; }
+  #sbPanel { position: fixed; top: max(48px, calc(env(safe-area-inset-top) + 40px)); right: 14px; width: min(360px, calc(100vw - 28px));
+             max-height: calc(100vh - 150px); overflow-y: auto; z-index: 20; padding: 14px 16px; border-radius: 14px;
+             background: rgba(24, 18, 12, .86); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+             font: 14px/1.5 Georgia, serif; }
+  #sbPanel[hidden] { display: none; }
+  #sbPanel .close { position: absolute; top: 6px; right: 8px; font: 22px Georgia, serif; color: var(--muted); background: none; border: 0; cursor: pointer; }
+  #sbPanel .who { font-size: 18px; margin: 0 24px 2px 0; }
+  #sbPanel .sub { color: var(--muted); font-size: 12.5px; margin: 2px 0; }
+  #sbPanel h4 { font: 600 11px/1 Georgia, serif; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); margin: 14px 0 6px; }
+  #sbPanel h4 small { letter-spacing: 0; text-transform: none; font-weight: 400; }
+  #sbPanel .dream { font-style: italic; margin: 4px 0; }
+  #sbPanel .belief { margin: 4px 0; } #sbPanel .belief span { display: inline-block; min-width: 38px; color: #e8b34a; font-size: 12px; }
+  .title a { pointer-events: auto; }
   noscript, .fallback { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; }
 </style>
 </head>

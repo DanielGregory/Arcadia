@@ -29,11 +29,15 @@ import { Painter } from "./render/painterly.js";
 import { FlyRig } from "./camera.js";
 import { loadManifest, loadBackdrops, loadTextures, loadObject } from "./scene/aiassets.js";
 import { at } from "./world/layout.js";
+import { loadSandbox, makeSandbox, seasonize } from "./sandbox.js";
 
 const qualityName = chooseQuality();
 const Q = QUALITY[qualityName];
 const seed = Number(params.get("seed")) || 1717;
 const fixedTime = params.has("t") ? Number(params.get("t")) : null;
+// ?world=sandbox: the world engine's sandbox on the island (estates, people as lanterns, the season,
+// this season's events). Read-only, from the sandbox_* tables; without it nothing here changes.
+const sandboxMode = params.get("world") === "sandbox";
 
 // --- renderer, scene, camera --------------------------------------------------------------------
 const canvas = document.getElementById("view");
@@ -114,6 +118,21 @@ if (tex.hillside) {
       #endif`);
   };
 }
+// the sandbox: load the engine's world, and let its season colour the leaves and grass
+let sandbox = null;
+if (sandboxMode) {
+  try {
+    sandbox = makeSandbox(await loadSandbox(), { onFly: v => rig.flyTo(v) });
+    scene.add(sandbox.group);
+    seasonize(terrain.material, sandbox.season);
+    for (const k of Object.values(terrain.treeKinds)) seasonize(k.mat, sandbox.season);
+    document.querySelector(".title").innerHTML = `<a href="/">Arcadia</a> · Corva · <a href="/#chronicle">${sandbox.title}</a>`;
+    const tap = rig.tap.bind(rig);
+    rig.tap = (x, y) => { if (!sandbox.tap(x, y, camera)) tap(x, y); };   // a lantern first, else fly
+  } catch (e) {
+    document.querySelector(".title").textContent = `Sandbox couldn't load: ${e.message}`;
+  }
+}
 for (const m of Object.values(city.materials)) m.needsUpdate = true;
 terrain.material.needsUpdate = true;
 scene.add(sky.mesh, sea.mesh, land, distant, rivers.group, paths, city.group, makeTrees(layout), ships.group,
@@ -156,6 +175,7 @@ function applyDay(state, time) {
   hemi.color.copy(state.skyAmbient);
   hemi.groundColor.copy(state.groundAmbient);
   hemi.intensity = 1.25 + 0.35 * state.night;
+  sandbox?.light({ sunLight, hemi });
   scene.fog.color.copy(state.fog);
   // the air thins as you climb: from high up the whole island should be visible, so the haze
   // fades with the camera's height (stage 1's view, ~60 m up, is unchanged)
@@ -208,6 +228,7 @@ function frame(now) {
   clouds.update(dt, state, camera);
   rivers.update(state, clock, scene.fog.density);
   labels.update(camera, rig.view.dist);
+  sandbox?.update(camera, state, clock);
   if (backdrops) backdrops.update(state, rig.target);
   fpsCount(dt);
   // aerial perspective: near haze is the light in the air, far haze cools toward violet-blue
@@ -267,4 +288,4 @@ if (hint && !shot) {
   canvas.addEventListener("pointerdown", hide, { once: true });
   setTimeout(hide, 9000);
 } else hint?.remove();
-window.__corva = { layout, features, renderer, rig, terrain, fps: () => fpsValue, setTime: t => { live = false; dayT = t; } };   // for tests
+window.__corva = { sandbox, layout, features, renderer, rig, terrain, fps: () => fpsValue, setTime: t => { live = false; dayT = t; } };   // for tests

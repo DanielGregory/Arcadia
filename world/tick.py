@@ -93,6 +93,11 @@ def age(p, year):
 # --- 1. advance ------------------------------------------------------------------------------------------
 def advance(con, R, year, season):
     report = {}
+    # Where people are: at the start of every season everyone who is here goes home to their house's
+    # seat; acting in an event this season takes them to its place (move_actors, below). The absent
+    # keep place_id NULL: where they are is sealed.
+    con.execute("update people set place_id = (select h.seat_place_id from house_members m join houses h on h.id = m.house_id "
+                "where m.person_id = people.id and m.left_year is null limit 1) where alive = 1 and absent = 0")
     for h in rows(con, "select * from houses"):
         y = R["houses"]["yield"][h["land_kind"]]
         f = R["houses"]["season_yield"][season]
@@ -106,6 +111,14 @@ def advance(con, R, year, season):
                     (round(max(0.0, food), 2), round(h["goods"] + y["goods"] * f, 2), round(h["materials"] + y["materials"] * f, 2), h["id"]))
         report[h["name"]] = {"fed": fed, "food": round(max(0.0, food), 1), "need": round(need, 1)}
     return report
+
+
+def move_actors(con, person_ids, place):
+    """People who act somewhere are there now (until the season ends). The absent stay unplaced."""
+    if not place:
+        return
+    for pid in person_ids:
+        con.execute("update people set place_id = ? where id = ? and absent = 0 and alive = 1", (place["id"], pid))
 
 
 def latest_clients(con, house_id):
@@ -576,6 +589,7 @@ def validate_and_record(con, R, items, year, season, tick, r):
                     status = {"success": "accepted", "partial": "partial", "failure": "failed"}[outcome]
                     reason = f"rolled {roll:.2f} against {chance:.2f}"
                     effects(con, R, family, outcome, h, thouse, actor, target if tkind == "person" else None, ev, year, season, r)
+                    move_actors(con, [actor["id"]] + ([target["id"]] if tkind == "person" else []), place)
         pid = insert(con, "storyteller_proposals", year=year, season=season, tick=tick, house_id=h["id"],
                      kind=str((p or {}).get("kind") or "?"), payload=payload, wording=json.dumps(p or {}, ensure_ascii=False),
                      status=status, reason=reason, rule_broken=rule, event_id=ev)

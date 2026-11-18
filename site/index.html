@@ -92,6 +92,29 @@
   .past { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
   .past .card { margin: 0; }
   .past .body { padding: 8px 10px 10px; }
+  /* Chronicle (the world engine's sandbox) */
+  .sandbox-note { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+  .sandbox-note a { color: var(--gold); }
+  .chron { font: 16px/1.65 Georgia, serif; }
+  .chron h1, .chron h2, .chron h3 { font-family: Georgia, serif; line-height: 1.25; }
+  .chron h1 { font-size: 22px; margin: 4px 0 10px; } .chron h2 { font-size: 18px; margin: 22px 0 8px; } .chron h3 { font-size: 16px; margin: 18px 0 6px; }
+  .chron blockquote { margin: 8px 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--gold-soft); color: var(--muted); }
+  .chron ul { padding-left: 20px; }
+  .chron.clamped { max-height: 520px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 80%, transparent); mask-image: linear-gradient(#000 80%, transparent); }
+  .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.grid { border-collapse: collapse; font-size: 13px; width: 100%; }
+  table.grid th, table.grid td { padding: 6px 7px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap; }
+  table.grid th:first-child, table.grid td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); }
+  table.grid thead th { font-weight: 600; color: var(--muted); font-size: 11.5px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+  .cellnum { display: inline-block; min-width: 26px; padding: 2px 5px; border-radius: 6px; }
+  .feel { display: inline-block; width: 30px; height: 22px; line-height: 22px; border-radius: 4px; font-size: 11px; color: #fff; }
+  .bar-mini { display: inline-block; width: 70px; height: 7px; border-radius: 99px; background: var(--line); vertical-align: 1px; overflow: hidden; }
+  .bar-mini b { display: block; height: 100%; background: var(--keep); }
+  details.who-believes { margin-top: 8px; font-size: 14px; }
+  details.who-believes summary { cursor: pointer; color: var(--gold); }
+  details.who-believes p { margin: 4px 0; } details.who-believes p small { color: var(--muted); }
+  .sky-mode { display: flex; gap: 6px; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -103,6 +126,7 @@
     <button role="tab" data-tab="corva" aria-selected="false">Corva</button>
     <button role="tab" data-tab="dreams" aria-selected="false">Dreams</button>
     <button role="tab" data-tab="wallpapers" aria-selected="false">Wallpapers</button>
+    <button role="tab" data-tab="chronicle" aria-selected="false">Chronicle</button>
   </nav>
 </header>
 
@@ -113,6 +137,7 @@
   <section id="corva" hidden><p class="empty">Loading…</p></section>
   <section id="dreams" hidden><p class="empty">Loading…</p></section>
   <section id="wallpapers" hidden><p class="empty">Loading…</p></section>
+  <section id="chronicle" hidden><p class="empty">Loading…</p></section>
 </main>
 
 <div id="viewer" hidden><img alt=""></div>
@@ -165,9 +190,9 @@ document.querySelectorAll("nav button").forEach(btn => btn.addEventListener("cli
   document.querySelectorAll("main section").forEach(s => (s.hidden = s.id !== btn.dataset.tab));
   try { localStorage.setItem("arcadia-tab", btn.dataset.tab); } catch (_) {}
   window.scrollTo(0, 0);
-  if (btn.dataset.tab === "sky" && sky.dreams.length) requestAnimationFrame(drawSky);
+  if (btn.dataset.tab === "sky" && skyDreams().length) requestAnimationFrame(drawSky);
 }));
-try { const t = localStorage.getItem("arcadia-tab"); if (t) document.querySelector(`nav [data-tab="${t}"]`)?.click(); } catch (_) {}
+try { const t = location.hash.slice(1) || localStorage.getItem("arcadia-tab"); if (t) document.querySelector(`nav [data-tab="${t}"]`)?.click(); } catch (_) {}
 
 // ---------------------------------------------------------------- Today
 // One morning wallpaper a day (daily/morning.py). The newest is shown large;
@@ -240,6 +265,7 @@ const TAG_COLORS = { dream: "#f4ead2", myth: "#f0a65a", tale: "#b9a2f2", saga: "
 const sky = { dreams: [], cons: [], syms: {}, selected: null, pts: [], edges: [] };
 
 async function loadSky() {
+  if (skyMode === "sandbox") await loadSandboxSky().catch(() => (skyMode = "arcadia"));
   const [dreams, cons, links] = await Promise.all([
     apiAll("dreams?select=id,run,kind,tag,prompt,text,remembered,day,sky_x,sky_y,constellation&order=id"),
     api("sky_constellations?select=*&order=id", { headers: { Prefer: "" } }),
@@ -277,22 +303,69 @@ function constellationLines(dreams) {
   return edges;
 }
 
+// Sandbox Sky: the same sky, but its stars are the world engine's dreams (sandbox_dreams, read-only):
+// each one dreamt by a person of Corva, coloured by their house, placed by meaning by the engine's
+// publish step. Brighter stars were remembered; a halo marks a dream that was told and talked about.
+let skyMode = "arcadia";
+try { skyMode = localStorage.getItem("arcadia-sky") || "arcadia"; } catch (_) {}
+const sandboxSky = { loaded: false, dreams: [], houses: {}, people: {} };
+async function loadSandboxSky() {
+  if (sandboxSky.loaded) return;
+  const [dreams, houses, people, world] = await Promise.all([
+    apiAll("sandbox_dreams?select=*&order=id"), apiAll("sandbox_houses?select=id,name,color&order=id"),
+    apiAll("sandbox_people?select=id,name,house_id&order=id"), api("sandbox_world?select=*", { headers: { Prefer: "" } }),
+  ]);
+  sandboxSky.dreams = dreams.filter(d => d.sky_x != null).map(d => ({ ...d, constellation: null }));
+  houses.forEach(h => (sandboxSky.houses[h.id] = h));
+  people.forEach(p => (sandboxSky.people[p.id] = p));
+  sandboxSky.world = world[0];
+  sandboxSky.loaded = true;
+}
+async function setSkyMode(mode) {
+  skyMode = mode;
+  try { localStorage.setItem("arcadia-sky", mode); } catch (_) {}
+  sky.selected = null;
+  if (mode === "sandbox") {
+    try { await loadSandboxSky(); } catch (e) { toast("Couldn't load the sandbox: " + e.message); skyMode = "arcadia"; }
+  }
+  renderSky();
+}
+function starColor(d) {
+  if (skyMode === "sandbox") return sandboxSky.houses[sandboxSky.people[d.dreamer_id]?.house_id]?.color || "#f4ead2";
+  return TAG_COLORS[d.tag] || "#fff";
+}
+function skyDreams() { return skyMode === "sandbox" ? sandboxSky.dreams : sky.dreams; }
+
 function renderSky() {
   const el = document.getElementById("sky");
-  if (!sky.dreams.length) { el.innerHTML = `<p class="empty">The sky is empty. Dreams arrive after the memory sync.</p>`; return; }
+  const modeChips = `<div class="sky-mode"><button class="chip ${skyMode === "arcadia" ? "on" : ""}" data-skymode="arcadia">Arcadia's dreams</button>
+    <button class="chip ${skyMode === "sandbox" ? "on" : ""}" data-skymode="sandbox">Sandbox · the people of Corva</button></div>`;
+  if (skyMode === "sandbox") {
+    const ds = sandboxSky.dreams, W = sandboxSky.world;
+    const hs = Object.values(sandboxSky.houses);
+    el.innerHTML = `${modeChips}
+      <p class="today-head">${ds.length} dreams of the world engine's sandbox${W ? ` · ${esc(W.season)}, year ${W.year}` : ""}</p>
+      <div class="sky-wrap"><canvas id="skyCanvas" aria-label="A star map of the sandbox's dreams"></canvas></div>
+      <div class="sky-legend">${hs.map(h => `<span><i style="background:${esc(h.color)}"></i>${esc(h.name)}</span>`).join("")}
+        <span style="margin-left:auto">bright: remembered · halo: talked about</span></div>
+      <div id="starCard"></div>`;
+  } else {
+  if (!sky.dreams.length) { el.innerHTML = `${modeChips}<p class="empty">The sky is empty. Dreams arrive after the memory sync.</p>`; return; }
   const tags = [...new Set(sky.dreams.map(d => d.tag))];
-  el.innerHTML = `
+  el.innerHTML = `${modeChips}
     <p class="today-head">${sky.dreams.length} dreams · ${sky.cons.length} constellations</p>
     <div class="sky-wrap"><canvas id="skyCanvas" aria-label="A star map of every dream"></canvas></div>
     <div class="sky-legend">${tags.map(t => `<span><i style="background:${TAG_COLORS[t] || "#fff"}"></i>${esc(t)}</span>`).join("")}
       <span style="margin-left:auto">tap a star</span></div>
     <div id="starCard"></div>`;
+  }
+  el.querySelectorAll("[data-skymode]").forEach(b => b.addEventListener("click", () => setSkyMode(b.dataset.skymode)));
   const canvas = document.getElementById("skyCanvas");
   canvas.addEventListener("click", e => {
     const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
     let best = null;
     for (const p of sky.pts) { const d = Math.hypot(p.x - x, p.y - y); if (d < 22 && (!best || d < best.d)) best = { d, i: p.i }; }
-    if (best) selectStar(sky.dreams[best.i].id);
+    if (best) (skyMode === "sandbox" ? selectSandboxStar : selectStar)(skyDreams()[best.i].id);
   });
   drawSky();
 }
@@ -308,6 +381,7 @@ function drawSky(t = performance.now()) {
   bg.addColorStop(0, "#1a1f3d"); bg.addColorStop(1, "#060814");
   g.fillStyle = bg; g.fillRect(0, 0, w, h);
   const P = d => ({ x: 14 + d.sky_x * (w - 28), y: 14 + (1 - d.sky_y) * (h - 28) });
+  if (skyMode === "sandbox") { drawSandboxStars(g, P, t); requestAnimationFrame(drawSky); return; }
   sky.pts = sky.dreams.map((d, i) => ({ ...P(d), i }));
   // constellation lines
   g.lineWidth = 0.7;
@@ -368,6 +442,146 @@ async function selectStar(id) {
     document.getElementById("similar").innerHTML = sim.map(m => `
       <button data-star="${esc(m.id)}"><small>${(m.similarity * 100).toFixed(0)}% · &lt;${esc(m.tag)}&gt; · ${esc(m.id)}</small><br>${esc(m.text.slice(0, 140))}…</button>`).join("");
   } catch (e) { document.getElementById("similar").innerHTML = `<p class="meta">Couldn't load: ${esc(e.message)}</p>`; }
+}
+
+function drawSandboxStars(g, P, t) {
+  const ds = sandboxSky.dreams;
+  sky.pts = ds.map((d, i) => ({ ...P(d), i }));
+  ds.forEach((d, i) => {
+    const p = sky.pts[i];
+    const r = d.recalled ? 2.2 + Math.min(d.discussed, 6) * 0.45 : 1.2;
+    g.globalAlpha = (d.recalled ? 0.85 : 0.45) * (0.8 + 0.2 * Math.sin(t / 900 + i * 1.7));
+    if (d.discussed > 0 || (sky.selected && sky.selected.id === d.id)) {
+      const halo = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 6);
+      halo.addColorStop(0, "rgba(255,240,200,.4)"); halo.addColorStop(1, "rgba(255,240,200,0)");
+      g.fillStyle = halo; g.beginPath(); g.arc(p.x, p.y, r * 6, 0, 7); g.fill();
+    }
+    g.fillStyle = starColor(d);
+    g.beginPath(); g.arc(p.x, p.y, r, 0, 7); g.fill();
+  });
+  g.globalAlpha = 1;
+}
+function selectSandboxStar(id) {
+  const d = sandboxSky.dreams.find(x => x.id === id);
+  sky.selected = d;
+  const who = sandboxSky.people[d.dreamer_id], house = sandboxSky.houses[who?.house_id];
+  const told = (d.shared_with || []).map(i => sandboxSky.people[i]?.name).filter(Boolean);
+  document.getElementById("starCard").innerHTML = `
+    <article class="card star-card"><div class="body">
+      <div class="meta"><span class="dot" style="background:${esc(house?.color)}"></span>${esc(who?.name || "someone")}${house ? " · House " + esc(house.name) : ""}
+        · ${esc(d.season)}, year ${d.year} · &lt;${esc(d.tag)}&gt;${d.recalled ? "" : " · forgotten on waking"}</div>
+      ${d.retelling ? `<p class="label">As they told it</p><p class="text">${esc(d.retelling)}</p><p class="label">The dream itself</p>` : ""}
+      <p class="${d.retelling ? "raw" : "text"}">${esc(d.text)}</p>
+      ${told.length ? `<p class="meta" style="margin-top:10px">Told to ${esc(told.join(", "))} · talked about ${d.discussed}×</p>` : ""}
+    </div></article>`;
+  document.getElementById("starCard").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+// ---------------------------------------------------------------- Chronicle (sandbox)
+// The world engine's sandbox, as it stands after its latest season: the chronicle it wrote, who
+// believes what about the Flight, how the houses feel about each other, and their clients.
+// Read-only (sandbox_* tables); the engine is the only writer.
+const FLIGHT_READINGS = [
+  ["force", "Carried off", /carried|against her will|took her|stole|abduct/i],
+  ["willing", "Her own will", /own will|chose|willing|love/i],
+  ["plot", "A Theren plot", /arrang|plot|humiliat|conspir/i],
+  ["east", "Sailed east", /east/i],
+  ["north", "Northern road", /northern road|north/i],
+];
+function readingOf(text) { for (const [k, , re] of FLIGHT_READINGS) if (re.test(text)) return k; return "other"; }
+function mdToHtml(md) {
+  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\*(.+?)\*/g, "<em>$1</em>");
+  const out = []; let list = false;
+  for (const line of md.split("\n")) {
+    if (/^\s*[-*] /.test(line)) { if (!list) { out.push("<ul>"); list = true; } out.push(`<li>${inline(line.replace(/^\s*[-*] /, ""))}</li>`); continue; }
+    if (list) { out.push("</ul>"); list = false; }
+    const h = line.match(/^(#{1,3}) (.*)/);
+    if (h) out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`);
+    else if (line.startsWith(">")) out.push(`<blockquote>${inline(line.replace(/^>\s?/, ""))}</blockquote>`);
+    else if (line.trim()) out.push(`<p>${inline(line)}</p>`);
+  }
+  if (list) out.push("</ul>");
+  return out.join("\n");
+}
+async function loadChronicle() {
+  const el = document.getElementById("chronicle");
+  const q = p => apiAll(p);
+  const [world, houses, people, events, beliefs, feelings, clients, chron, previews] = await Promise.all([
+    api("sandbox_world?select=*", { headers: { Prefer: "" } }), q("sandbox_houses?select=*&order=id"), q("sandbox_people?select=*&order=id"),
+    q("sandbox_events?select=id,kind,year,season&order=id"), q("sandbox_beliefs?select=holder_id,subject_type,subject_id,interpretation,confidence&subject_type=eq.event&order=id"),
+    q("sandbox_house_feelings?select=*&order=from_house"), q("sandbox_house_clients?select=*&order=id"),
+    q("sandbox_chronicles?select=*&kind=eq.chronicle&order=id"),
+    api("sandbox_previews?select=*&order=id.desc&limit=1", { headers: { Prefer: "" } }).catch(() => []),
+  ]);
+  const W = world[0];
+  if (!W) { el.innerHTML = `<p class="empty">The sandbox hasn't been published yet (python -m world.publish).</p>`; return; }
+  const H = Object.fromEntries(houses.map(h => [h.id, h]));
+  const dot = h => `<span class="dot" style="background:${esc(h?.color)}"></span>`;
+  const latest = chron[chron.length - 1];
+
+  // who believes what about the Flight: each person's strongest reading of "why", and of "where"
+  const flight = events.find(e => e.kind === "departure");
+  const byPerson = {};
+  for (const b of beliefs) if (flight && String(b.subject_id) === String(flight.id)) (byPerson[b.holder_id] ||= []).push(b);
+  const cols = [...FLIGHT_READINGS.map(([k, label]) => [k, label]), ["other", "Other"]];
+  const rowsHtml = [], details = [];
+  for (const h of houses) {
+    const members = people.filter(p => p.house_id === h.id && !p.absent);
+    const count = Object.fromEntries(cols.map(([k]) => [k, { n: 0, conf: 0 }]));
+    const lines = [];
+    for (const p of members) {
+      const bs = (byPerson[p.id] || []).filter(b => b.confidence >= 0.2).sort((a, b) => b.confidence - a.confidence);
+      const seen = new Set();
+      for (const b of bs) { const k = readingOf(b.interpretation); if (seen.has(k)) continue; seen.add(k); count[k].n++; count[k].conf += b.confidence; }
+      if (bs.length) lines.push(`<p>${esc(p.name)}: ${bs.slice(0, 2).map(b => `“${esc(b.interpretation)}” <small>${Math.round(b.confidence * 100)}%</small>`).join("; ")}</p>`);
+    }
+    rowsHtml.push(`<tr><td>${dot(h)}${esc(h.name)}</td>${cols.map(([k]) => {
+      const c = count[k]; if (!c.n) return `<td style="color:var(--line)">·</td>`;
+      const a = 0.15 + 0.6 * (c.conf / c.n);
+      return `<td title="average confidence ${Math.round(100 * c.conf / c.n)}%"><span class="cellnum" style="background:rgba(184,134,43,${a.toFixed(2)})">${c.n}</span></td>`;
+    }).join("")}</tr>`);
+    details.push(`<details class="who-believes"><summary>${dot(h)}House ${esc(h.name)}: each person</summary>${lines.join("") || "<p><small>no one holds a view</small></p>"}</details>`);
+  }
+
+  // house to house feelings: rows feel about columns (-1 cold .. +1 warm), from members' beliefs
+  const F = {};
+  for (const f of feelings) F[f.from_house + ":" + f.to_house] = f;
+  const feelCell = f => {
+    if (!f) return `<td style="color:var(--line)">·</td>`;
+    const v = Math.max(-1, Math.min(1, f.feeling)), c = v < 0 ? `rgba(176,58,46,${(0.25 + 0.75 * -v).toFixed(2)})` : `rgba(63,125,79,${(0.25 + 0.75 * v).toFixed(2)})`;
+    return `<td><span class="feel" style="background:${c}" title="${f.beliefs} beliefs">${v > 0 ? "+" : ""}${v.toFixed(1)}</span></td>`;
+  };
+  const feelRows = houses.map(a => `<tr><td>${dot(a)}${esc(a.name)}</td>${houses.map(b => a.id === b.id ? `<td style="color:var(--line)">–</td>` : feelCell(F[a.id + ":" + b.id])).join("")}</tr>`).join("");
+
+  // clients: the latest count and loyalty per house, and this season's change
+  const lastC = {};
+  for (const c of clients) if (c.house_id != null) lastC[c.house_id] = c;
+  const clientRows = houses.map(h => { const c = lastC[h.id]; if (!c) return "";
+    return `<tr><td>${dot(h)}${esc(h.name)}</td><td>${c.count}</td><td><span class="bar-mini"><b style="width:${Math.round((c.loyalty || 0) * 100)}%"></b></span> ${Math.round((c.loyalty || 0) * 100)}%</td>
+            <td style="color:var(--keep)">${c.gained ? "+" + c.gained : ""}</td><td style="color:var(--skip)">${c.lost ? "−" + c.lost : ""}</td></tr>`; }).join("");
+
+  const pv = previews[0];
+  el.innerHTML = `
+    <p class="today-head">World engine sandbox · ${esc(W.season)}, year ${W.year} · season ${W.tick}</p>
+    <p class="sandbox-note">Offline sandbox, not production. Published ${new Date(W.published_at).toLocaleString()}.
+      <a href="/world/?world=sandbox">See it on the island ↗</a></p>
+    ${pv ? `<article class="card"><img class="wall" src="${pv.image ? STORAGE + esc(pv.image) : ""}" alt="" data-view="${pv.image ? STORAGE + esc(pv.image) : ""}">
+      <div class="body"><div class="meta">Wallpaper preview (not production): tomorrow's wallpaper if it came from the engine's most-discussed dream</div>
+      <p class="text" style="margin-top:4px">A dream of ${esc(pv.dreamer)}, House ${esc(pv.house)} · Arcadia, ${esc(pv.season)} of year ${pv.year}</p>
+      ${pv.status !== "done" ? `<p class="meta">${esc(pv.status)}${pv.error ? ": " + esc(pv.error) : ""}</p>` : ""}</div></article>` : ""}
+    <article class="card"><div class="body"><div class="chron clamped" id="chronText">${latest ? mdToHtml(latest.text) : "<p class='empty'>No chronicle yet.</p>"}</div>
+      <button class="more" id="chronMore">Read the whole chronicle</button></div></article>
+    <article class="card"><div class="body"><p class="label" style="margin-top:0">Who believes what about the Flight</p>
+      <p class="meta">People in each house holding each reading (confidence ≥ 20%; one person can hold a “why” and a “where”). Darker: held more firmly.</p>
+      <div class="tbl-wrap"><table class="grid"><thead><tr><th>House</th>${cols.map(([, l]) => `<th>${esc(l)}</th>`).join("")}</tr></thead><tbody>${rowsHtml.join("")}</tbody></table></div>
+      ${details.join("")}</div></article>
+    <article class="card"><div class="body"><p class="label" style="margin-top:0">How the houses feel about each other</p>
+      <p class="meta">Each row's feeling about each column, from its members' beliefs about past events (−1 cold … +1 warm).</p>
+      <div class="tbl-wrap"><table class="grid"><thead><tr><th>feels →</th>${houses.map(h => `<th title="${esc(h.name)}">${esc(h.name.slice(0, 4))}</th>`).join("")}</tr></thead><tbody>${feelRows}</tbody></table></div></div></article>
+    <article class="card"><div class="body"><p class="label" style="margin-top:0">Clients and loyalty</p>
+      <div class="tbl-wrap"><table class="grid"><thead><tr><th>House</th><th>Clients</th><th>Loyalty</th><th>Gained</th><th>Lost</th></tr></thead><tbody>${clientRows}</tbody></table></div></div></article>`;
+  document.getElementById("chronMore")?.addEventListener("click", e => { document.getElementById("chronText").classList.remove("clamped"); e.target.remove(); });
+  el.querySelector("[data-view]")?.addEventListener("click", e => e.target.dataset.view && openViewer(e.target.dataset.view));
 }
 
 // ---------------------------------------------------------------- Corva
@@ -496,6 +710,7 @@ document.querySelector("main").addEventListener("focusout", e => {
 // ---------------------------------------------------------------- load
 (async () => {
   // Mornings load on their own, so a problem there never hides the review tabs (and vice versa).
+  loadChronicle().catch(e => { document.getElementById("chronicle").innerHTML = `<p class="empty">Couldn't load the sandbox: ${esc(e.message)}</p>`; });
   loadSky().catch(e => { document.getElementById("sky").innerHTML = `<p class="empty">Couldn't load: ${esc(e.message)}</p>`; });
   Promise.all([
     api("mornings?select=*&order=day.desc", { headers: { Prefer: "" } }),
