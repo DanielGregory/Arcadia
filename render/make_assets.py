@@ -119,6 +119,41 @@ def sdxl(out: Path) -> None:
     torch.cuda.empty_cache()
 
 
+def _triposr_weights_for_new_transformers(out: Path) -> Path:
+    """TripoSR's checkpoint names its image encoder (a ViT) the way transformers 4.x did. transformers 5
+    renamed the insides of ViT (encoder.layer.N.attention.attention.query -> layers.N.attention.q_proj, ...),
+    so the saved weights no longer load. Download the checkpoint once, rename its keys, and point
+    TripoSR at the renamed copy."""
+    import re
+    import shutil
+
+    from huggingface_hub import hf_hub_download
+
+    local = out / "_triposr_weights"
+    if (local / "model.ckpt").exists():
+        return local
+    local.mkdir(parents=True, exist_ok=True)
+    shutil.copy(hf_hub_download("stabilityai/TripoSR", "config.yaml"), local / "config.yaml")
+    sd = torch.load(hf_hub_download("stabilityai/TripoSR", "model.ckpt"), map_location="cpu")
+    renames = [(r"encoder\.layer\.(\d+)\.attention\.attention\.query", r"layers.\1.attention.q_proj"),
+               (r"encoder\.layer\.(\d+)\.attention\.attention\.key", r"layers.\1.attention.k_proj"),
+               (r"encoder\.layer\.(\d+)\.attention\.attention\.value", r"layers.\1.attention.v_proj"),
+               (r"encoder\.layer\.(\d+)\.attention\.output\.dense", r"layers.\1.attention.o_proj"),
+               (r"encoder\.layer\.(\d+)\.intermediate\.dense", r"layers.\1.mlp.fc1"),
+               (r"encoder\.layer\.(\d+)\.output\.dense", r"layers.\1.mlp.fc2"),
+               (r"encoder\.layer\.(\d+)\.layernorm_", r"layers.\1.layernorm_")]
+    import transformers
+    if int(transformers.__version__.split(".")[0]) >= 5:
+        new = {}
+        for k, v in sd.items():
+            for a, b in renames:
+                k = re.sub(a, b, k)
+            new[k] = v
+        sd = new
+    torch.save(sd, local / "model.ckpt")
+    return local
+
+
 def triposr(out: Path) -> None:
     """TripoSR: one picture -> a 3D mesh with vertex colours, in about a second on a T4."""
     import numpy as np
@@ -142,7 +177,8 @@ def triposr(out: Path) -> None:
     from tsr.system import TSR
     from tsr.utils import remove_background, resize_foreground
 
-    model = TSR.from_pretrained("stabilityai/TripoSR", config_name="config.yaml", weight_name="model.ckpt")
+    model = TSR.from_pretrained(str(_triposr_weights_for_new_transformers(out)), config_name="config.yaml",
+                                weight_name="model.ckpt")
     model.renderer.set_chunk_size(8192)
     model.to("cuda")
     session = rembg.new_session()
