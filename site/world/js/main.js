@@ -47,9 +47,15 @@ const layout = generateLayout(seed, qualityName);
 const useAI = params.get("ai") !== "0";
 const manifest = useAI ? await loadManifest() : null;
 const objModel = params.get("model") || "triposr";
+// Each concept was made with two seeds (11 and 12). These are the cleanest of each pair: the others
+// rebuilt the concept's grey background as a solid slab behind the object. ?temple=temple_11 etc.
+// swaps one in to compare.
+const BEST = { temple: "temple_12", ship: "ship_11", statue: "statue_12", fountain: "fountain_12" };
 const aiObj = {};
 for (const name of ["temple", "ship", "statue", "fountain"]) {
-  const pick = manifest?.objects?.[objModel] && Object.keys(manifest.objects[objModel]).find(k => k.startsWith(name));
+  const have = Object.keys(manifest?.objects?.[objModel] || {});
+  const want = params.get(name) || BEST[name];
+  const pick = have.includes(want) ? want : have.find(k => k.startsWith(name));
   aiObj[name] = pick ? await loadObject(objModel, pick) : null;
 }
 const sky = makeSky(), sea = makeSea(shoreTexture(heightAt));

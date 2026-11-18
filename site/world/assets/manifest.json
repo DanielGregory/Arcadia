@@ -16,5 +16,48 @@
   "plaster",
   "stone"
  ],
- "objects": {}
+ "objects": {
+  "triposr": {
+   "fountain_11": {
+    "faces": 4998,
+    "faces_before": 129312,
+    "kb": 98
+   },
+   "fountain_12": {
+    "faces": 5000,
+    "faces_before": 185906,
+    "kb": 99
+   },
+   "ship_11": {
+    "faces": 4998,
+    "faces_before": 108580,
+    "kb": 98
+   },
+   "ship_12": {
+    "faces": 5000,
+    "faces_before": 127376,
+    "kb": 99
+   },
+   "statue_11": {
+    "faces": 5000,
+    "faces_before": 219992,
+    "kb": 99
+   },
+   "statue_12": {
+    "faces": 5000,
+    "faces_before": 81292,
+    "kb": 99
+   },
+   "temple_11": {
+    "faces": 5000,
+    "faces_before": 246156,
+    "kb": 99
+   },
+   "temple_12": {
+    "faces": 5000,
+    "faces_before": 290112,
+    "kb": 98
+   }
+  }
+ }
 }

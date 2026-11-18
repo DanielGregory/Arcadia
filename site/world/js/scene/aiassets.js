@@ -129,7 +129,23 @@ export async function loadObject(model, name) {
     const src = gltf.scene;
     src.traverse(o => {
       if (o.isMesh) {
-        o.material = new THREE.MeshLambertMaterial({ vertexColors: !!o.geometry.attributes.color, side: THREE.DoubleSide });
+        const g = o.geometry;
+        // pack_assets.py's GLBs carry positions and colours only: without normals the lighting has
+        // nothing to work with and the object renders black, so work them out from the triangles
+        if (!g.attributes.normal) g.computeVertexNormals();
+        // the colours are stored as sRGB bytes; the renderer lights in linear space, so convert them
+        // (otherwise they come out pale and washed)
+        const c = g.attributes.color;
+        if (c && !c.userData?.linear) {
+          const lin = new Float32Array(c.count * 3), col = new THREE.Color();
+          for (let i = 0; i < c.count; i++) {
+            col.setRGB(c.getX(i), c.getY(i), c.getZ(i), THREE.SRGBColorSpace);   // getX de-normalises 0..255 -> 0..1
+            lin[i * 3] = col.r; lin[i * 3 + 1] = col.g; lin[i * 3 + 2] = col.b;
+          }
+          g.setAttribute("color", new THREE.BufferAttribute(lin, 3));
+          g.attributes.color.userData = { linear: true };
+        }
+        o.material = new THREE.MeshLambertMaterial({ vertexColors: !!g.attributes.color, side: THREE.DoubleSide });
         o.castShadow = o.receiveShadow = true;
       }
     });
