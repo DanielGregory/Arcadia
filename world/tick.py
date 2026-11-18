@@ -197,23 +197,36 @@ INTERPRET_SYSTEM = (
     "You speak for one person in Corva, an old island city of ten noble houses. Corva remembers one thing above all this "
     "season: at the autumn festival of the sea, Livia Corvane and Soren of the Harbor (raised by House Theren) vanished "
     "together; nobody knows where. You will be given the person and a dream they had and told to someone. Say what the "
-    "dream means TO THIS PERSON, in their own voice, from their own beliefs and fears. It is their opinion, not a fact. "
-    "Reply with JSON only: {\"interpretation\": one or two sentences in the first person, \"confidence\": 0.0-1.0, "
+    "dream means TO THIS PERSON, in their own voice (\"I\"), from their own beliefs and fears, in under 40 words. It is their "
+    "opinion, not a fact. Reply with ONE JSON object only: {\"interpretation\": one or two short sentences in the first person, \"confidence\": 0.0-1.0, "
     "\"about_house\": one of Corvane, Valerius, Theren, Aurelian, Marcellan, Cassian, Severin, Damaris, Veyra, Solenne or null, "
     "\"stance\": -1.0 (against that house) to 1.0 (for it) or null, \"intention\": something they now mean to do, or null}")
 
 
 def parse_json(text: str):
-    m = re.search(r"\{.*\}", text, re.S)
-    if not m:
-        return None
-    try:
-        return json.loads(m.group(0))
-    except json.JSONDecodeError:
+    """The model's JSON, forgivingly: one object, or several to merge (the 1.5B model often splits its
+    answer across two), or, failing that, the fields it managed to write before running out of room."""
+    def load(t):
         try:
-            return json.loads(re.sub(r",\s*([}\]])", r"\1", m.group(0)))
+            return json.loads(t)
         except json.JSONDecodeError:
-            return None
+            try:
+                return json.loads(re.sub(r",\s*([}\]])", r"\1", t))
+            except json.JSONDecodeError:
+                return None
+    whole = re.search(r"\{.*\}", text, re.S)
+    if whole and (j := load(whole.group(0))) is not None:
+        return j
+    merged = {}
+    for m in re.finditer(r"\{[^{}]*\}", text):
+        j = load(m.group(0))
+        if isinstance(j, dict):
+            merged.update(j)
+    if merged:
+        return merged
+    # cut off mid-answer: salvage the string fields that are complete
+    found = dict(re.findall(r'"(\w+)"\s*:\s*"([^"]*)"', text))
+    return found or None
 
 
 def person_sketch(con, p) -> str:
@@ -247,10 +260,16 @@ def interpret(con, R, shared, llm, clock, year, season):
         if not text:
             out.append({"dream": d, "raw": raw, "ok": False})
             continue
-        conf = float(j.get("confidence") or 0.5)
+        try:
+            conf = float(j.get("confidence") or 0.5)
+        except (TypeError, ValueError):
+            conf = 0.5
         about = houses.get(str(j.get("about_house") or "").strip())
         stance = j.get("stance")
-        stance = max(-1.0, min(1.0, float(stance))) if isinstance(stance, (int, float)) and about else None
+        try:
+            stance = max(-1.0, min(1.0, float(stance))) if stance is not None and about else None
+        except (TypeError, ValueError):
+            stance = None
         insert(con, "beliefs", year=year, season=season, holder_id=p["id"], subject_type="dream", subject_id=d["id"],
                interpretation=text, confidence=round(max(0.05, min(1.0, conf)), 2), source_type="own_dream",
                about_house=about, stance=stance)
@@ -272,7 +291,8 @@ def interpret(con, R, shared, llm, clock, year, season):
 STORY_SYSTEM = (
     "You are the storyteller of Corva, an old island city of ten noble houses. You do not decide what happens: you "
     "propose what one house might DO this season, and the world's rules decide whether it works. Propose actions by "
-    "named, adult members who are in Corva. Only these kinds: {kinds}. Places you may name: {places}. "
+    "named, adult members who are in Corva: the actor must be one of the people listed as able to act, by their exact "
+    "name (never \"House ...\" as an actor). Only these kinds: {kinds}. Places you may name: {places}. "
     "Never say what anything means (no omens, signs, fate or gods' wishes): only what people do. "
     "Reply with JSON only: {{\"proposals\": [{{\"kind\": ..., \"actor\": full name, \"target_house\": a house name or null, "
     "\"target_person\": a full name or null, \"place\": a place name or null, \"why\": a short reason from the house's point "

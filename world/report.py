@@ -15,17 +15,29 @@ from __future__ import annotations
 
 import json
 
+import re
+
 from world.db import ROOT, one, rows
 
 VOICE_SYSTEM = (
-    "You write one page of a private account kept by a person of Corva, an old island city of ten noble houses, at the end "
-    "of a season. Write in the first person, in their voice, 120 to 170 words, plain and concrete, like a letter or a "
-    "journal from an older age (no modern words). Use ONLY the events and beliefs you are given: do not invent new events, "
-    "names or places. Their opinions are theirs and may be wrong. Do not reveal anything they could not know.")
+    "You are a person of Corva, an old island city ruled by ten noble houses, writing in your private journal at the end "
+    "of a season. Write ONLY in the first person (\"I\", \"my house\"), 110 to 150 words, plain and concrete, in the "
+    "manner of an older age (no modern words). Say what you did or saw, what you heard, and what you think it means for "
+    "you and your house. Use ONLY the facts you are given: do not invent people, houses, titles, family ties or events. "
+    "Your opinions are your own and may be wrong. Do not begin with the date or the season's name.")
 TOWN_SYSTEM = (
-    "You write what the townsfolk of Corva, an old island city, were saying at the end of a season: market talk, harbour "
-    "talk, 100 to 140 words, in the voice of an unnamed townsperson. Use ONLY the events and rumours given; do not invent "
-    "new events, names or places. Rumours may be wrong.")
+    "You are an unnamed townsperson of Corva, an old island city ruled by ten noble houses, gossiping at the market at "
+    "the end of a season. 90 to 130 words, in the first person, plain and lively, in the manner of an older age (no modern "
+    "words). Talk about the vanished lovers Livia Corvane and Soren of the Harbor, about what the great houses did this "
+    "season, and about the strange dreams going round. Use ONLY the facts and rumours given; do not invent names or events. "
+    "Rumours may be wrong.")
+
+
+def finish(text: str) -> str:
+    """Cut a reply back to its last full sentence (the model sometimes runs out of room mid-sentence)."""
+    text = text.strip()
+    m = re.search(r"^(.*[.!?][\"')\]]?)", text, re.S)
+    return m.group(1).strip() if m else text
 
 
 def season_events(con, year, season):
@@ -64,26 +76,27 @@ def account(con, llm, p, year, season, clock):
     beliefs = rows(con, "select interpretation from beliefs where holder_id = ? order by year desc, confidence desc limit 4", p["id"])
     dream = one(con, "select d.text, b.interpretation from dreams d left join beliefs b on b.subject_id = d.id and b.holder_id = d.dreamer_id "
                      "where d.dreamer_id = ? and d.year = ? and d.season = ? and d.recalled = 1", p["id"], year, season)
-    user = (f"The writer: {p['name']} of House {p['house']}, {year - p['born_year']} years old ({p['note'] or 'of the house'}).\n"
-            f"The season: {season} of year {year}, the first season after Livia Corvane and Soren of the Harbor vanished at the autumn festival.\n"
-            f"What their house did or had done to it this season: " + (" ".join(seen) or "nothing of note.") + "\n"
-            f"What they heard of elsewhere in the city: " + (" ".join(heard) or "little.") + "\n"
-            f"What they believe: " + " / ".join(b["interpretation"] for b in beliefs) + "\n" +
-            (f"A dream they remember from this season: \"{dream['text'][:300]}\"" + (f" (what they made of it: {dream['interpretation']})" if dream["interpretation"] else "") if dream else ""))
+    user = (f"You are {p['name']} of House {p['house']}, {year - p['born_year']} years old: {p['note'] or 'a member of the house'}.\n"
+            f"It is the end of the first {season} since Livia Corvane and Soren of the Harbor vanished at the autumn festival of the sea.\n"
+            f"What you and your house did, or had done to you, this {season}: " + (" ".join(seen) or "nothing of note.") + "\n"
+            f"What you heard of elsewhere in the city: " + (" ".join(heard) or "little.") + "\n"
+            f"What you believe: " + " / ".join(b["interpretation"] for b in beliefs) + "\n" +
+            (f"A dream you remember from this {season}: \"{dream['text'][:300]}\"" + (f" (what you made of it: {dream['interpretation']})" if dream["interpretation"] else "") if dream else ""))
     clock.calls += 1
-    return llm.chat(VOICE_SYSTEM, user, max_new_tokens=300)
+    return finish(llm.chat(VOICE_SYSTEM, user, max_new_tokens=360))
 
 
 def town_talk(con, llm, year, season, clock):
     evs = [event_line(e) for e in season_events(con, year, season) if not e["sealed"]]
     rumors = rows(con, "select text from dreams where kind = 'rumor' and year = ? and season = ?", year, season)
-    clients = rows(con, "select h.name, c.count, c.loyalty, c.gained, c.lost from house_clients c join houses h on h.id = c.house_id "
-                        "where c.year = ? and c.season = ?", year, season)
+    told = rows(con, "select interpretation from beliefs where year = ? and season = ? and subject_type = 'dream' and source_type = 'told_by' limit 3", year, season)
     user = ("What happened this season: " + " ".join(evs[:10]) + "\n"
-            "Dreams going round the town, nobody knows whose: " + " / ".join(f"\"{r['text'][:200]}\"" for r in rumors) + "\n"
-            "Which houses gained or lost townsfolk: " + ", ".join(f"{c['name']} {c['gained'] - c['lost']:+d}" for c in clients if c["gained"] or c["lost"]))
+            "Old talk still going round: Soren carried her off; no, she went willingly; the Therens arranged it; a sailor saw a "
+            "boat sailing east; a merchant says the northern road; old Philo saw two figures at the western gate.\n"
+            "Dreams going round the town, nobody knows whose: " + " / ".join(f"\"{r['text'][:160]}\"" for r in rumors) + "\n" +
+            ("What people say their dreams meant: " + " / ".join(t["interpretation"] for t in told) if told else ""))
     clock.calls += 1
-    return llm.chat(TOWN_SYSTEM, user, max_new_tokens=240)
+    return finish(llm.chat(TOWN_SYSTEM, user, max_new_tokens=260))
 
 
 def write_chronicle(con, llm, year, season, tick, clock) -> str:
@@ -106,14 +119,19 @@ def write_chronicle(con, llm, year, season, tick, clock) -> str:
     lines += ["## Dreams that were told", "",
               "*Everyone dreamed. Most dreams were forgotten by morning; these were remembered and told to someone. Only "
               "told dreams are interpreted, and the reading is the dreamer's own.*", ""]
-    for d in told:
+    readings = [d for d in told if d["interpretation"]]
+    others = [d for d in told if not d["interpretation"]]
+    for d in readings:
         listener = one(con, "select name from people where id = ?", json.loads(d["shared_with"])[0])["name"]
         lines += [f"**{d['dreamer']}** (House {d['house']}, in the voice of *{d['tag']}*) told {listener}:", "",
-                  f"> {d['text'][:600]}", ""]
-        if d["interpretation"]:
-            lines += [f"What {d['dreamer'].split()[0]} made of it ({d['confidence']:.0%} sure): *{d['interpretation']}*", ""]
-        else:
-            lines += ["*(Not among the dreams interpreted this season.)*", ""]
+                  f"> {d['text'][:500]}", "",
+                  f"What {d['dreamer'].split()[0]} made of it ({d['confidence']:.0%} sure): *{d['interpretation']}*", ""]
+    if others:
+        lines += [f"Also told, but not interpreted this season ({len(others)}):", ""]
+        for d in others[:5]:
+            excerpt = " ".join(d["text"].split()[:28])
+            lines.append(f"- **{d['dreamer']}** (House {d['house']}, *{d['tag']}*): \"{excerpt}…\"")
+        lines.append("")
     rumors = rows(con, "select text from dreams where kind = 'rumor' and year = ? and season = ?", year, season)
     if rumors:
         lines += ["## Rumour dreams", "", "*Dreams going round the town that nobody owns.*", ""]
@@ -148,7 +166,8 @@ def write_log(con, year, season, tick, stats, interp, raw_failures) -> str:
               "| Dreamer | Told to | Reading (the dreamer's) | Sure | Toward | Intention |", "|---|---|---|---|---|---|"]
     for i in interp:
         if not i["ok"]:
-            lines.append(f"| {i['dream']['person']['name']} | | *(reply unreadable)* | | | |")
+            raw = i.get("raw", "")[:120].replace("|", "/").replace("\n", " ")
+            lines.append(f"| {i['dream']['person']['name']} | | *(reply unreadable: `{raw}`)* | | | |")
             continue
         if i["dream"]["person"]["absent"]:
             continue

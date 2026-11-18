@@ -45,7 +45,7 @@ dreaming:
 interpretation:
   model: Qwen/Qwen2.5-1.5B-Instruct
   max_per_season: 8           # shared dreams interpreted (the most salient first)
-  max_new_tokens: 160
+  max_new_tokens: 220
   listener_trust: 0.7         # a listener takes the teller's reading at confidence x trust x (0.5 + warmth/2)
 
 storyteller:
