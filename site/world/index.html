@@ -23,6 +23,11 @@
   .title { position: fixed; top: max(16px, env(safe-area-inset-top)); left: 18px; letter-spacing: .32em; text-transform: uppercase;
            font-size: 12px; color: var(--muted); text-shadow: 0 1px 3px rgba(0,0,0,.4); }
   .title a { color: inherit; text-decoration: none; }
+  #hint { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 10px 16px; border-radius: 12px;
+          background: var(--glass); border: 1px solid var(--line); color: var(--ink); pointer-events: none; text-align: center;
+          transition: opacity .8s; max-width: calc(100vw - 48px); }
+  #hint.gone { opacity: 0; }
+  #home { font-style: italic; }
   #fps { position: fixed; top: max(14px, env(safe-area-inset-top)); right: 16px; font: 12px ui-monospace, monospace;
          color: var(--ink); background: var(--glass); padding: 4px 8px; border-radius: 8px; z-index: 10; }
   noscript, .fallback { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; }
@@ -31,16 +36,18 @@
 <body>
 <canvas id="view" aria-label="Corva at the edge of the sea, a living painting"></canvas>
 <div class="title"><a href="/">Arcadia</a> · Corva</div>
-<div class="bar" role="toolbar" aria-label="Time of day and quality">
+<div class="bar" role="toolbar" aria-label="Time of day, home and quality">
   <span id="clock">--:--</span>
   <button data-time="dawn" aria-pressed="false">Dawn</button>
   <button data-time="golden" aria-pressed="false">Golden hour</button>
   <button data-time="night" aria-pressed="false">Night</button>
   <button data-time="live" aria-pressed="true">Live</button>
+  <button id="home" title="Fly back to the city">Corva</button>
   <select id="quality" aria-label="Quality">
     <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
   </select>
 </div>
+<div id="hint">Drag to move · pinch or scroll to zoom · twist or right-drag to turn · tap a place to fly there</div>
 <noscript>Corva needs JavaScript and WebGL.</noscript>
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
 <script type="module" src="js/main.js"></script>

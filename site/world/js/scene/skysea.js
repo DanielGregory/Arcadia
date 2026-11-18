@@ -49,7 +49,8 @@ export function makeSky() {
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(4000, 48, 24), material);
   mesh.frustumCulled = false;
   mesh.renderOrder = -1;
-  return { mesh, uniforms };
+  // the dome is centred on the camera wherever it goes (it is drawn at the far plane anyway)
+  return { mesh, uniforms, follow(camera) { mesh.position.copy(camera.position); } };
 }
 
 // The sea needs to know how deep the water is under each point, for the turquoise shallows and the
@@ -67,9 +68,21 @@ export function shoreTexture(heightAt, rect = { x: -40, z: -560, w: 420, d: 1000
   return { tex, rect: new THREE.Vector4(rect.x, rect.z, rect.w, rect.d) };
 }
 
+// The same for the whole island, but coarser (about 16 m per texel): made in a worker after
+// startup, so until it arrives the sea away from the city is simply deep.
+export function islandShoreTexture({ data, rect, nx, nz }) {
+  const tex = new THREE.DataTexture(data, nx, nz, THREE.RedFormat, THREE.UnsignedByteType);
+  tex.minFilter = tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return { tex, rect: new THREE.Vector4(rect.x, rect.z, rect.w, rect.d) };
+}
+
 export function makeSea(shore) {
+  const none = new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.RedFormat, THREE.UnsignedByteType);
+  none.needsUpdate = true;
   const uniforms = {
     shoreTex: { value: shore.tex }, shoreRect: { value: shore.rect },
+    islandTex: { value: none }, islandRect: { value: new THREE.Vector4(0, 0, 0, 0) },
     time: { value: 0 }, sunDir: { value: new THREE.Vector3() }, sunColor: { value: new THREE.Color() },
     sunUp: { value: 1 }, zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() },
     ambient: { value: new THREE.Color() }, fogColor: { value: new THREE.Color() }, fogDensity: { value: 0.0012 },
@@ -89,13 +102,20 @@ export function makeSea(shore) {
     fragmentShader: /* glsl */`
       uniform float time, sunUp, fogDensity, night;
       uniform vec3 sunDir, sunColor, zenith, horizon, ambient, fogColor, lightDir, deep, shallow, turquoise;
-      uniform sampler2D shoreTex; uniform vec4 shoreRect;
+      uniform sampler2D shoreTex, islandTex; uniform vec4 shoreRect, islandRect;
       varying vec3 vWorld;
-      // depth of water here, from the baked land heights (deep everywhere outside the baked area)
+      // depth of water here, from the baked land heights: the fine map round the city, else the
+      // coarse one round the whole island, else deep
       float waterDepth(vec2 p) {
         vec2 uv = (p - shoreRect.xy) / shoreRect.zw;
-        if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return 30.0;
-        return -(texture2D(shoreTex, uv).r * 16.0 - 8.0);
+        if (all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0))))
+          return -(texture2D(shoreTex, uv).r * 16.0 - 8.0);
+        if (islandRect.z > 0.0) {
+          uv = (p - islandRect.xy) / islandRect.zw;
+          if (all(greaterThanEqual(uv, vec2(0.0))) && all(lessThanEqual(uv, vec2(1.0))))
+            return -(texture2D(islandTex, uv).r * 16.0 - 8.0);
+        }
+        return 30.0;
       }
       // sum of a few travelling waves: returns the slope (d height / dx, d height / dz)
       vec2 waves(vec2 p) {
@@ -139,7 +159,14 @@ export function makeSea(shore) {
         gl_FragColor = vec4(mix(col, fogColor, f), 1.0);
       }`,
   });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000, 1, 1), material);
+  // 120 km across, and it follows the camera (see follow()), so the sea reaches the horizon from
+  // wherever you fly. The waves are worked out from world positions, so they don't slide with it.
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(120000, 120000, 1, 1), material);
   mesh.rotation.x = -Math.PI / 2;
-  return { mesh, uniforms };
+  mesh.frustumCulled = false;
+  return {
+    mesh, uniforms,
+    follow(camera) { mesh.position.set(camera.position.x, 0, camera.position.z); },
+    setIslandShore(t) { uniforms.islandTex.value = t.tex; uniforms.islandRect.value.copy(t.rect); },
+  };
 }

@@ -186,24 +186,36 @@ function cloudTexture() {
   return t;
 }
 
-export function makeClouds(count = 16) {
+// `count` low clouds over the bay in front of the city (stage 1's), plus `wide` bigger, higher ones
+// spread over the whole island and the sea round it. All drift slowly south on the breeze.
+export function makeClouds(count = 16, wide = 0) {
   const r = rng(3), tex = cloudTexture(), group = new THREE.Group();
-  const clouds = Array.from({ length: count }, () => {
+  const clouds = Array.from({ length: count + wide }, (_, i) => {
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: true });
     const s = new THREE.Sprite(mat);
-    const w = 160 + r() * 240;
+    const big = i >= count;
+    const w = big ? 500 + r() * 900 : 160 + r() * 240;
     s.scale.set(w, w * 0.32, 1);
-    s.position.set(150 + r() * 1500, 190 + r() * 200, -1100 + r() * 2200);
+    if (big) s.position.set(-9500 + r() * 12500, 600 + r() * 1100, -8000 + r() * 16000);
+    else s.position.set(150 + r() * 1500, 190 + r() * 200, -1100 + r() * 2200);
     group.add(s);
-    return { s, speed: 2 + r() * 3, shade: 0.8 + r() * 0.3 };
+    return { s, speed: big ? 4 + r() * 5 : 2 + r() * 3, shade: 0.8 + r() * 0.3, big };
   });
   const col = new THREE.Color();
   return {
     group,
-    update(dt, state) {
+    // camera: clouds fade when they would only get in the way: the low ones over the bay once
+    // you're above them (from the air they'd hide the city), any one you're about to fly through
+    update(dt, state, camera = null) {
       for (const c of clouds) {
+        if (camera) {
+          const above = c.big ? 1 : 1 - THREE.MathUtils.smoothstep(camera.position.y, 320, 650);
+          const inside = THREE.MathUtils.smoothstep(camera.position.distanceTo(c.s.position), c.s.scale.x * 0.3, c.s.scale.x * 0.9);
+          c.s.material.opacity = above * inside;
+          c.s.visible = c.s.material.opacity > 0.01;
+        }
         c.s.position.z += c.speed * dt;
-        if (c.s.position.z > 1100) c.s.position.z = -1100;
+        if (c.big ? c.s.position.z > 8000 : c.s.position.z > 1100) c.s.position.z = c.big ? -8000 : -1100;
         col.copy(state.horizon).lerp(state.sunColor, 0.45 * state.sunUp).multiplyScalar(c.shade * (0.35 + 0.65 * state.sunUp));
         c.s.material.color.copy(col);
       }

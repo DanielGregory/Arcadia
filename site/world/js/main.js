@@ -1,25 +1,26 @@
-// Corva, living: stage 1. Wires the pieces together and runs the loop.
+// Corva, living: the island. Wires the pieces together and runs the loop.
 //
-//   world/   pure data: terrain function, city layout, day cycle (no rendering)
-//   scene/   builders that turn that data into three.js objects
+//   world/   pure data: the island's terrain function, the city layout, the day cycle (no rendering)
+//   scene/   builders that turn that data into three.js objects (the ground in tiles, sky and sea,
+//            the city, life, the distant islands)
 //   render/  the painterly post-process
-//   camera.js the drift rig
+//   camera.js the fly rig: drag, pinch, twist, tap to travel; "Corva" flies home
 //
-// Stage 2 (a larger land to fly over) swaps the rig and widens the terrain; stage 3 (buildings,
-// people and weather from the world tables) swaps generateLayout() for a layout read from
-// Supabase. Neither needs this file restructured.
+// Next (step B): villages, roads, rivers and forests from the same seed; then (step C) the map
+// stored in the world tables so the simulation can change it.
 
 import * as THREE from "../vendor/three.module.min.js";
 import { QUALITY, params, chooseQuality, safeSet, DAY_SECONDS, START_TIME } from "./config.js";
 import { generateLayout } from "./world/layout.js";
 import { dayState, TIMES } from "./world/daycycle.js";
-import { makeSky, makeSea, shoreTexture } from "./scene/skysea.js";
+import { makeSky, makeSea, shoreTexture, islandShoreTexture } from "./scene/skysea.js";
 import { heightAt } from "./world/terrain.js";
-import { makeLand } from "./scene/land.js";
+import { Terrain } from "./scene/terrain.js";
+import { makeDistantIslands } from "./scene/horizon.js";
 import { makeCity, makeTrees } from "./scene/city.js";
 import { makeShips, makeSmoke, Lanterns, makeClouds } from "./scene/life.js";
 import { Painter } from "./render/painterly.js";
-import { DriftRig } from "./camera.js";
+import { FlyRig } from "./camera.js";
 import { loadManifest, loadBackdrops, loadTextures, loadObject } from "./scene/aiassets.js";
 import { at } from "./world/layout.js";
 
@@ -36,8 +37,13 @@ renderer.shadowMap.enabled = Q.shadows;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0xffffff, 0.00018);   // light: the painter adds the real haze
-const camera = new THREE.PerspectiveCamera(38, 1, 1, 9000);
-const rig = new DriftRig(camera, canvas, { still: params.get("still") === "1" });
+const camera = new THREE.PerspectiveCamera(38, 1, 1, 60000);
+const rig = new FlyRig(camera, canvas, { still: params.get("still") === "1" });
+// ?view=x,z,dist,az,el: start somewhere else (for screenshots and links to a place)
+if (params.has("view")) {
+  const [x, z, dist, az, el] = params.get("view").split(",").map(Number);
+  rig.jump({ x, z, dist, az, el });
+}
 const painter = new Painter(renderer, Q);
 
 // --- the world ----------------------------------------------------------------------------------
@@ -62,7 +68,9 @@ const sky = makeSky(), sea = makeSea(shoreTexture(heightAt));
 // the AI temple replaces the hand-built summit temple (the first in the layout)
 const city = makeCity(aiObj.temple ? { ...layout, temples: layout.temples.slice(1) } : layout, Q, seed);
 const ships = makeShips(layout, aiObj.ship ? () => { const s = aiObj.ship(5.5); s.rotation.y = Math.PI / 2; return s; } : null);
-const backdrops = useAI ? await loadBackdrops(params.get("backdrop") || "sdxl", manifest,
+// The painted backdrops only work from stage 1's fixed viewpoint; with free flight the real
+// terrain and the distant islands take their place. ?backdrop=sdxl still shows them, to compare.
+const backdrops = useAI ? await loadBackdrops(params.get("backdrop") || "none", manifest,
                                              { paintedSky: params.get("paintedsky") === "1" }) : null;
 if (backdrops) scene.add(backdrops.group);
 if (aiObj.temple) {
@@ -85,16 +93,35 @@ if (aiObj.fountain) {   // in a little square halfway up the town
 }
 const smoke = makeSmoke(layout, Q.smoke);
 const lanterns = new Lanterns(layout.streets, 25, Q.lights);
-const clouds = makeClouds(qualityName === "low" ? 10 : 18);
-const land = makeLand(Q.terrain);
+const clouds = makeClouds(qualityName === "low" ? 10 : 18, qualityName === "low" ? 16 : 34);
+// the ground, in tiles; the first batch is built right away so the first frame is complete
+const terrain = new Terrain({ finest: Q.tileRes, levels: 5 });
+const land = terrain.group;
+rig.update(0, 0);
+terrain.update(camera.position, { sync: true });
+// the island-wide shallows for the sea, worked out in the background (waited for in screenshots)
+const shoreReady = terrain.shoreMap().then(m => sea.setIslandShore(islandShoreTexture(m)));
+if (params.get("shot") === "1") await shoreReady;
+const distant = makeDistantIslands();
 const tex = useAI ? await loadTextures(manifest) : {};
 if (tex.plaster) for (const k of ["houses", "uppers"]) city.materials[k].map = tex.plaster;
 if (tex.terracotta) city.materials.roofs.map = tex.terracotta, city.materials.roofs.color.set("#ffffff");
 if (tex.stone) for (const k of ["stairs", "walls", "blocks"]) city.materials[k].map = tex.stone;
-if (tex.hillside) { land.material.map = tex.hillside; land.material.color.setScalar(2.0); }   // a detail map, mean 0.5
+if (tex.hillside) {
+  // A detail map (mean 0.5, doubled), faded out beyond ~400 m: further away its 24 m repeat would
+  // show as a grid of squares, and at that distance it can't be seen as texture anyway.
+  terrain.material.map = tex.hillside;
+  terrain.material.onBeforeCompile = shader => {
+    shader.fragmentShader = shader.fragmentShader.replace("#include <map_fragment>", `
+      #ifdef USE_MAP
+        float detailFade = smoothstep(420.0, 160.0, length(vViewPosition));
+        diffuseColor.rgb *= mix(vec3(1.0), texture2D(map, vMapUv).rgb * 2.0, detailFade);
+      #endif`);
+  };
+}
 for (const m of Object.values(city.materials)) m.needsUpdate = true;
-land.material.needsUpdate = true;
-scene.add(sky.mesh, sea.mesh, land, city.group, makeTrees(layout), ships.group,
+terrain.material.needsUpdate = true;
+scene.add(sky.mesh, sea.mesh, land, distant, city.group, makeTrees(layout), ships.group,
           smoke.points, lanterns.points, clouds.group, ...lanterns.lights);
 
 const sunLight = new THREE.DirectionalLight(0xffffff, 2);
@@ -127,16 +154,19 @@ function applyDay(state, time) {
   s.fogColor.value.copy(state.fog); s.fogDensity.value = scene.fog.density;
   s.lightDir.value.copy(state.light); s.night.value = state.night;
 
-  sunLight.position.copy(sunLight.target.position).addScaledVector(state.light, 500);
+  // (the sun light's position follows the camera's target: set in frame())
   sunLight.color.copy(state.sunColor);
   sunLight.intensity = state.sunPower * (state.sunUp > 0.02 ? 1.4 : 0.9);
   hemi.color.copy(state.skyAmbient);
   hemi.groundColor.copy(state.groundAmbient);
   hemi.intensity = 1.6;
   scene.fog.color.copy(state.fog);
-  // a little denser haze at dawn and golden hour, when the light lies along the bay
-  scene.fog.density = 0.00018;
+  // the air thins as you climb: from high up the whole island should be visible, so the haze
+  // fades with the camera's height (stage 1's view, ~60 m up, is unchanged)
+  scene.fog.density = 0.00018 * airAbove();
 }
+// 1 near the ground, about a third by 1 km up, a tenth by 3 km
+function airAbove() { return 1 / (1 + Math.max(0, camera.position.y - 150) / 350); }
 
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -166,18 +196,27 @@ function frame(now) {
   const state = dayState(dayT);
   applyDay(state, clock);
   rig.update(dt, clock);
+  sky.follow(camera);
+  sea.follow(camera);
+  terrain.update(camera.position);
+  // the sun's shadows cover the area round what you're looking at, wider when far away
+  const reach = THREE.MathUtils.clamp(rig.view.dist * 0.55, 170, 1400);
+  sunLight.target.position.copy(rig.target);
+  Object.assign(sunLight.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, far: 1800 + reach * 2 });
+  sunLight.shadow.camera.updateProjectionMatrix();
+  sunLight.position.copy(rig.target).addScaledVector(state.light, 900 + reach);
   city.update(state);
   ships.update(clock);
   smoke.update(clock, state);
   lanterns.update(dt, clock, state);
-  clouds.update(dt, state);
+  clouds.update(dt, state, camera);
   if (backdrops) backdrops.update(state, rig.target);
   fpsCount(dt);
   // aerial perspective: near haze is the light in the air, far haze cools toward violet-blue
   hazeNear.copy(state.fog).lerp(state.horizon, 0.5);
   hazeFar.copy(state.horizon).lerp(VIOLET, 0.32).multiplyScalar(0.55 + 0.45 * state.sunUp);
   painter.render(scene, camera, { exposure: 1.12 + 0.9 * state.night, night: state.night, hazeNear, hazeFar,
-                                  hazeScale: 0.00055 + 0.00025 * (1 - Math.abs(state.sun.y)) });
+                                  hazeScale: (0.00055 + 0.00025 * (1 - Math.abs(state.sun.y))) * airAbove() });
   document.getElementById("clock").textContent = timeLabel(dayT);
   frames++;
   // ?shot=1: draw a few frames (so smoke and lanterns settle), then stop, for screenshots
@@ -212,4 +251,13 @@ function fpsCount(dt) {
   fpsFrames++; fpsTime += dt;
   if (fpsTime >= 1) { fpsValue = fpsFrames / fpsTime; fpsFrames = 0; fpsTime = 0; if (fpsEl) fpsEl.textContent = `${fpsValue.toFixed(0)} fps · ${qualityName}`; }
 }
-window.__corva = { layout, renderer, fps: () => fpsValue, setTime: t => { live = false; dayT = t; } };   // for tests
+// "Corva": fly home to the city
+document.getElementById("home")?.addEventListener("click", () => rig.home());
+// a one-time hint on how to fly, gone after the first touch (or 9 s)
+const hint = document.getElementById("hint");
+if (hint && !shot) {
+  const hide = () => hint.classList.add("gone");
+  canvas.addEventListener("pointerdown", hide, { once: true });
+  setTimeout(hide, 9000);
+} else hint?.remove();
+window.__corva = { layout, renderer, rig, terrain, fps: () => fpsValue, setTime: t => { live = false; dayT = t; } };   // for tests
