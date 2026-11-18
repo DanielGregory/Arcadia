@@ -29,8 +29,9 @@ js/render/painterly.js  Kuwahara oil-paint filter, aerial perspective, ACES, war
 ```
 
 The island: about 7 x 9.5 km, its centre ~3.8 km east of the city, Mount Aetos (~1,100 m) in the
-middle, rolling hills and basins round it, four villages (three harbour towns at river mouths,
-Elaia, Ampelos and Kryoneri, and Platanos in the hills) joined to Corva by roads, five rivers from the mountain to the sea, forests on the middle slopes,
+middle, rolling hills and basins round it, five villages (harbour towns Elaia and Ampelos at
+river mouths, river villages Kryoneri and Platanos inland on the banks, and Melissa up in the hills
+with no river) joined to Corva by roads, five rivers from the mountain to the sea, forests on the middle slopes,
 olive groves round the villages. Change the terrain or the rules and run
 `node site/world/tools/make_features.mjs 1717 map.ppm` to remake the saved features. Near the city (within ~0.7-1.5 km) the hand-tuned bay of
 stage 1 is blended in, so the city and the first view are unchanged.

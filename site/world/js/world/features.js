@@ -1,9 +1,11 @@
 // The island's villages, rivers and roads, made from the seed. (No three.js.)
 //
-//   villages  three on the coast and one in the hills. Like nearly every real island town, the
-//             coastal ones sit on gentle ground by the shore, best at a river mouth (fresh water,
-//             a landing for boats, trade), each with a small harbour; the hill village farms the
-//             basins. All 1.9+ km from Corva and 1.8+ km from each other. Each gets a name.
+//   villages  five, of three kinds, as island villages really grew:
+//               two harbour towns on gentle ground by the shore, best at a river mouth (fresh
+//                 water, a landing for boats, trade), each with a small harbour;
+//               two river villages inland, on a river's bank (water for mills, gardens, fields);
+//               one hill village with no river at all (springs and wells), farming the basins.
+//             All 1.9+ km from Corva and 1.8+ km from each other. Each gets a name.
 //   rivers    from springs on the mountain's flanks down to the sea: each step goes mostly
 //             downhill, partly toward the nearest coast (so a river can't get stuck in a hollow),
 //             with a little meander. Their water height is made to fall all the way, and the
@@ -51,7 +53,9 @@ function seaward(x, z) {
 
 function placeVillages(r, rivers) {
   const mouths = rivers.filter(rv => !rv.joins).map(rv => rv.pts[rv.pts.length - 1]);
-  const coast = [], hills = [];
+  const riverPts = rivers.flatMap(rv => rv.pts);
+  const toRiver = (x, z) => { let d = Infinity; for (const p of riverPts) d = Math.min(d, Math.hypot(p.x - x, p.z - z)); return d; };
+  const coast = [], river = [], hills = [];
   for (let z = BOUNDS.minZ; z < BOUNDS.maxZ; z += 100) for (let x = BOUNDS.minX; x < BOUNDS.maxX; x += 100) {
     const s = inland(x, z);
     if (s < 90) continue;
@@ -62,28 +66,34 @@ function placeVillages(r, rivers) {
       const slope = meanSlope(x, z, 90);
       if (slope > 0.3) continue;
       const mouth = Math.min(...mouths.map(m => Math.hypot(m.x - x, m.z - z)), Infinity);
-      coast.push({ x, z, y, coastal: true, score: -slope * 3 + (mouth < 600 ? 1.2 * (1 - mouth / 600) : 0) + r() * 0.4 });
-    } else if (s >= 600 && s <= 3200 && y > 50 && y < 420) {  // a hill site
+      coast.push({ x, z, y, kind: "coast", score: -slope * 3 + (mouth < 600 ? 1.2 * (1 - mouth / 600) : 0) + r() * 0.4 });
+    } else if (s >= 500 && s <= 3000 && y > 25 && y < 420) {
       const slope = meanSlope(x, z, 70);
       if (slope > 0.32) continue;
-      hills.push({ x, z, y, coastal: false, score: -slope * 3 + y / 500 + r() * 0.35 });
+      const dr = toRiver(x, z);
+      if (dr > 50 && dr < 220) {                              // on a river's bank, clear of its channel
+        river.push({ x, z, y, kind: "river", score: -slope * 3 + (1 - dr / 220) * 0.8 + r() * 0.4 });
+      } else if (dr > 600 && s >= 600 && y > 50) {            // up in the hills, away from the rivers
+        hills.push({ x, z, y, kind: "hill", score: -slope * 3 + y / 500 + r() * 0.35 });
+      }
     }
   }
   const out = [];
   const pick = (list, n, gap) => {
     list.sort((a, b) => b.score - a.score);
     for (const c of list) {
-      if (out.filter(v => v.coastal === c.coastal).length >= n) break;
+      if (out.filter(v => v.kind === c.kind).length >= n) break;
       if (out.some(v => Math.hypot(v.x - c.x, v.z - c.z) < gap)) continue;
       out.push(c);
     }
   };
-  pick(coast, 3, 2000);
+  pick(coast, 2, 2000);
+  pick(river, 2, 1800);
   pick(hills, 1, 1800);
   return out.map((v, i) => {
     const vil = { name: NAMES[i % NAMES.length], x: Math.round(v.x), z: Math.round(v.z), y: Math.round(v.y),
-                  coastal: v.coastal, r: v.coastal ? 115 + Math.round(r() * 30) : 95 + Math.round(r() * 20) };
-    if (v.coastal) {
+                  kind: v.kind, coastal: v.kind === "coast", r: v.kind === "coast" ? 115 + Math.round(r() * 30) : 95 + Math.round(r() * 20) };
+    if (vil.coastal) {
       // the harbour: walk from the middle of the village toward the sea until the water is deep enough
       const d = seaward(v.x, v.z);
       let hx = v.x, hz = v.z;
