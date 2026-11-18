@@ -1,8 +1,14 @@
 """Portraits of Corva's principal characters: one painted portrait each, in one consistent style.
 
     python -m world.portraits --dry_run     # print the prompts
-    python -m world.portraits               # paint them on Kaggle's GPU, upload, store each on its person's record
-    python -m world.portraits --no_push     # collect the latest Kaggle run instead of starting one
+    python -m world.portraits               # paint 4 candidates per principal on Kaggle's GPU (from their appearance record)
+    python -m world.portraits --only 2,6    # just these people (e.g. once Danny has written their descriptions)
+    python -m world.portraits adopt         # make Danny's picks (review page, Portraits tab) their portraits + reference images
+
+Since the second round, every prompt is built from the person's appearance record (world/appearance.py: exact
+age, build, face, hair, eyes, marks, clothing), plus their station. Four candidates each; Danny picks one on the
+review page; the engine adopts the pick as the portrait and keeps the full-size image as a REFERENCE: later
+portraits of that person are painted with it as an image prompt (IP-Adapter), so they keep their face.
 
 Sandbox only. The prompt for each person is built from their record (house, role, age, the public note
 about them) plus a fixed style, so the portraits read as one painter's gallery; the house sets the colours
@@ -21,6 +27,7 @@ male or a female list, and the story names are fixed) and stored as people.sex (
 from __future__ import annotations
 
 import argparse
+import re
 import hashlib
 import json
 import shutil
@@ -83,41 +90,61 @@ def age_words(age: int, sex: str) -> str:
     return f"an old {noun} of about {age}, white-haired and lined"
 
 
-def prompts(con) -> list[dict]:
+def role_words(p) -> str:
+    """Their station, from the public note (the parts that are not visible, what they said or did, left out)."""
+    what = (p["note"] or "").split(";")[0]
+    what = "" if any(k in what for k in ("said", "swore", "believes", "fled", "took ", "spouse of")) else what
+    return what.removeprefix("his ").removeprefix("her ")
+
+
+def prompts(con, candidates: int = 4, only: list[int] | None = None) -> tuple[list[dict], list[str]]:
+    """The batch to paint: everyone principal who has an appearance record, built from that record (exact age now,
+    build, face, hair, eyes, marks, clothing) plus their station; candidates each, with their own seeds. People
+    whose record is still empty (Danny's to write) are returned by name, waiting."""
     year = rows(con, "select max(year) y from storyteller_proposals")[0]["y"] or 0
-    out = []
-    for p in rows(con, "select p.id, p.name, p.born_year, p.note, p.dream_temperament, m.role, h.name house from people p "
-                       "join house_members m on m.person_id = p.id join houses h on h.id = m.house_id "
+    out, waiting = [], []
+    for p in rows(con, "select p.id, p.name, p.born_year, p.note, p.dream_temperament, p.appearance, p.portrait_ref, m.role, "
+                       "h.name house from people p join house_members m on m.person_id = p.id join houses h on h.id = m.house_id "
                        "where p.tier = 'principal' order by p.id"):
-        sex = sex_of(p["name"])
+        if only and p["id"] not in only:
+            continue
+        a = json.loads(p["appearance"] or "{}")
+        if not any(a.get(f) for f in ("build", "face", "hair")):
+            waiting.append(p["name"])
+            continue
+        sex = a.get("sex") or sex_of(p["name"])
         age = year - p["born_year"]
-        h = int(hashlib.sha1(p["name"].encode()).hexdigest(), 16)
-        hair = HAIR[h % len(HAIR)] if age < 50 else ""
-        what = (p["note"] or "").split(";")[0]
-        # the parts of a note that are not visible (what they said, believe or did) are left out
-        what = "" if any(k in what for k in ("said", "swore", "believes", "fled", "took ")) else what
-        what = what.removeprefix("his ").removeprefix("her ")
-        of_house = "" if p["house"] in what else f", of House {p['house']}"
-        prompt = (f"{age_words(age, sex)}" + (f" with {hair} hair" if hair else "") + f", wearing {DRESS[p['house']]}"
-                  + (f", {what}" if what else "") + f"{of_house}, a {p['dream_temperament']} temperament in the eyes")
-        out.append({"id": p["id"], "name": p["name"], "sex": sex, "prompt": prompt, "style": STYLE, "negative": NEGATIVE,
-                    "seed": 1000 + p["id"]})
-    return out
+        noun = ("girl" if sex == "f" else "boy") if age < 16 else ("woman" if sex == "f" else "man")
+        station = role_words(p)
+        # SDXL reads only ~77 tokens: what must show comes first (age, the house's clothes and colours, hair, eyes,
+        # face), then build and any mark a head-and-shoulders portrait can show (not hands or knuckles)
+        clothing = re.sub(r"\s*\(House [^)]*\)", "", a["clothing"])
+        marks = [m.strip() for m in (a.get("marks") or "").split(";")
+                 if m.strip() and m.strip() != "no marks of note" and not re.search(r"hand|finger|knuckle|forearm|smell", m)]
+        if "nose" in a["face"]:
+            marks = [m for m in marks if "nose" not in m]
+        prompt = (f"a {noun} of exactly {age} years wearing {clothing}, hair {a['hair']}, {a['eyes']} eyes, {a['face']}, "
+                  f"{a['build']}" + (f", {marks[0]}" if marks else ""))
+        for k in range(candidates):
+            out.append({"id": p["id"], "k": k, "name": p["name"], "sex": sex, "prompt": prompt, "style": STYLE, "negative": NEGATIVE,
+                        "seed": 5000 + p["id"] * 10 + k,
+                        "reference": (STORAGE_PUBLIC + p["portrait_ref"]) if p["portrait_ref"] else None})
+    return out, waiting
 
 
+STORAGE_PUBLIC = "https://dbrtvwhslxkdpmuawrgd.supabase.co/storage/v1/object/public/arcadia/"
 JOB = {"notebook": "notebooks/kaggle_portraits.ipynb", "slug": "arcadia-portraits", "title": "Arcadia Portraits"}
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--dry_run", action="store_true")
-    ap.add_argument("--no_push", action="store_true")
-    args = ap.parse_args()
-    con = connect()
-    batch = prompts(con)
+def paint(con, args) -> None:
+    """Candidates on Kaggle -> the public bucket (sandbox/portraits/candidates/) -> portrait_candidates (engine record)."""
+    batch, waiting = prompts(con, args.candidates, args.only)
+    if waiting:
+        print("waiting for their appearance to be written: " + ", ".join(waiting))
     if args.dry_run:
         for b in batch:
-            print(f"p{b['id']} {b['name']} ({b['sex']}): {b['prompt']}")
+            if b["k"] == 0:
+                print(f"p{b['id']} {b['name']}: {b['prompt']}")
         return
     from kaggle_run import USER, gpu_minutes, kaggle, push, wait
     from memory_sync import client
@@ -129,6 +156,7 @@ def main() -> None:
         time.sleep(30)
     status = wait(kernel)
     sb = client()
+    dest = ROOT / "out/portrait_candidates"
     with tempfile.TemporaryDirectory() as tmp:
         kaggle("kernels", "output", kernel, "-p", tmp, "--force")
         log = next(Path(tmp).glob("*.log"), None)
@@ -136,15 +164,58 @@ def main() -> None:
         made = Path(tmp) / "portraits"
         if "COMPLETE" not in status or not (made / "portraits.json").exists():
             sys.exit(f"{kernel}: {status}, no portraits ({minutes:.1f} GPU minutes)")
-        dest = ROOT / "out/portraits"
         shutil.copytree(made, dest, dirs_exist_ok=True)
     done = json.loads((dest / "portraits.json").read_text())
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     for d in done:
-        remote = f"sandbox/portraits/p{d['id']}.jpg"
-        sb.upload_bytes(jpeg(dest / f"p{d['id']}.png", quality=88), remote, "image/jpeg")
-        con.execute("update people set portrait = ?, sex = ? where id = ?", (remote, d["sex"], d["id"]))
+        remote = f"sandbox/portraits/candidates/p{d['id']}_{d['k']}.jpg"
+        sb.upload_bytes(jpeg(dest / f"p{d['id']}_{d['k']}.png", quality=88), remote, "image/jpeg")
+        con.execute("delete from portrait_candidates where person_id = ? and k = ?", (d["id"], d["k"]))
+        con.execute("insert into portrait_candidates (person_id, k, seed, prompt, image, made_at) values (?, ?, ?, ?, ?, ?)",
+                    (d["id"], d["k"], d["seed"], d["prompt"], remote, now))
     con.commit()
-    print(f"{kernel}: {status} | {minutes:.1f} GPU minutes | {len(done)} portraits stored on their people's records")
+    print(f"{kernel}: {status} | {minutes:.1f} GPU minutes | {len(done)} candidates for "
+          f"{len({d['id'] for d in done})} people; pick them on the review page (Portraits)")
+
+
+def adopt(con=None) -> int:
+    """Danny's picks (portrait_picks, chosen on the review page) become portraits: people.portrait is the chosen
+    candidate, and the full-size image is kept as the person's reference (sandbox/portraits/ref/p<id>.png,
+    people.portrait_ref) for every later portrait of them. Returns how many changed."""
+    from memory_sync import client, select
+    con = con or connect()
+    sb = client()
+    picks = select(sb, "portrait_picks?select=*")
+    n = 0
+    for pk in picks:
+        c = rows(con, "select * from portrait_candidates where id = ? and person_id = ?", pk["candidate_id"], pk["person_id"])
+        if not c:
+            continue
+        c = c[0]
+        cur = rows(con, "select portrait from people where id = ?", c["person_id"])[0]["portrait"]
+        if cur == c["image"]:
+            continue
+        ref = f"sandbox/portraits/ref/p{c['person_id']}.png"
+        local = ROOT / f"out/portrait_candidates/p{c['person_id']}_{c['k']}.png"
+        data = local.read_bytes() if local.exists() else sb.session.get(STORAGE_PUBLIC + c["image"], timeout=60).content
+        sb.upload_bytes(data, ref, "image/png" if local.exists() else "image/jpeg")
+        con.execute("update people set portrait = ?, portrait_ref = ? where id = ?", (c["image"], ref, c["person_id"]))
+        n += 1
+    con.commit()
+    print(f"{n} portrait(s) adopted from the review page's picks")
+    return n
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("command", nargs="?", default="paint", choices=["paint", "adopt"])
+    ap.add_argument("--dry_run", action="store_true")
+    ap.add_argument("--no_push", action="store_true")
+    ap.add_argument("--candidates", type=int, default=4)
+    ap.add_argument("--only", type=lambda s: [int(x) for x in s.split(",")], help="person ids, e.g. 2,6")
+    args = ap.parse_args()
+    con = connect()
+    paint(con, args) if args.command == "paint" else adopt(con)
 
 
 if __name__ == "__main__":

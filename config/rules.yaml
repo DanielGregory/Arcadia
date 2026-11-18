@@ -56,11 +56,16 @@ interpretation:
 
 storyteller:
   model: Qwen/Qwen2.5-3B-Instruct  # the storyteller and the chronicle's accounts (interpretations keep the 1.5B)
-  max_new_tokens: 320
+  max_new_tokens: 240
   dtype: bfloat16             # 3B in float32 needs ~12 GB and was killed for memory; bfloat16 halves it (the CPU has native bf16)
   retries: 1                  # if a reply is unusable (or names nobody), ask once more, saying what was wrong
   proposals_per_house: 2      # one call per house per season, asking for up to this many actions
-  legends_in_context: 2       # legends the house's members know, retrieved into the prompt
+  legends_in_context: 1       # the house's own legend, retrieved into the prompt (2 before season 4)
+  legend_chars: 200           # each legend cut to this many characters
+  max_ties: 12                # family ties of the house's own people
+  max_context_tokens: 1300    # the house's context is trimmed to this (least needed parts first); with the system
+                              # prompt, ~1600 tokens = ~7 s to read; output fields capped (strategy 150, why 110 chars)
+                              # so a call stays ~40 s (0.24 s per output token on this CPU)
 
 validation:
   # Proposals whose text asserts what something MEANS are rejected (the hard rule).

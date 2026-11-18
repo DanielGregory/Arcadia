@@ -48,11 +48,13 @@ def main() -> None:
         small = Instruct(R["interpretation"]["model"], dtype=R["interpretation"].get("dtype", "float32"))
     with clock.step("interpretations"):
         interp = T.interpret(con, R, shared, small, clock, year, season)
+    T.record_calls(con, year, season, "interpretation", small.calls)
     small.free()
     with clock.step("load storyteller (3B)"):
         llm = Instruct(R["storyteller"]["model"], dtype=R["storyteller"].get("dtype", "float32"))
     with clock.step("storyteller proposals"):
         items = T.propose(con, R, llm, clock, year, season, tick, drives)
+    T.record_calls(con, year, season, "storyteller", llm.calls)
     with clock.step("validation and events"):
         results = T.validate_and_record(con, R, items, year, season, tick, r)
     with clock.step("beliefs, feelings, clients"):

@@ -41,7 +41,7 @@ from world.placements import ESTATES, place_positions  # noqa: E402
 TABLES = [("sandbox_places", "id"), ("sandbox_houses", "id"), ("sandbox_people", "id"), ("sandbox_events", "id"),
           ("sandbox_beliefs", "id"), ("sandbox_dreams", "id"), ("sandbox_house_clients", "id"),
           ("sandbox_chronicles", "id"), ("sandbox_house_feelings", "from_house"), ("sandbox_vital_signs", "year"),
-          ("sandbox_lineage", "id"), ("sandbox_relationships", "id"), ("sandbox_legends", "id"), ("sandbox_symbols", "symbol"),
+          ("sandbox_portrait_candidates", "id"), ("sandbox_lineage", "id"), ("sandbox_relationships", "id"), ("sandbox_legends", "id"), ("sandbox_symbols", "symbol"),
           ("sandbox_world", "id")]
 PUBLIC_TIES = ("spouse", "betrothed", "kin", "friend", "rival", "teacher")   # never 'lover' (the Codex shows only public ties)
 
@@ -100,9 +100,10 @@ def build(con) -> dict[str, list[dict]]:
 
     from world.portraits import sex_of
     people = [{**p, "alive": bool(p["alive"]), "absent": bool(p["absent"]), "proposed": bool(p["proposed"]),
-               "place_id": None if p["absent"] else p["place_id"], "sex": p["sex"] or sex_of(p["name"])}
+               "place_id": None if p["absent"] else p["place_id"], "sex": p["sex"] or sex_of(p["name"]),
+               "appearance": json.loads(p["appearance"]) if p["appearance"] else None}
               for p in rows(con, "select p.id, p.name, p.tier, m.house_id, m.role, p.place_id, p.alive, p.absent, p.proposed, "
-                                 "p.dream_temperament, p.born_year, p.note, p.sex, p.portrait from people p "
+                                 "p.dream_temperament, p.born_year, p.note, p.sex, p.portrait, p.portrait_ref, p.appearance from people p "
                                  "left join house_members m on m.person_id = p.id and m.left_year is null")]
     house_of = {p["id"]: p["house_id"] for p in people}
 
@@ -178,6 +179,7 @@ def build(con) -> dict[str, list[dict]]:
     return {"sandbox_places": places, "sandbox_houses": houses, "sandbox_people": people, "sandbox_events": events,
             "sandbox_beliefs": beliefs, "sandbox_dreams": out_dreams, "sandbox_house_clients": clients,
             "sandbox_chronicles": chronicles, "sandbox_house_feelings": feelings, "sandbox_vital_signs": vitals,
+            "sandbox_portrait_candidates": rows(con, "select id, person_id, k, seed, prompt, image, made_at from portrait_candidates"),
             "sandbox_lineage": lineage, "sandbox_relationships": ties, "sandbox_legends": legends, "sandbox_symbols": symbols,
             "sandbox_world": [{"id": 1, "year": clock["year"], "season": clock["season"], "tick": clock["tick"]}]}
 

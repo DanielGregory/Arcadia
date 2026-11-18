@@ -72,10 +72,19 @@ def main() -> None:
         state.push(f"world: after season {tick} ({season}, year {year})")
         if season == "winter":
             break                              # the year is done: one day, one year
+    # portraits Danny picked on the review page since the last run become the people's portraits and references
+    try:
+        from world.portraits import adopt
+        if adopt():
+            state.push("world: adopted portrait picks")
+            done = done or [{"tick": None, "season": "portraits", "year": None, "minutes": 0}]
+    except Exception as err:  # noqa: BLE001  (never lose a night's seasons to the portrait step)
+        print(f"portrait picks not adopted: {err}", flush=True)
     if done:
         subprocess.run([sys.executable, "-m", "world.publish"], cwd=ROOT, check=True)
     total = (time.time() - t0) / 60
     print(json.dumps({"seasons": done, "total_minutes": round(total, 1), "ceiling_minutes": args.ceiling / 60}), flush=True)
+    done = [d for d in done if d["tick"] is not None]
     if done and not args.no_git:
         git("add", *[f for f in files if (ROOT / f).exists()])
         last = done[-1]

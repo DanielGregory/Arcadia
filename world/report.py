@@ -240,16 +240,31 @@ def chronicler_history(con, llm, c, year, evs, span, R, clock) -> dict | None:
             + ("Dreams people told this year: " + " / ".join(f"{t['name']}: {t['text'][len('(as told) '):][:160]}" for t in told) + "\n" if told else "")
             + "Reference only (never repeat): family ties: " + "; ".join(ties[:20]) + ".")
     text, cut = "", 0
+    # the chronicler writing about themselves by name ("Aldric Severin attempted...") is the third-person slip:
+    # they are "I" in their own chronicle
+    first = p["name"].split()[0]
+    self_name = re.compile(rf"\b{re.escape(p['name'])}\b|\b{re.escape(first)}\b(?! of\b)")
     for attempt in range(2):
         clock.calls += 1
         text = finish(llm.chat(system, user, max_new_tokens=int(hi * 1.6), repetition_penalty=1.12))
         text, cut = drop_ties(text)
         bad = anachronism.find(text)
-        if not bad and cut <= 1:
+        third = bool(self_name.search(text))
+        if not bad and cut <= 1 and not third:
             break
-        user += ("\n(Write it again without " + (", ".join(bad) + " (Corva has no such things or places)" if bad else "")
-                 + (" and " if bad and cut > 1 else "") + ("listing family ties" if cut > 1 else "") + ".)")
+        fixes = []
+        if bad:
+            fixes.append(", ".join(bad) + " (Corva has no such things or places)")
+        if cut > 1:
+            fixes.append("listing family ties")
+        if third:
+            fixes.append(f"naming yourself: you are {p['name']}, so write \"I\" for what you did, never \"{first}\"")
+        user += "\n(Write it again without " + "; and without ".join(fixes) + ".)"
     text = anachronism.strip(text) if anachronism.find(text) else text
+    # still there after the retry: "Aldric Severin attempted" -> "I attempted"; "Aldric's" -> "my"
+    text = re.sub(rf"\b{re.escape(p['name'])}'s\b|\b{re.escape(first)}'s\b", "my", text)
+    text = re.sub(rf"\b{re.escape(p['name'])}\b|\b{re.escape(first)}\b(?! of\b)", "I", text)
+    text = re.sub(r"(^|[.!?]\s+)my\b", lambda m: m.group(1) + "My", text)
     from world.db import insert
     title = f"{p['name']}, {c['title']}, of House {p['house']}"
     insert(con, "chronicles", year=year, season=evs[-1]["season"] if evs else "winter", author_id=p["id"],
@@ -397,6 +412,13 @@ def write_log(con, year, season, tick, stats, interp, raw_failures, budget_secon
     for r in rt:
         lines.append(f"| {r['step']} | {r['seconds']:.0f} | {r['calls']} | {per_day(r) / 60:.1f} min | {per_day(r) / budget_seconds:.0%} |")
     lines.append(f"| **total** | **{total:.0f}** | **{sum(r['calls'] for r in rt)}** | **{day_total / 60:.0f} min** | **{day_total / budget_seconds:.0%}** |")
+    prof = rows(con, "select step, count(*) n, avg(prompt_tokens) pin, max(prompt_tokens) pmax, avg(output_tokens) pout, "
+                     "max(output_tokens) omax, avg(seconds) s, max(seconds) smax from model_calls where year = ? and season = ? "
+                     "group by step", year, season)
+    if prof:
+        lines += ["", "### Model calls (profile)", "", "| Step | Calls | Prompt tokens (mean / max) | Output tokens (mean / max) | Seconds (mean / max) |",
+                  "|---|---:|---:|---:|---:|"]
+        lines += [f"| {r['step']} | {r['n']} | {r['pin']:.0f} / {r['pmax']} | {r['pout']:.0f} / {r['omax']} | {r['s']:.1f} / {r['smax']:.1f} |" for r in prof]
     if ACCOUNT_CUTS:
         lines += ["", "Background ties cut from the chronicles (sentences): " + ", ".join(f"{a} {n}" for a, n in ACCOUNT_CUTS) + "."]
     lines += ["", "## Vital signs", "", "```json", json.dumps({k: v for k, v in stats.items() if k != "runtime"}, indent=1), "```", ""]

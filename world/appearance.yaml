@@ -1,0 +1,1298 @@
+# Physical descriptions of Corva's people: the fixed record every portrait is built from.
+# status: proposed (an engine draft: rewrite freely) | danny (Danny writes it; empty until then) | written (settled)
+# age_in_year: the age this describes, by year (the portrait uses their age in the year it is painted).
+# natural_hair: their hair colour before any grey (their children are drafted with it).
+# Change anything; then: python -m world.appearance load
+
+Ismene:
+  status: proposed
+  born_year: -74
+  age_in_year:
+    1: 75
+  sex: f
+  build: slight and wiry, stooped a little with age
+  face: a narrow face and a sharp chin, weathered
+  hair: white, braided and pinned up
+  eyes: hazel
+  marks: calloused, ink-stained fingers
+  clothing: 'white priestly robes with a sea-blue stole and a shell pendant (House Aurelian: white and sea blue)'
+  natural_hair: black
+Theodric Aurelian:
+  status: danny
+  born_year: -59
+  age_in_year:
+    1: 60
+  sex: m
+  build: ''
+  face: ''
+  hair: ''
+  eyes: ''
+  marks: ''
+  clothing: ''
+Iola Aurelian:
+  status: proposed
+  born_year: -19
+  age_in_year:
+    1: 20
+  sex: f
+  build: sturdy and broad-hipped
+  face: a wide mouth quick to smile
+  hair: auburn, worn long and loose
+  eyes: hazel
+  marks: a gap between the front teeth
+  clothing: 'white priestly robes with a sea-blue stole and a shell pendant (House Aurelian: white and sea blue)'
+  natural_hair: auburn
+Rufus Cassian:
+  status: proposed
+  born_year: -51
+  age_in_year:
+    1: 52
+  sex: m
+  build: stocky, thick through the chest
+  face: a square jaw, weathered
+  hair: light brown going grey, tied back, clean-shaven
+  eyes: black
+  marks: stone-cut scars across the knuckles; a burn scar on the back of one hand
+  clothing: 'a grey tunic with a rust-red border, dusted with stone (House Cassian: stone grey and rust)'
+  natural_hair: light brown
+Brenna Cassian:
+  status: proposed
+  born_year: -26
+  age_in_year:
+    1: 27
+  sex: f
+  build: of middling height, straight-backed
+  face: a long face with a high forehead
+  hair: light brown, coiled at the nape
+  eyes: black
+  marks: stone-cut scars across the knuckles; freckles across the nose
+  clothing: 'a grey tunic with a rust-red border, dusted with stone (House Cassian: stone grey and rust)'
+  natural_hair: light brown
+Marius Corvane:
+  status: danny
+  born_year: -61
+  age_in_year:
+    1: 62
+  sex: m
+  build: ''
+  face: ''
+  hair: ''
+  eyes: ''
+  marks: ''
+  clothing: ''
+Decimus Corvane:
+  status: proposed
+  born_year: -33
+  age_in_year:
+    1: 34
+  sex: m
+  build: stocky, thick through the chest
+  face: a thin, severe mouth
+  hair: dark, tightly curled, thick and unruly, a short beard
+  eyes: amber-brown
+  marks: a thin scar through the left eyebrow
+  clothing: 'a long black robe banded in gold, a gold signet ring (House Corvane: black and deep gold)'
+  natural_hair: dark, tightly curled
+Livia Corvane:
+  status: danny
+  born_year: -20
+  age_in_year:
+    1: 21
+  sex: f
+  build: ''
+  face: ''
+  hair: ''
+  eyes: ''
+  marks: ''
+  clothing: ''
+Hesione Damaris:
+  status: proposed
+  born_year: -56
+  age_in_year:
+    1: 57
+  sex: f
+  build: sturdy and broad-hipped
+  face: a long face with a high forehead, weathered
+  hair: chestnut going grey, coiled at the nape
+  eyes: dark brown
+  marks: hands that smell of rosemary and myrrh; deep lines at the eyes
+  clothing: 'teal healer''s robes with a white headcloth, a satchel of herbs (House Damaris: teal and white)'
+  natural_hair: chestnut
+Neria:
+  status: danny
+  born_year: -34
+  age_in_year:
+    1: 35
+  sex: f
+  build: ''
+  face: ''
+  hair: ''
+  eyes: ''
+  marks: ''
+  clothing: ''
+Octavia Marcellan:
+  status: proposed
+  born_year: -48
+  age_in_year:
+    1: 49
+  sex: f
+  build: small and quick
+  face: a strong hooked nose
+  hair: dark brown going grey, bound in a plain cloth
+  eyes: grey
+  marks: a crooked nose, once broken
+  clothing: 'rich saffron-orange robes, rings on several fingers (House Marcellan: saffron orange and brown)'
+  natural_hair: dark brown
+Nikias Marcellan:
+  status: proposed
+  born_year: -28
+  age_in_year:
+    1: 29
+  sex: m
+  build: rangy and long-limbed
+  face: a narrow face and a sharp chin
+  hair: dark brown, worn to the shoulder, a short beard
+  eyes: grey
+  marks: a gap between the front teeth
+  clothing: 'rich saffron-orange robes, rings on several fingers (House Marcellan: saffron orange and brown)'
+  natural_hair: dark brown
+Aldric Severin:
+  status: proposed
+  born_year: -67
+  age_in_year:
+    1: 68
+  sex: m
+  build: stocky, thick through the chest, stooped a little with age
+  face: deep-set features, weathered
+  hair: white, cropped short, a trimmed beard
+  eyes: amber-brown
+  marks: a mole on the right cheek
+  clothing: 'a violet judge''s mantle over pale linen (House Severin: violet and pale linen)'
+  natural_hair: dark brown
+Quintus Severin:
+  status: proposed
+  born_year: -41
+  age_in_year:
+    1: 42
+  sex: m
+  build: rangy and long-limbed
+  face: a thin, severe mouth
+  hair: dark brown, tied back, a short beard
+  eyes: amber-brown
+  marks: a missing fingertip on the left hand
+  clothing: 'a violet judge''s mantle over pale linen (House Severin: violet and pale linen)'
+  natural_hair: dark brown
+Seraphine Solenne:
+  status: proposed
+  born_year: -71
+  age_in_year:
+    1: 72
+  sex: f
+  build: of middling height, straight-backed, stooped a little with age
+  face: a square jaw, weathered
+  hair: white, bound in a plain cloth
+  eyes: black
+  marks: a missing fingertip on the left hand
+  clothing: 'faded rose silk, once very fine, now worn at the seams, an old silver brooch (House Solenne: faded rose and silver)'
+  natural_hair: black
+Silvan Solenne:
+  status: proposed
+  born_year: -19
+  age_in_year:
+    1: 20
+  sex: m
+  build: tall and lean
+  face: a wide mouth quick to smile
+  hair: dark brown, thick and unruly, a full beard
+  eyes: black
+  marks: a mole on the right cheek
+  clothing: 'faded rose silk, once very fine, now worn at the seams, an old silver brooch (House Solenne: faded rose and silver)'
+  natural_hair: dark brown
+Galen Theren:
+  status: danny
+  born_year: -58
+  age_in_year:
+    1: 59
+  sex: m
+  build: ''
+  face: ''
+  hair: ''
+  eyes: ''
+  marks: ''
+  clothing: ''
+Tiberon Theren:
+  status: danny
+  born_year: -29
+  age_in_year:
+    1: 30
+  sex: m
+  build: ''
+  face: ''
+  hair: ''
+  eyes: ''
+  marks: ''
+  clothing: ''
+Corin Theren:
+  status: proposed
+  born_year: -24
+  age_in_year:
+    1: 25
+  sex: m
+  build: of middling height, solid
+  face: deep-set features
+  hair: dark, tightly curled, worn to the shoulder, a trimmed beard
+  eyes: black
+  marks: a crooked nose, once broken
+  clothing: 'an olive-green wool mantle over undyed linen (House Theren: olive green and undyed linen)'
+  natural_hair: dark, tightly curled
+Soren of the Harbor:
+  status: danny
+  born_year: -22
+  age_in_year:
+    1: 23
+  sex: m
+  build: ''
+  face: ''
+  hair: ''
+  eyes: ''
+  marks: ''
+  clothing: ''
+Gaius Valerius:
+  status: proposed
+  born_year: -55
+  age_in_year:
+    1: 56
+  sex: m
+  build: stocky, thick through the chest
+  face: a narrow face and a sharp chin, weathered
+  hair: light brown going grey, cropped short, clean-shaven
+  eyes: green
+  marks: skin browned by sea wind; freckles across the nose
+  clothing: 'a sea-blue cloak pinned with a bronze clasp over a white tunic (House Valerius: sea blue and bronze)'
+  natural_hair: light brown
+Lucan Valerius:
+  status: danny
+  born_year: -26
+  age_in_year:
+    1: 27
+  sex: m
+  build: ''
+  face: ''
+  hair: ''
+  eyes: ''
+  marks: ''
+  clothing: ''
+Drusilla Valerius:
+  status: proposed
+  born_year: -22
+  age_in_year:
+    1: 23
+  sex: f
+  build: sturdy and broad-hipped
+  face: a wide mouth quick to smile
+  hair: light brown, bound in a plain cloth
+  eyes: green
+  marks: a missing fingertip on the left hand
+  clothing: 'a sea-blue cloak pinned with a bronze clasp over a white tunic (House Valerius: sea blue and bronze)'
+  natural_hair: light brown
+Kael Veyra:
+  status: proposed
+  born_year: -45
+  age_in_year:
+    1: 46
+  sex: m
+  build: of middling height, solid
+  face: a strong hooked nose
+  hair: black going grey, cropped short, clean-shaven
+  eyes: black
+  marks: a weathered, windburned face; a crooked nose, once broken
+  clothing: 'rust-red hunter''s leathers with a fur collar (House Veyra: rust red and fur)'
+  natural_hair: black
+Ysolde Veyra:
+  status: proposed
+  born_year: -23
+  age_in_year:
+    1: 24
+  sex: f
+  build: sturdy and broad-hipped
+  face: a long face with a high forehead
+  hair: black, bound in a plain cloth
+  eyes: black
+  marks: a weathered, windburned face; a gap between the front teeth
+  clothing: 'rust-red hunter''s leathers with a fur collar (House Veyra: rust red and fur)'
+  natural_hair: black
+Philo:
+  status: proposed
+  born_year: -68
+  age_in_year:
+    1: 69
+  sex: m
+  build: rangy and long-limbed, stooped a little with age
+  face: a strong hooked nose, weathered
+  hair: white, cropped short, a short beard
+  eyes: amber-brown
+  marks: a burn scar on the back of one hand
+  clothing: 'a plain white temple tunic with a blue cord (House Aurelian: white and sea blue)'
+  natural_hair: chestnut
+Calla Aurelian:
+  status: proposed
+  born_year: -59
+  age_in_year:
+    1: 60
+  sex: f
+  build: tall and slender
+  face: deep-set features, weathered
+  hair: white, coiled at the nape
+  eyes: hazel
+  marks: freckles across the nose
+  clothing: 'white priestly robes with a sea-blue stole and a shell pendant (House Aurelian: white and sea blue)'
+  natural_hair: light brown
+Corvin:
+  status: proposed
+  born_year: -36
+  age_in_year:
+    1: 37
+  sex: m
+  build: rangy and long-limbed
+  face: a broad face with heavy cheekbones
+  hair: chestnut, thick and unruly, clean-shaven
+  eyes: amber-brown
+  marks: a mole on the right cheek
+  clothing: 'a plain white temple tunic with a blue cord (House Aurelian: white and sea blue)'
+  natural_hair: chestnut
+Silas Aurelian:
+  status: proposed
+  born_year: -23
+  age_in_year:
+    1: 24
+  sex: m
+  build: broad-shouldered and heavy
+  face: a strong hooked nose
+  hair: chestnut, tied back, a trimmed beard
+  eyes: grey
+  marks: a burn scar on the back of one hand
+  clothing: 'a plain white temple tunic with a blue cord (House Aurelian: white and sea blue)'
+  natural_hair: chestnut
+Xenia Cassian:
+  status: proposed
+  born_year: -59
+  age_in_year:
+    1: 60
+  sex: f
+  build: sturdy and broad-hipped
+  face: a long face with a high forehead, weathered
+  hair: white, bound in a plain cloth
+  eyes: black
+  marks: stone-cut scars across the knuckles; a mole on the right cheek
+  clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
+  natural_hair: light brown
+Sabina Cassian:
+  status: proposed
+  born_year: -49
+  age_in_year:
+    1: 50
+  sex: f
+  build: full-figured and strong
+  face: a strong hooked nose, weathered
+  hair: chestnut going grey, braided and pinned up
+  eyes: dark brown
+  marks: stone-cut scars across the knuckles; a missing fingertip on the left hand
+  clothing: 'a grey tunic with a rust-red border, dusted with stone (House Cassian: stone grey and rust)'
+  natural_hair: chestnut
+Julia (p78):
+  status: proposed
+  born_year: -41
+  age_in_year:
+    1: 42
+  sex: f
+  build: sturdy and broad-hipped
+  face: a narrow face and a sharp chin
+  hair: auburn, coiled at the nape
+  eyes: green
+  marks: stone-cut scars across the knuckles; a missing fingertip on the left hand
+  clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
+  natural_hair: auburn
+Rhea:
+  status: proposed
+  born_year: -38
+  age_in_year:
+    1: 39
+  sex: f
+  build: of middling height, straight-backed
+  face: a strong hooked nose
+  hair: light brown, worn long and loose
+  eyes: dark brown
+  marks: stone-cut scars across the knuckles; a burn scar on the back of one hand
+  clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
+  natural_hair: light brown
+Cyra:
+  status: proposed
+  born_year: -33
+  age_in_year:
+    1: 34
+  sex: f
+  build: sturdy and broad-hipped
+  face: a thin, severe mouth
+  hair: chestnut, worn long and loose
+  eyes: grey
+  marks: stone-cut scars across the knuckles; a burn scar on the back of one hand
+  clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
+  natural_hair: chestnut
+Elara Cassian:
+  status: proposed
+  born_year: -26
+  age_in_year:
+    1: 27
+  sex: f
+  build: tall and slender
+  face: a long face with a high forehead
+  hair: light brown, worn long and loose
+  eyes: black
+  marks: freckles across the nose
+  clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
+  natural_hair: light brown
+Felix Cassian:
+  status: proposed
+  born_year: -10
+  age_in_year:
+    1: 11
+  sex: m
+  build: a child, tall for their age
+  face: a broad face with heavy cheekbones
+  hair: light brown, thick and unruly
+  eyes: black
+  marks: a burn scar on the back of one hand
+  clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
+  natural_hair: light brown
+Clio Cassian:
+  status: proposed
+  born_year: -10
+  age_in_year:
+    1: 11
+  sex: f
+  build: a child, tall for their age
+  face: a long face with a high forehead
+  hair: light brown, bound in a plain cloth
+  eyes: black
+  marks: a mole on the right cheek
+  clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
+  natural_hair: light brown
+Calla Corvane:
+  status: proposed
+  born_year: -58
+  age_in_year:
+    1: 59
+  sex: f
+  build: tall and slender
+  face: a thin, severe mouth, weathered
+  hair: dark brown going grey, worn long and loose
+  eyes: black
+  marks: a thin scar through the left eyebrow
+  clothing: 'plain black wool with a gold-thread hem (House Corvane: black and deep gold)'
+  natural_hair: dark brown
+Aelia Corvane:
+  status: proposed
+  born_year: -52
+  age_in_year:
+    1: 53
+  sex: f
+  build: slight and wiry
+  face: a narrow face and a sharp chin, weathered
+  hair: black going grey, braided and pinned up
+  eyes: grey
+  marks: a mole on the right cheek
+  clothing: 'a long black robe banded in gold, a gold signet ring (House Corvane: black and deep gold)'
+  natural_hair: black
+Theon Corvane:
+  status: proposed
+  born_year: -49
+  age_in_year:
+    1: 50
+  sex: m
+  build: stocky, thick through the chest
+  face: a square jaw, weathered
+  hair: dark brown going grey, thick and unruly, a short beard
+  eyes: dark brown
+  marks: a missing fingertip on the left hand
+  clothing: 'plain black wool with a gold-thread hem (House Corvane: black and deep gold)'
+  natural_hair: dark brown
+Elara Corvane:
+  status: proposed
+  born_year: -28
+  age_in_year:
+    1: 29
+  sex: f
+  build: sturdy and broad-hipped
+  face: a strong hooked nose
+  hair: dark brown, worn long and loose
+  eyes: green
+  marks: a thin scar through the left eyebrow
+  clothing: 'plain black wool with a gold-thread hem (House Corvane: black and deep gold)'
+  natural_hair: dark brown
+Nerva Corvane:
+  status: proposed
+  born_year: -12
+  age_in_year:
+    1: 13
+  sex: m
+  build: broad-shouldered and heavy
+  face: a wide mouth quick to smile
+  hair: dark, tightly curled, cropped short
+  eyes: hazel
+  marks: deep lines at the eyes
+  clothing: 'plain black wool with a gold-thread hem (House Corvane: black and deep gold)'
+  natural_hair: dark, tightly curled
+Selene Damaris:
+  status: proposed
+  born_year: -67
+  age_in_year:
+    1: 68
+  sex: f
+  build: full-figured and strong, stooped a little with age
+  face: a long face with a high forehead, weathered
+  hair: white, coiled at the nape
+  eyes: green
+  marks: hands that smell of rosemary and myrrh; a gap between the front teeth
+  clothing: 'a teal smock, a bundle of dried herbs at the belt (House Damaris: teal and white)'
+  natural_hair: dark, tightly curled
+Aulus Damaris:
+  status: proposed
+  born_year: -54
+  age_in_year:
+    1: 55
+  sex: m
+  build: of middling height, solid
+  face: a long face with a high forehead, weathered
+  hair: chestnut going grey, worn to the shoulder, a short beard
+  eyes: hazel
+  marks: hands that smell of rosemary and myrrh; a burn scar on the back of one hand
+  clothing: 'teal healer''s robes with a white headcloth, a satchel of herbs (House Damaris: teal and white)'
+  natural_hair: chestnut
+Selene:
+  status: proposed
+  born_year: -48
+  age_in_year:
+    1: 49
+  sex: f
+  build: full-figured and strong
+  face: a wide mouth quick to smile
+  hair: black going grey, bound in a plain cloth
+  eyes: green
+  marks: hands that smell of rosemary and myrrh; freckles across the nose
+  clothing: 'a teal smock, a bundle of dried herbs at the belt (House Damaris: teal and white)'
+  natural_hair: black
+Tamsin:
+  status: proposed
+  born_year: -43
+  age_in_year:
+    1: 44
+  sex: f
+  build: tall and slender
+  face: a strong hooked nose
+  hair: dark brown, worn long and loose
+  eyes: black
+  marks: hands that smell of rosemary and myrrh; freckles across the nose
+  clothing: 'a teal smock, a bundle of dried herbs at the belt (House Damaris: teal and white)'
+  natural_hair: dark brown
+Varro Damaris:
+  status: proposed
+  born_year: -35
+  age_in_year:
+    1: 36
+  sex: m
+  build: broad-shouldered and heavy
+  face: a strong hooked nose
+  hair: auburn, tied back, a full beard
+  eyes: amber-brown
+  marks: hands that smell of rosemary and myrrh; freckles across the nose
+  clothing: 'a teal smock, a bundle of dried herbs at the belt (House Damaris: teal and white)'
+  natural_hair: auburn
+Doros Marcellan:
+  status: proposed
+  born_year: -66
+  age_in_year:
+    1: 67
+  sex: m
+  build: broad-shouldered and heavy, stooped a little with age
+  face: a wide mouth quick to smile, weathered
+  hair: white, thick and unruly, a trimmed beard
+  eyes: dark brown
+  marks: a thin scar through the left eyebrow
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: chestnut
+Sabina Marcellan:
+  status: proposed
+  born_year: -46
+  age_in_year:
+    1: 47
+  sex: f
+  build: sturdy and broad-hipped
+  face: deep-set features
+  hair: chestnut going grey, braided and pinned up
+  eyes: amber-brown
+  marks: a missing fingertip on the left hand
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: chestnut
+Hesper:
+  status: proposed
+  born_year: -44
+  age_in_year:
+    1: 45
+  sex: m
+  build: short and wiry
+  face: a strong hooked nose
+  hair: dark, tightly curled going grey, thick and unruly, a full beard
+  eyes: black
+  marks: a gap between the front teeth
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: dark, tightly curled
+Basil Marcellan:
+  status: proposed
+  born_year: -43
+  age_in_year:
+    1: 44
+  sex: m
+  build: short and wiry
+  face: a square jaw
+  hair: black, tied back, a short beard
+  eyes: green
+  marks: a burn scar on the back of one hand
+  clothing: 'rich saffron-orange robes, rings on several fingers (House Marcellan: saffron orange and brown)'
+  natural_hair: black
+Dion:
+  status: proposed
+  born_year: -37
+  age_in_year:
+    1: 38
+  sex: m
+  build: of middling height, solid
+  face: a narrow face and a sharp chin
+  hair: chestnut, worn to the shoulder, a short beard
+  eyes: hazel
+  marks: a thin scar through the left eyebrow
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: chestnut
+Milo Marcellan:
+  status: proposed
+  born_year: -35
+  age_in_year:
+    1: 36
+  sex: m
+  build: broad-shouldered and heavy
+  face: deep-set features
+  hair: dark brown, cropped short, a full beard
+  eyes: black
+  marks: freckles across the nose
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: dark brown
+Delia Marcellan:
+  status: proposed
+  born_year: -33
+  age_in_year:
+    1: 34
+  sex: f
+  build: small and quick
+  face: a narrow face and a sharp chin
+  hair: black, braided and pinned up
+  eyes: dark brown
+  marks: a crooked nose, once broken
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: black
+Lysias Marcellan:
+  status: proposed
+  born_year: -28
+  age_in_year:
+    1: 29
+  sex: m
+  build: stocky, thick through the chest
+  face: a thin, severe mouth
+  hair: dark brown, thick and unruly, a trimmed beard
+  eyes: grey
+  marks: a crooked nose, once broken
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: dark brown
+Ione Marcellan:
+  status: proposed
+  born_year: -25
+  age_in_year:
+    1: 26
+  sex: f
+  build: slight and wiry
+  face: deep-set features
+  hair: chestnut, braided and pinned up
+  eyes: black
+  marks: freckles across the nose
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: chestnut
+Lavinia (p66):
+  status: proposed
+  born_year: -25
+  age_in_year:
+    1: 26
+  sex: f
+  build: sturdy and broad-hipped
+  face: a square jaw
+  hair: light brown, bound in a plain cloth
+  eyes: hazel
+  marks: a mole on the right cheek
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: light brown
+Orin Marcellan:
+  status: proposed
+  born_year: -23
+  age_in_year:
+    1: 24
+  sex: m
+  build: of middling height, solid
+  face: a round, open face
+  hair: dark brown, tied back, clean-shaven
+  eyes: grey
+  marks: no marks of note
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: dark brown
+Daphne Marcellan:
+  status: proposed
+  born_year: -20
+  age_in_year:
+    1: 21
+  sex: f
+  build: slight and wiry
+  face: a strong hooked nose
+  hair: dark brown, worn long and loose
+  eyes: grey
+  marks: a missing fingertip on the left hand
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: dark brown
+Zoe:
+  status: proposed
+  born_year: -17
+  age_in_year:
+    1: 18
+  sex: f
+  build: tall and slender
+  face: deep-set features
+  hair: chestnut, bound in a plain cloth
+  eyes: amber-brown
+  marks: deep lines at the eyes
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: chestnut
+Rhea Marcellan:
+  status: proposed
+  born_year: -15
+  age_in_year:
+    1: 16
+  sex: f
+  build: full-figured and strong
+  face: a narrow face and a sharp chin
+  hair: dark brown, coiled at the nape
+  eyes: grey
+  marks: a burn scar on the back of one hand
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: dark brown
+Lysandra Marcellan:
+  status: proposed
+  born_year: -9
+  age_in_year:
+    1: 10
+  sex: f
+  build: a child, tall for their age
+  face: a square jaw
+  hair: dark brown, coiled at the nape
+  eyes: grey
+  marks: a crooked nose, once broken
+  clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
+  natural_hair: dark brown
+Fausta:
+  status: proposed
+  born_year: -63
+  age_in_year:
+    1: 64
+  sex: f
+  build: tall and slender
+  face: a long face with a high forehead, weathered
+  hair: white, bound in a plain cloth
+  eyes: black
+  marks: a mole on the right cheek
+  clothing: 'pale linen with a violet cord at the waist (House Severin: violet and pale linen)'
+  natural_hair: chestnut
+Phaedra Severin:
+  status: proposed
+  born_year: -62
+  age_in_year:
+    1: 63
+  sex: f
+  build: slight and wiry
+  face: a wide mouth quick to smile, weathered
+  hair: white, bound in a plain cloth
+  eyes: hazel
+  marks: a gap between the front teeth
+  clothing: 'a violet judge''s mantle over pale linen (House Severin: violet and pale linen)'
+  natural_hair: auburn
+Zoe Severin:
+  status: proposed
+  born_year: -51
+  age_in_year:
+    1: 52
+  sex: f
+  build: sturdy and broad-hipped
+  face: a wide mouth quick to smile, weathered
+  hair: dark brown going grey, coiled at the nape
+  eyes: amber-brown
+  marks: a burn scar on the back of one hand
+  clothing: 'pale linen with a violet cord at the waist (House Severin: violet and pale linen)'
+  natural_hair: dark brown
+Thalia Severin:
+  status: proposed
+  born_year: -45
+  age_in_year:
+    1: 46
+  sex: f
+  build: tall and slender
+  face: deep-set features
+  hair: dark brown going grey, worn long and loose
+  eyes: dark brown
+  marks: a thin scar through the left eyebrow
+  clothing: 'pale linen with a violet cord at the waist (House Severin: violet and pale linen)'
+  natural_hair: dark brown
+Damon Severin:
+  status: proposed
+  born_year: -10
+  age_in_year:
+    1: 11
+  sex: m
+  build: a child, small for their age
+  face: deep-set features
+  hair: dark brown, tied back
+  eyes: amber-brown
+  marks: a gap between the front teeth
+  clothing: 'pale linen with a violet cord at the waist (House Severin: violet and pale linen)'
+  natural_hair: dark brown
+Isidor Solenne:
+  status: proposed
+  born_year: -71
+  age_in_year:
+    1: 72
+  sex: m
+  build: of middling height, solid, stooped a little with age
+  face: a square jaw, weathered
+  hair: white, cropped short, a trimmed beard
+  eyes: hazel
+  marks: freckles across the nose
+  clothing: 'faded rose silk, once very fine, now worn at the seams, an old silver brooch (House Solenne: faded rose and silver)'
+  natural_hair: black
+Petros Theren:
+  status: proposed
+  born_year: -64
+  age_in_year:
+    1: 65
+  sex: m
+  build: tall and lean, stooped a little with age
+  face: a broad face with heavy cheekbones, weathered
+  hair: white, cropped short, a trimmed beard
+  eyes: grey
+  marks: sun-browned forearms; deep lines at the eyes
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: chestnut
+Xenia Theren:
+  status: proposed
+  born_year: -63
+  age_in_year:
+    1: 64
+  sex: f
+  build: of middling height, straight-backed
+  face: a square jaw, weathered
+  hair: white, coiled at the nape
+  eyes: hazel
+  marks: sun-browned forearms; calloused, ink-stained fingers
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: chestnut
+Cyra Theren:
+  status: proposed
+  born_year: -56
+  age_in_year:
+    1: 57
+  sex: f
+  build: full-figured and strong
+  face: a wide mouth quick to smile, weathered
+  hair: light brown going grey, bound in a plain cloth
+  eyes: amber-brown
+  marks: sun-browned forearms; a gap between the front teeth
+  clothing: 'an olive-green wool mantle over undyed linen (House Theren: olive green and undyed linen)'
+  natural_hair: light brown
+Maia Theren:
+  status: proposed
+  born_year: -42
+  age_in_year:
+    1: 43
+  sex: f
+  build: full-figured and strong
+  face: a broad face with heavy cheekbones
+  hair: chestnut, worn long and loose
+  eyes: hazel
+  marks: sun-browned forearms; deep lines at the eyes
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: chestnut
+Julia (p62):
+  status: proposed
+  born_year: -41
+  age_in_year:
+    1: 42
+  sex: f
+  build: sturdy and broad-hipped
+  face: a narrow face and a sharp chin
+  hair: auburn, coiled at the nape
+  eyes: green
+  marks: sun-browned forearms; a missing fingertip on the left hand
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: auburn
+Kleon:
+  status: proposed
+  born_year: -35
+  age_in_year:
+    1: 36
+  sex: m
+  build: tall and lean
+  face: deep-set features
+  hair: black, worn to the shoulder, a short beard
+  eyes: amber-brown
+  marks: sun-browned forearms; calloused, ink-stained fingers
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: black
+Lavinia (p87):
+  status: proposed
+  born_year: -31
+  age_in_year:
+    1: 32
+  sex: f
+  build: sturdy and broad-hipped
+  face: a square jaw
+  hair: light brown, bound in a plain cloth
+  eyes: hazel
+  marks: sun-browned forearms; a mole on the right cheek
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: light brown
+Varro Theren:
+  status: proposed
+  born_year: -29
+  age_in_year:
+    1: 30
+  sex: m
+  build: broad-shouldered and heavy
+  face: deep-set features
+  hair: chestnut, thick and unruly, clean-shaven
+  eyes: amber-brown
+  marks: sun-browned forearms; a burn scar on the back of one hand
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: chestnut
+Junius Theren:
+  status: proposed
+  born_year: -28
+  age_in_year:
+    1: 29
+  sex: m
+  build: of middling height, solid
+  face: a strong hooked nose
+  hair: black, thick and unruly, a full beard
+  eyes: dark brown
+  marks: sun-browned forearms
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: black
+Zoe Theren:
+  status: proposed
+  born_year: -20
+  age_in_year:
+    1: 21
+  sex: f
+  build: full-figured and strong
+  face: a thin, severe mouth
+  hair: chestnut, braided and pinned up
+  eyes: dark brown
+  marks: a missing fingertip on the left hand
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: chestnut
+Daphne Theren:
+  status: proposed
+  born_year: -20
+  age_in_year:
+    1: 21
+  sex: f
+  build: small and quick
+  face: a broad face with heavy cheekbones
+  hair: auburn, bound in a plain cloth
+  eyes: amber-brown
+  marks: no marks of note
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: auburn
+Lysandra Theren:
+  status: proposed
+  born_year: -11
+  age_in_year:
+    1: 12
+  sex: f
+  build: tall and slender
+  face: deep-set features
+  hair: dark, tightly curled, braided and pinned up
+  eyes: black
+  marks: a gap between the front teeth
+  clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
+  natural_hair: dark, tightly curled
+Otho Valerius:
+  status: proposed
+  born_year: -61
+  age_in_year:
+    1: 62
+  sex: m
+  build: broad-shouldered and heavy
+  face: deep-set features, weathered
+  hair: white, cropped short, a full beard
+  eyes: grey
+  marks: skin browned by sea wind; a burn scar on the back of one hand
+  clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
+  natural_hair: light brown
+Daphne:
+  status: proposed
+  born_year: -60
+  age_in_year:
+    1: 61
+  sex: f
+  build: tall and slender
+  face: a broad face with heavy cheekbones, weathered
+  hair: white, bound in a plain cloth
+  eyes: hazel
+  marks: skin browned by sea wind; a crooked nose, once broken
+  clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
+  natural_hair: chestnut
+Nyssa Valerius:
+  status: proposed
+  born_year: -58
+  age_in_year:
+    1: 59
+  sex: f
+  build: small and quick
+  face: a long face with a high forehead, weathered
+  hair: chestnut going grey, coiled at the nape
+  eyes: green
+  marks: skin browned by sea wind; freckles across the nose
+  clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
+  natural_hair: chestnut
+Rhea Valerius:
+  status: proposed
+  born_year: -55
+  age_in_year:
+    1: 56
+  sex: f
+  build: full-figured and strong
+  face: a long face with a high forehead, weathered
+  hair: auburn going grey, braided and pinned up
+  eyes: hazel
+  marks: skin browned by sea wind; a gap between the front teeth
+  clothing: 'a sea-blue cloak pinned with a bronze clasp over a white tunic (House Valerius: sea blue and bronze)'
+  natural_hair: auburn
+Sabina Valerius:
+  status: proposed
+  born_year: -51
+  age_in_year:
+    1: 52
+  sex: f
+  build: full-figured and strong
+  face: a thin, severe mouth, weathered
+  hair: light brown going grey, coiled at the nape
+  eyes: dark brown
+  marks: skin browned by sea wind; a mole on the right cheek
+  clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
+  natural_hair: light brown
+Cato:
+  status: proposed
+  born_year: -44
+  age_in_year:
+    1: 45
+  sex: m
+  build: stocky, thick through the chest
+  face: a wide mouth quick to smile
+  hair: chestnut going grey, thick and unruly, a short beard
+  eyes: green
+  marks: skin browned by sea wind; a gap between the front teeth
+  clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
+  natural_hair: chestnut
+Clio Valerius:
+  status: proposed
+  born_year: -24
+  age_in_year:
+    1: 25
+  sex: f
+  build: full-figured and strong
+  face: deep-set features
+  hair: light brown, coiled at the nape
+  eyes: grey
+  marks: skin browned by sea wind; freckles across the nose
+  clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
+  natural_hair: light brown
+Bion:
+  status: proposed
+  born_year: -17
+  age_in_year:
+    1: 18
+  sex: m
+  build: rangy and long-limbed
+  face: a strong hooked nose
+  hair: light brown, worn to the shoulder, a short beard
+  eyes: black
+  marks: skin browned by sea wind; freckles across the nose
+  clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
+  natural_hair: light brown
+Xanthos Valerius:
+  status: proposed
+  born_year: -13
+  age_in_year:
+    1: 14
+  sex: m
+  build: stocky, thick through the chest
+  face: a round, open face
+  hair: light brown, thick and unruly
+  eyes: green
+  marks: a gap between the front teeth
+  clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
+  natural_hair: light brown
+Lavinia Valerius:
+  status: proposed
+  born_year: -12
+  age_in_year:
+    1: 13
+  sex: f
+  build: slight and wiry
+  face: a long face with a high forehead
+  hair: light brown, bound in a plain cloth
+  eyes: green
+  marks: no marks of note
+  clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
+  natural_hair: light brown
+Clio Veyra:
+  status: proposed
+  born_year: -69
+  age_in_year:
+    1: 70
+  sex: f
+  build: sturdy and broad-hipped, stooped a little with age
+  face: a strong hooked nose, weathered
+  hair: white, bound in a plain cloth
+  eyes: black
+  marks: a weathered, windburned face
+  clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
+  natural_hair: chestnut
+Evander:
+  status: proposed
+  born_year: -51
+  age_in_year:
+    1: 52
+  sex: m
+  build: stocky, thick through the chest
+  face: a wide mouth quick to smile, weathered
+  hair: dark brown going grey, worn to the shoulder, a full beard
+  eyes: hazel
+  marks: a weathered, windburned face; deep lines at the eyes
+  clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
+  natural_hair: dark brown
+Helia Veyra:
+  status: proposed
+  born_year: -41
+  age_in_year:
+    1: 42
+  sex: f
+  build: slight and wiry
+  face: a square jaw
+  hair: light brown, bound in a plain cloth
+  eyes: grey
+  marks: a weathered, windburned face; a crooked nose, once broken
+  clothing: 'rust-red hunter''s leathers with a fur collar (House Veyra: rust red and fur)'
+  natural_hair: light brown
+Aelia Veyra:
+  status: proposed
+  born_year: -27
+  age_in_year:
+    1: 28
+  sex: f
+  build: tall and slender
+  face: a strong hooked nose
+  hair: chestnut, worn long and loose
+  eyes: hazel
+  marks: a weathered, windburned face; freckles across the nose
+  clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
+  natural_hair: chestnut
+Selene Veyra:
+  status: proposed
+  born_year: -25
+  age_in_year:
+    1: 26
+  sex: f
+  build: tall and slender
+  face: a square jaw
+  hair: black, braided and pinned up
+  eyes: black
+  marks: no marks of note
+  clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
+  natural_hair: black
+Lysandra Veyra:
+  status: proposed
+  born_year: -24
+  age_in_year:
+    1: 25
+  sex: f
+  build: tall and slender
+  face: a round, open face
+  hair: black, worn long and loose
+  eyes: black
+  marks: no marks of note
+  clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
+  natural_hair: black
+Irene Veyra:
+  status: proposed
+  born_year: -22
+  age_in_year:
+    1: 23
+  sex: f
+  build: small and quick
+  face: a narrow face and a sharp chin
+  hair: black, coiled at the nape
+  eyes: black
+  marks: a missing fingertip on the left hand
+  clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
+  natural_hair: black
+Titus:
+  status: proposed
+  born_year: -21
+  age_in_year:
+    1: 22
+  sex: m
+  build: short and wiry
+  face: a round, open face
+  hair: dark, tightly curled, worn to the shoulder, clean-shaven
+  eyes: black
+  marks: a weathered, windburned face; a mole on the right cheek
+  clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
+  natural_hair: dark, tightly curled
+Laurent Veyra:
+  status: proposed
+  born_year: -18
+  age_in_year:
+    1: 19
+  sex: m
+  build: rangy and long-limbed
+  face: a wide mouth quick to smile
+  hair: auburn, thick and unruly, a full beard
+  eyes: green
+  marks: a weathered, windburned face; a burn scar on the back of one hand
+  clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
+  natural_hair: auburn
+Fausta Veyra:
+  status: proposed
+  born_year: -10
+  age_in_year:
+    1: 11
+  sex: f
+  build: a child, tall for their age
+  face: a wide mouth quick to smile
+  hair: black, coiled at the nape
+  eyes: black
+  marks: calloused, ink-stained fingers
+  clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
+  natural_hair: black

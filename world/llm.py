@@ -51,6 +51,11 @@ class Instruct:
         self.model = AutoModelForCausalLM.from_pretrained(model_id, dtype=getattr(torch, dtype))
         self.model.eval()
         self._tdata = None
+        self.calls = []        # one entry per call: prompt tokens, output tokens, seconds (the season log's profile)
+        # read every weight once now (a 16-token pass): the first real call otherwise pays for loading the weights
+        # from disk, minutes on a cold machine, and that would be blamed on the storyteller
+        with torch.no_grad():
+            self.model(**self.tok("warm up", return_tensors="pt"))
         self.load_seconds = time.time() - t
 
     def _generate(self, system: str, user: str, max_new_tokens: int, allowed=None, repetition_penalty: float = 1.0) -> str:
@@ -58,9 +63,12 @@ class Instruct:
         prompt = self.tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = self.tok(prompt, return_tensors="pt")
         kw = {"prefix_allowed_tokens_fn": allowed} if allowed else {}
+        t = time.time()
         with torch.no_grad():
             out = self.model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, repetition_penalty=repetition_penalty, **kw)
-        return self.tok.decode(out[0, inputs["input_ids"].shape[1]:], skip_special_tokens=True).strip()
+        n_in = inputs["input_ids"].shape[1]
+        self.calls.append({"prompt_tokens": n_in, "output_tokens": int(out.shape[1] - n_in), "seconds": round(time.time() - t, 1)})
+        return self.tok.decode(out[0, n_in:], skip_special_tokens=True).strip()
 
     def chat(self, system: str, user: str, max_new_tokens: int = 200, repetition_penalty: float = 1.0) -> str:
         """Plain text. A repetition penalty above 1 (e.g. 1.12) keeps long prose from going round in circles."""

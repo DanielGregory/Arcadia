@@ -138,6 +138,8 @@ export function personHtml(W, p, { codexLink = true, maxDreams = 12 } = {}) {
           <p class="sub">${p.absent ? "Missing from Corva since the autumn of year 0" : place ? "Now at " + esc(place.name) : ""}</p>
           ${p.proposed ? `<p class="sub"><em>a placeholder character (proposed)</em></p>` : ""}
           ${codexLink ? `<p class="sub"><a href="${W.codexLink(p)}">Codex entry ↗</a></p>` : ""}</div></div>
+      ${p.appearance && p.appearance.build ? `<h4>Appearance <small>${p.appearance.status === "proposed" ? "a draft (proposed)" : ""}</small></h4>
+        <p class="sub" style="font-size:14px">${esc(["build", "face", "hair", "eyes", "marks", "clothing"].map(k => p.appearance[k]).filter(Boolean).join("; "))}.</p>` : ""}
       ${famItems.length ? `<h4>Family and ties</h4><ul class="links">${famItems.map(x => `<li>${x}</li>`).join("")}</ul>` : ""}
       ${patron ? `<h4>Patron</h4><p>${link(patron)}, head of House ${esc(h?.name)}</p>` : ""}
       <h4>Recent actions</h4>

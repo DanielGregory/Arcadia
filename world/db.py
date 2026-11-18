@@ -84,6 +84,11 @@ create table runtimes (year int, season text, step text, seconds real, calls int
 LATER = """
 create table if not exists drives (
   id integer primary key, year int not null, season text not null, person_id int not null, text text not null, source text);
+create table if not exists portrait_candidates (
+  id integer primary key, person_id int not null, k int not null, seed int, prompt text, image text not null, made_at text);
+create table if not exists model_calls (
+  id integer primary key, year int not null, season text not null, step text not null, prompt_tokens int,
+  output_tokens int, seconds real);
 create table if not exists chronicles (
   id integer primary key, year int not null, season text not null, author_id int, events text not null default '[]',
   text text not null, kind text);
@@ -92,7 +97,7 @@ create table if not exists chronicles (
 
 # Columns added later (to older sandboxes on connect): people.portrait (a path in the public bucket) and
 # people.sex (PROPOSED: read from the first name; see world/portraits.py)
-LATER_COLUMNS = {"people": [("portrait", "text"), ("sex", "text")], "chronicles": [("title", "text")]}
+LATER_COLUMNS = {"people": [("portrait", "text"), ("sex", "text"), ("appearance", "text"), ("portrait_ref", "text")], "chronicles": [("title", "text")]}
 
 
 def connect(path: Path = DB_PATH) -> sqlite3.Connection:

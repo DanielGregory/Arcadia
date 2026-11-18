@@ -415,6 +415,13 @@ def interpret(con, R, shared, llm, clock, year, season):
     return out
 
 
+def record_calls(con, year, season, step, calls):
+    """Each model call's size and time (the season log's profile: is the storyteller staying under ~50 s?)."""
+    for c in calls:
+        insert(con, "model_calls", year=year, season=season, step=step, **c)
+    calls.clear()
+
+
 def lean_by_house(interp) -> dict:
     """Which way each interpreting house's readings leaned: toward which houses, how warmly, how often 'none'."""
     out = defaultdict(lambda: {"readings": 0, "none": 0, "toward": defaultdict(list)})
@@ -452,7 +459,7 @@ def proposal_schema(actor_ids, target_ids, place_names, n):
     return {
         "type": "object",
         "properties": {
-            "strategy": {"type": "string", "maxLength": 200},
+            "strategy": {"type": "string", "maxLength": 150},
             "proposals": {"type": "array", "minItems": 1, "maxItems": n, "items": {
                 "type": "object",
                 "properties": {
@@ -460,7 +467,7 @@ def proposal_schema(actor_ids, target_ids, place_names, n):
                     "actor": {"type": "string", "enum": actor_ids},
                     "target": {"type": "string", "enum": target_ids + ["none"]},
                     "place": {"type": "string", "enum": place_names + ["none"]},
-                    "why": {"type": "string", "maxLength": 180},
+                    "why": {"type": "string", "maxLength": 110},
                 },
                 "required": ["kind", "actor", "target", "place", "why"]}},
         },
@@ -512,21 +519,59 @@ def house_context(con, R, h, year, season, drives, used_kinds, last_events, lege
     lines.append(f"Groups that can act: h{h['id']} (House {h['name']} as a family), c{h['id']} (its {clients['count']} clients).")
     lines.append("Other houses: " + ", ".join(f"h{o['id']} {o['name']}" for o in others) + ".")
     lines.append("Notable people of other houses: " + ", ".join(f"p{p['id']} {p['name']} ({p['house']})" for p in principals_elsewhere) + ".")
-    if legends:
-        lines.append("Legends the house tells: " + " | ".join(f"{l['title']}: {l['text']}" for l in legends))
+    if legends:   # the house's own legend first, each cut to a sentence or two (context budget)
+        lines.append("Legends the house tells: " + " | ".join(f"{l['title']}: {l['text'][:R['storyteller']['legend_chars']]}" for l in legends))
     if feel:
         lines.append("How the house feels toward others (-1 to 1): " + ", ".join(f"{f['name']} {f['f']:+.2f}" for f in feel))
-    ties = true_ties(con, [m["id"] for m in adults] + [p["id"] for p in principals_elsewhere])
-    lines.append("True family ties: " + "; ".join(ties[:30]) + ".")
+    # family ties: only this house's own people (the storyteller needs its own family right; other houses' ties
+    # were 400+ tokens a call and rarely used)
+    ties = [t for t in true_ties(con, [m["id"] for m in adults]) if any(m["name"] in t for m in adults)]
+    lines.append("True family ties: " + "; ".join(ties[:R['storyteller']['max_ties']]) + ".")
     lines.append("Recent events in Corva: " + " ".join(last_events))
     if used_kinds:
         lines.append("Already done this season by other houses: " + ", ".join(f"{k} x{n}" for k, n in used_kinds.most_common()) + ".")
     lines.append(f"Strategy question: what is House {h['name']} trying to achieve about the Flight this season, and why?")
+    lines = trim_context(lines, R["storyteller"]["max_context_tokens"])
     actor_ids = [f"p{m['id']}" for m in adults] + [f"h{h['id']}", f"c{h['id']}"]
     target_ids = [f"h{o['id']}" for o in others] + [f"p{p['id']}" for p in principals_elsewhere] + \
                  [f"p{m['id']}" for m in members if m["id"] not in {a["id"] for a in adults}] + [f"p{m['id']}" for m in adults]
     places = [p["name"] for p in rows(con, "select name from places where kind != 'house'")]
     return "\n".join(lines), actor_ids, sorted(set(target_ids)), places
+
+
+_TOK = None
+
+
+def ntokens(text: str) -> int:
+    """Tokens in the storyteller's own tokenizer (loaded once; the tokenizer alone is small and quick)."""
+    global _TOK
+    if _TOK is None:
+        from transformers import AutoTokenizer
+        _TOK = AutoTokenizer.from_pretrained(load_rules()["storyteller"]["model"])
+    return len(_TOK(text)["input_ids"])
+
+
+TRIM_ORDER = ("Legends the house tells", "True family ties", "Recent events in Corva", "Notable people of other houses",
+              "How the house feels")
+
+
+def trim_context(lines: list[str], budget: int) -> list[str]:
+    """Keep a house's context under the token budget as history grows: shorten its least needed parts first
+    (legends, then family ties, then recent events, then the list of other houses' notable people), each by
+    half, until it fits. The members, their drives, the house's state and the strategy question are never cut."""
+    for _ in range(12):
+        if ntokens("\n".join(lines)) <= budget:
+            return lines
+        for key in TRIM_ORDER:
+            i = next((j for j, l in enumerate(lines) if l.startswith(key)), None)
+            if i is not None and len(lines[i]) > 120:
+                head, _, body = lines[i].partition(": ")
+                cut = body[: len(body) // 2]
+                lines[i] = f"{head}: {cut.rsplit(';', 1)[0].rsplit('.', 1)[0].rsplit(',', 1)[0]}…"
+                break
+        else:
+            return lines
+    return lines
 
 
 def family_of(R, kind: str) -> str:
