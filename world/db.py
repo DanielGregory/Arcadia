@@ -90,10 +90,20 @@ create table if not exists chronicles (
 """
 
 
+# Columns added later (to older sandboxes on connect): people.portrait (a path in the public bucket) and
+# people.sex (PROPOSED: read from the first name; see world/portraits.py)
+LATER_COLUMNS = {"people": [("portrait", "text"), ("sex", "text")]}
+
+
 def connect(path: Path = DB_PATH) -> sqlite3.Connection:
     con = sqlite3.connect(path)
     con.row_factory = sqlite3.Row
     con.executescript(LATER)
+    for table, cols in LATER_COLUMNS.items():
+        have = {r[1] for r in con.execute(f"pragma table_info({table})")}
+        for name, kind in cols:
+            if name not in have:
+                con.execute(f"alter table {table} add column {name} {kind}")
     return con
 
 
