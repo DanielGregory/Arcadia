@@ -48,7 +48,7 @@ def main() -> None:
         interp = T.interpret(con, R, shared, small, clock, year, season)
     small.free()
     with clock.step("load storyteller (3B)"):
-        llm = Instruct(R["storyteller"]["model"])
+        llm = Instruct(R["storyteller"]["model"], dtype=R["storyteller"].get("dtype", "float32"))
     with clock.step("storyteller proposals"):
         items = T.propose(con, R, llm, clock, year, season, tick, drives)
     with clock.step("validation and events"):

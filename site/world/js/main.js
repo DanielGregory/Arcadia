@@ -288,4 +288,4 @@ if (hint && !shot) {
   canvas.addEventListener("pointerdown", hide, { once: true });
   setTimeout(hide, 9000);
 } else hint?.remove();
-window.__corva = { sandbox, layout, features, renderer, rig, terrain, fps: () => fpsValue, setTime: t => { live = false; dayT = t; } };   // for tests
+window.__corva = { sandbox, camera, layout, features, renderer, rig, terrain, fps: () => fpsValue, setTime: t => { live = false; dayT = t; } };   // for tests

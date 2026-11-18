@@ -46,10 +46,11 @@ export async function loadSandbox() {
 // sun: multiplies the sun's colour; power: its strength; foliage: the colour green things lean to,
 // and how far (0..1). Spring's green is fresh, summer's is burnt gold, autumn's is rust, winter's grey.
 const SEASONS = {
-  spring: { sun: "#fff4e6", power: 0.95, ambient: 1.05, foliage: "#6fae4a", amount: 0.35 },
-  summer: { sun: "#fff0c8", power: 1.12, ambient: 1.0, foliage: "#b9a35a", amount: 0.4 },
-  autumn: { sun: "#ffc890", power: 0.9, ambient: 0.95, foliage: "#b8682e", amount: 0.5 },
-  winter: { sun: "#d8e2ff", power: 0.7, ambient: 0.9, foliage: "#8a8c7c", amount: 0.55 },
+  // (a Mediterranean island: winter stays green, only duller; it's summer that burns the hills gold)
+  spring: { sun: "#fff4e6", power: 0.95, ambient: 1.05, foliage: "#6fae4a", amount: 0.3 },
+  summer: { sun: "#fff0c8", power: 1.12, ambient: 1.0, foliage: "#b5a05a", amount: 0.32 },
+  autumn: { sun: "#ffd0a0", power: 0.9, ambient: 0.95, foliage: "#a8803e", amount: 0.3 },
+  winter: { sun: "#e2e8ff", power: 0.78, ambient: 0.92, foliage: "#5f7a52", amount: 0.25 },
 };
 
 // Patch a material so its green parts (leaves, grass) lean toward the season's colour. "Green" is
@@ -229,6 +230,7 @@ export function makeSandbox(data, { onFly } = {}) {
   const layer = document.createElement("div");
   layer.className = "labels sandbox-labels";
   document.body.append(layer);
+  labels.sort((a, b) => (a.kind === "event" ? 0 : 1) - (b.kind === "event" ? 0 : 1));
   for (const l of labels) {
     l.el = document.createElement("button");
     l.el.className = `sb-label ${l.kind}`;
@@ -312,16 +314,24 @@ export function makeSandbox(data, { onFly } = {}) {
     lanternMat.size = (11 + 5 * state.night) * Math.min(devicePixelRatio || 1, 2);
     lanternMat.opacity = 0.75 + 0.25 * state.night;
     for (const f of flames) f.scale.y = 0.85 + 0.25 * Math.sin(time * 9 + f.position.x);
-    const w = innerWidth, h = innerHeight;
+    const w = innerWidth, h = innerHeight, placed = [];
     for (const l of labels) {
       v.set(l.x, l.y, l.z);
       const d = camera.position.distanceTo(v);
       v.project(camera);
       let a = THREE.MathUtils.smoothstep(d, l.near * 0.5, l.near) * (1 - THREE.MathUtils.smoothstep(d, l.far, l.far * 1.6));
       if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) a = 0;
+      // no pile-ups: a label that would cover one already placed (events go first) waits until
+      // you come closer and they separate
+      const sx = ((v.x + 1) / 2) * w, sy = ((1 - v.y) / 2) * h;
+      if (a >= 0.03) {
+        const bw = l.el.offsetWidth || 120, bh = l.el.offsetHeight || 34;
+        if (placed.some(r => Math.abs(r.x - sx) < (r.w + bw) / 2 + 4 && Math.abs(r.y - sy) < (r.h + bh) / 2 + 2)) a = 0;
+        else placed.push({ x: sx, y: sy, w: bw, h: bh });
+      }
       l.el.style.opacity = a.toFixed(2);
       l.el.style.visibility = a < 0.03 ? "hidden" : "visible";
-      if (a >= 0.03) l.el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px) translate(-50%, -100%)`;
+      if (a >= 0.03) l.el.style.transform = `translate(${sx}px, ${sy}px) translate(-50%, -100%)`;
     }
   }
 

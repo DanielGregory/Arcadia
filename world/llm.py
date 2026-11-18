@@ -41,13 +41,14 @@ def _tokenizer_data(tok) -> TokenEnforcerTokenizerData:
 
 
 class Instruct:
-    def __init__(self, model_id: str, threads: int | None = None):
+    def __init__(self, model_id: str, threads: int | None = None, dtype: str = "float32"):
         if threads:
             torch.set_num_threads(threads)
         t = time.time()
         self.model_id = model_id
         self.tok = AutoTokenizer.from_pretrained(model_id)
-        self.model = AutoModelForCausalLM.from_pretrained(model_id, dtype=torch.float32)
+        # float32 by default; bfloat16 halves the memory (the 3B storyteller needs it on a 15 GB machine)
+        self.model = AutoModelForCausalLM.from_pretrained(model_id, dtype=getattr(torch, dtype))
         self.model.eval()
         self._tdata = None
         self.load_seconds = time.time() - t

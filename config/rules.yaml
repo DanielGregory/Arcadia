@@ -51,6 +51,7 @@ interpretation:
 storyteller:
   model: Qwen/Qwen2.5-3B-Instruct  # the storyteller and the chronicle's accounts (interpretations keep the 1.5B)
   max_new_tokens: 320
+  dtype: bfloat16             # 3B in float32 needs ~12 GB and was killed for memory; bfloat16 halves it (the CPU has native bf16)
   retries: 1                  # if a reply is unusable (or names nobody), ask once more, saying what was wrong
   proposals_per_house: 2      # one call per house per season, asking for up to this many actions
   legends_in_context: 2       # legends the house's members know, retrieved into the prompt
