@@ -138,6 +138,7 @@ def draft() -> None:
               "# age_in_year: the age this describes, by year (the portrait uses their age in the year it is painted).\n"
               "# natural_hair: their hair colour before any grey (their children are drafted with it).\n"
               "# scene: (optional) what their character card shows them doing, with the prop of their role; it leads the card's prompt.\n"
+              "# pose: (optional) the body their card holds (world/poses.py: seated_high, bow, helm, point_up, kneel).\n"
               "# Change anything; then: python -m world.appearance load\n\n")
     order = {p["key"]: (p["tier"] != "principal", p["house"], p["born_year"]) for p in people}
     text = yaml.safe_dump({k: out[k] for k in sorted(out, key=lambda n: order.get(n, (True, "", 0)))},

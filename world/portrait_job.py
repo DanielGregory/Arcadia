@@ -23,6 +23,9 @@ from pathlib import Path
 import torch
 
 REFERENCE_SCALE = 0.55   # how strongly a person's reference image holds their face
+STYLE_SCALE = 0.6        # how strongly the shared style plate sets the look (style-only: InstantStyle, one attention block)
+POSE_SCALE = 0.75        # how strongly the OpenPose skeleton holds the body
+CONTROLNET = "xinsir/controlnet-openpose-sdxl-1.0"
 
 
 def main() -> None:
@@ -35,25 +38,49 @@ def main() -> None:
     from PIL import Image
     batch = json.loads(args.batch.read_text(encoding="utf-8"))
     args.out.mkdir(parents=True, exist_ok=True)
-    with_ref = any(b.get("reference") for b in batch)
+    with_ref = any(b.get("reference") or b.get("style_ref") for b in batch)
+    with_pose = any(b.get("pose") for b in batch)
     extra = {}
+    if with_pose:   # an OpenPose ControlNet holds each person's body in the pose of their action (world/poses.py)
+        from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline as Pipeline
+        extra["controlnet"] = ControlNetModel.from_pretrained(CONTROLNET, torch_dtype=torch.float16)
+    else:
+        Pipeline = StableDiffusionXLPipeline
     if with_ref:
         from transformers import CLIPVisionModelWithProjection
         from render.generate_images import IP_ADAPTER
         extra["image_encoder"] = CLIPVisionModelWithProjection.from_pretrained(
             IP_ADAPTER["repo"], subfolder=IP_ADAPTER["image_encoder"], torch_dtype=torch.float16)
-    pipe = StableDiffusionXLPipeline.from_pretrained(
+    pipe = Pipeline.from_pretrained(
         "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16, use_safetensors=True, variant="fp16",
-        vae=AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16), **extra).to("cuda")
+        vae=AutoencoderKL.from_pretrained("madebyollin/sdxl-vae-fp16-fix", torch_dtype=torch.float16), **extra)
+    if with_pose and with_ref:
+        pipe.enable_model_cpu_offload()   # SDXL + ControlNet + IP-Adapter: too close to a T4's 15 GB to hold at once
+    else:
+        pipe.to("cuda")
     pipe.set_progress_bar_config(disable=True)
     if with_ref:
         pipe.load_ip_adapter(IP_ADAPTER["repo"], subfolder=IP_ADAPTER["subfolder"], weight_name=IP_ADAPTER["weight_name"])
     refs = {}
     done = []
+
+    def fetch(url):
+        if url not in refs:
+            import requests
+            refs[url] = Image.open(io.BytesIO(requests.get(url, timeout=60).content)).convert("RGB")
+        return refs[url]
+
     for b in batch:
         t = time.time()
         call = {}
-        if with_ref:
+        if with_pose:
+            call["image"] = fetch(b["pose"]) if b.get("pose") else Image.new("RGB", (832, 1024))
+            call["controlnet_conditioning_scale"] = POSE_SCALE if b.get("pose") else 0.0
+        if with_ref and b.get("style_ref") and not b.get("reference"):
+            # the shared look: the style plate steers only the style block (InstantStyle), not the face or the scene
+            pipe.set_ip_adapter_scale({"up": {"block_0": [0.0, STYLE_SCALE, 0.0]}})
+            call["ip_adapter_image"] = fetch(b["style_ref"])
+        elif with_ref:
             if b.get("reference"):
                 if b["reference"] not in refs:
                     import requests
@@ -67,7 +94,7 @@ def main() -> None:
         p2 = b.get("prompt_2") or f"{b['style']}: {b['prompt']}"
         img = pipe(prompt=p1, prompt_2=p2,
                    negative_prompt=b["negative"], negative_prompt_2=b["negative"], width=832, height=1024,
-                   num_inference_steps=args.steps, guidance_scale=6.5,
+                   num_inference_steps=args.steps, guidance_scale=b.get("guidance", 6.5),
                    generator=torch.Generator(device="cuda").manual_seed(b["seed"]), **call).images[0]
         k = b.get("k", 0)
         img.save(args.out / f"p{b['id']}_{k}.png")

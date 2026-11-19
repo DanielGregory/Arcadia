@@ -4,6 +4,8 @@
 # natural_hair: their hair colour before any grey (their children are drafted with it).
 # Change anything; then: python -m world.appearance load
 # scene: (optional) what their character card shows them doing, with the prop of their role; it leads the card's prompt.
+# pose: (optional) the body their card holds (world/poses.py: seated_high, bow, helm, point_up, kneel).
+
 Ismene:
   status: proposed
   born_year: -74
@@ -19,6 +21,7 @@ Ismene:
   natural_hair: black
   skin: golden brown
   scene: tending the sacred flame in a bronze brazier in the sea temple, feeding it a sprig of herbs
+  pose: kneel
 Theodric Aurelian:
   status: danny
   born_year: -59
@@ -76,6 +79,7 @@ Brenna Cassian:
   natural_hair: light brown
   skin: light olive
   scene: on a wooden scaffold over stone terraces, pointing and directing workers below, a plumb line in her other hand
+  pose: point_up
 Marius Corvane:
   status: danny
   born_year: -61
@@ -172,6 +176,7 @@ Nikias Marcellan:
   natural_hair: dark brown
   skin: sun-darkened bronze
   scene: at the helm of his merchant ship at sea, both hands on the steering oar, a full sail and spray behind him
+  pose: helm
 Aldric Severin:
   status: proposed
   born_year: -67
@@ -188,6 +193,7 @@ Aldric Severin:
   skin: sun-darkened bronze
   scene: seated high on a judge's bench raised above a stone courtroom, holding a carved staff of office, looking down at
     the petitioners
+  pose: seated_high
 Quintus Severin:
   status: proposed
   born_year: -41
@@ -356,6 +362,7 @@ Ysolde Veyra:
   natural_hair: black
   skin: pale, windburned red across the cheeks
   scene: drawing a hunting bow, arrow nocked, in a misty mountain forest of pines
+  pose: bow
 Philo:
   status: proposed
   born_year: -68

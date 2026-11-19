@@ -140,6 +140,10 @@ CARD_STYLE = ("loose ink line drawing with transparent watercolour washes, a cha
 CARD_NEGATIVE = ("photo, photograph, 3d render, glossy digital painting, anime, cartoon mascot, modern clothes, glasses, "
                  "text, letters, watermark, frame border, deformed hands, extra fingers, blurry, sepia, monochrome, "
                  "brown tint, grayscale, close-up headshot")
+CARD_NEGATIVE_3 = ("Japanese, ukiyo-e, Asian clothing, Victorian, engraving, church, building only, architecture only, "
+                   "empty room, landscape without a figure, close-up, headshot, portrait crop, face only")
+# the look every card shares: a test-1 plate (Aldric, the strongest ink line), given to the IP-Adapter in style-only mode
+STYLE_REF = "https://dbrtvwhslxkdpmuawrgd.supabase.co/storage/v1/object/public/arcadia/sandbox/portraits/style/plate_ref.png"
 YOUNG_NEGATIVE = "wrinkles, grey hair, gray hair, white hair, aged skin, old, elderly, sagging skin, crow's feet"
 # what they do and the one prop of their role, matched on their note and role (first match wins), then by house
 SCENES = [
@@ -239,19 +243,22 @@ def card_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tup
         # encoder 1: the SCENE first (what they are doing, with their prop), the figure at half length, then who
         # they are; younger women also get their own face and skin here, so they don't drift to one generic face
         # (each encoder reads only 77 tokens: short age words, the first clause of the mood and of the clothes)
-        own_face = f", {a['face']}" if sex == "f" and age < 40 else ""
+        own_face = f", {', '.join(a['face'].split(', ')[:2])}" if sex == "f" and age < 40 else ""
         short_age = (f"a young {noun} of {age}" if age < 30 else f"a {noun} of {age}" if age < 55 else
                      f"an old {noun} of {age}, white-haired and lined" if age >= 68 else f"an older {noun} of {age}, greying")
         mood = TEMPERAMENT.get(p["dream_temperament"], "").split(",")[0]
-        prompt = f"{scene}; half-length, {short_age}{own_face}, {mood}, wearing {clothing.split(',')[0]}"
-        # encoder 2: the style (washes in the house's colours), then skin, face, hair, eyes, and the house's light
-        prompt_2 = (f"ink line and watercolour washes of {colours}, old illustrated book plate, loose pen lines, white paper; "
-                    f"{a.get('skin', 'olive')} skin, {a['face']}, hair {a['hair'].split(',')[0]}, {a['eyes']} eyes; "
-                    f"{HOUSE_LIGHT[p['house']]}")
-        negative = CARD_NEGATIVE + (", " + YOUNG_NEGATIVE if age < 40 else "")
+        # test 3: the scene leads BOTH encoders (encoder 2, the stronger, took the face and drew headshots in test 2),
+        # the framing is concrete, the style is pinned to a period and a technique
+        prompt = (f"{scene}; waist-up figure in the middle ground, the whole scene visible, {short_age}{own_face}, {mood}, "
+                  f"wearing {clothing.split(',')[0]}")
+        prompt_2 = (f"{scene}; pen and ink drawing with flat watercolour washes of {colours}, Mediterranean antiquity, "
+                    f"illustrated book plate; {a.get('skin', 'olive')} skin, {a['face']}, hair {a['hair'].split(',')[0]}")
+        negative = CARD_NEGATIVE + ", " + CARD_NEGATIVE_3 + (", " + YOUNG_NEGATIVE if age < 40 else "")
+        pose = (STORAGE_PUBLIC + f"sandbox/portraits/poses/{a['pose']}.png") if a.get("pose") else None
         for k in range(candidates):
             out.append({"id": p["id"], "k": k, "name": p["name"], "sex": sex, "prompt": prompt, "prompt_2": prompt_2,
                         "style": CARD_STYLE, "negative": negative, "seed": 7000 + p["id"] * 10 + k,
+                        "pose": pose, "style_ref": STYLE_REF, "guidance": 7.5,
                         "reference": (STORAGE_PUBLIC + p["portrait_ref"]) if p["portrait_ref"] else None})
     return out, waiting
 
