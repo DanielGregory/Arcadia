@@ -214,6 +214,29 @@ def age_phrase(age: int, noun: str) -> str:
     return f"an old {noun} of {age}, white-haired, deeply wrinkled, aged"
 
 
+# Danny's chosen look (after test 2's Ysolde Veyra cards): an expressive loose watercolour and ink sketch, the house's
+# colours bleeding wet into white paper, bold ink lines, drips and splatters, edges left unfinished. Spelled out
+# exactly, because test 2's vaguer "illustrated book plate" drifted into engravings and woodblocks for the others.
+SKETCH_STYLE = ("expressive watercolour and ink sketch, wet washes of {colours} bleeding into white paper, "
+                "bold ink lines, drips and splatters")
+
+
+def sketch_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tuple[list[dict], list[str]]:
+    """Test 4: test 3's scene (in both encoders) and pose, in Danny's chosen sketch style; no style plate (it leaked
+    its face into everyone in test 3)."""
+    batch, waiting = card_prompts(con, candidates, only)
+    from world.appearance import HOUSE_DRESS
+    houses = {r["id"]: r["house"] for r in rows(con, "select p.id, h.name house from people p join house_members m on "
+                                                     "m.person_id = p.id join houses h on h.id = m.house_id")}
+    for b in batch:
+        style = SKETCH_STYLE.format(colours=HOUSE_DRESS[houses[b["id"]]][0])
+        scene = b["prompt"].split(";")[0]
+        rest = b["prompt_2"].split("; ", 2)[-1].split(", ")   # skin, face..., hair
+        b["prompt_2"] = f"{scene}; {style}; {', '.join(rest[:3])}"
+        b["style"], b["style_ref"] = style, None
+    return batch, waiting
+
+
 def card_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tuple[list[dict], list[str]]:
     """Portraits v2, character cards. Encoder 1 (prompt) gets who and what: age, action, prop, expression, clothes;
     encoder 2 (prompt_2) gets the look and the style: face, skin, hair, eyes, build, the house's light, ink and wash.
@@ -305,7 +328,8 @@ JOB = {"notebook": "notebooks/kaggle_portraits.ipynb", "slug": "arcadia-portrait
 
 def paint(con, args) -> None:
     """Candidates on Kaggle -> the public bucket (sandbox/portraits/candidates/) -> portrait_candidates (engine record)."""
-    batch, waiting = {"card": card_prompts, "plate": plate_prompts, "head": prompts}[args.style](con, args.candidates, args.only)
+    batch, waiting = {"card": card_prompts, "sketch": sketch_prompts, "plate": plate_prompts, "head": prompts}[args.style](
+        con, args.candidates, args.only)
     if waiting:
         print("waiting for their appearance to be written: " + ", ".join(waiting))
     if args.dry_run:
@@ -383,7 +407,7 @@ def main() -> None:
     ap.add_argument("--no_push", action="store_true")
     ap.add_argument("--candidates", type=int, default=4)
     ap.add_argument("--only", type=lambda s: [int(x) for x in s.split(",")], help="person ids, e.g. 2,6")
-    ap.add_argument("--style", choices=["card", "plate", "head"], default="card",
+    ap.add_argument("--style", choices=["sketch", "card", "plate", "head"], default="sketch",
                     help="card: scene cards (v2, test 3); plate: test-1 plates with house-colour washes and a prop; head: v1")
     ap.add_argument("--test", action="store_true", help="a trial: download to out/portrait_tests, upload and record nothing")
     args = ap.parse_args()
