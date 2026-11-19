@@ -23,17 +23,19 @@ Ismene:
   scene: tending the sacred flame in a bronze brazier in the sea temple, feeding it a sprig of herbs
   pose: kneel
 Theodric Aurelian:
-  status: danny
+  status: proposed
   born_year: -59
   age_in_year:
     1: 60
   sex: m
-  build: ''
-  face: ''
-  hair: ''
-  eyes: ''
-  marks: ''
-  clothing: ''
+  build: stocky, thick through the chest
+  face: a wide mouth quick to smile, weathered
+  hair: white, tied back, a full beard
+  eyes: hazel
+  marks: no marks of note
+  clothing: 'white priestly robes with a sea-blue stole and a shell pendant (House Aurelian: white and sea blue)'
+  skin: golden brown
+  natural_hair: auburn
 Iola Aurelian:
   status: proposed
   born_year: -19
@@ -81,17 +83,19 @@ Brenna Cassian:
   scene: on a wooden scaffold over stone terraces, pointing and directing workers below, a plumb line in her other hand
   pose: point_up
 Marius Corvane:
-  status: danny
+  status: proposed
   born_year: -61
   age_in_year:
     1: 62
   sex: m
-  build: ''
-  face: ''
-  hair: ''
-  eyes: ''
-  marks: ''
-  clothing: ''
+  build: broad-shouldered and heavy
+  face: a wide mouth quick to smile, weathered
+  hair: white, cropped short, a trimmed beard
+  eyes: green
+  marks: no marks of note
+  clothing: 'a long black robe banded in gold, a gold signet ring (House Corvane: black and deep gold)'
+  skin: tawny
+  natural_hair: dark, tightly curled
 Decimus Corvane:
   status: proposed
   born_year: -33
@@ -108,17 +112,19 @@ Decimus Corvane:
   skin: deep brown
   scene: on the citadel terrace above the city, reading a sealed letter by candlelight
 Livia Corvane:
-  status: danny
+  status: proposed
   born_year: -20
   age_in_year:
     1: 21
   sex: f
-  build: ''
-  face: ''
-  hair: ''
-  eyes: ''
-  marks: ''
-  clothing: ''
+  build: small and quick
+  face: a strong hooked nose
+  hair: black, worn long and loose
+  eyes: grey
+  marks: a missing fingertip on the left hand
+  clothing: 'a long black robe banded in gold, a gold signet ring (House Corvane: black and deep gold)'
+  skin: deep olive
+  natural_hair: black
 Hesione Damaris:
   status: proposed
   born_year: -56
@@ -135,17 +141,19 @@ Hesione Damaris:
   skin: sun-darkened bronze
   scene: at a cluttered table of herbs and clay jars, grinding leaves in a stone mortar
 Neria:
-  status: danny
+  status: proposed
   born_year: -34
   age_in_year:
     1: 35
   sex: f
-  build: ''
-  face: ''
-  hair: ''
-  eyes: ''
-  marks: ''
-  clothing: ''
+  build: tall and slender
+  face: a wide mouth quick to smile
+  hair: auburn, bound in a plain cloth
+  eyes: black
+  marks: hands that smell of rosemary and myrrh; deep lines at the eyes
+  clothing: 'teal healer''s robes with a white headcloth, a satchel of herbs (House Damaris: teal and white)'
+  skin: deep brown
+  natural_hair: auburn
 Octavia Marcellan:
   status: proposed
   born_year: -48
@@ -240,29 +248,33 @@ Silvan Solenne:
   skin: deep olive
   scene: in an overgrown courtyard of an old house, practising with a borrowed sword
 Galen Theren:
-  status: danny
+  status: proposed
   born_year: -58
   age_in_year:
     1: 59
   sex: m
-  build: ''
-  face: ''
-  hair: ''
-  eyes: ''
-  marks: ''
-  clothing: ''
+  build: tall and lean
+  face: deep-set features, weathered
+  hair: light brown going grey, cropped short, clean-shaven
+  eyes: amber-brown
+  marks: sun-browned forearms; calloused, ink-stained fingers
+  clothing: 'an olive-green wool mantle over undyed linen (House Theren: olive green and undyed linen)'
+  skin: sun-darkened bronze
+  natural_hair: light brown
 Tiberon Theren:
-  status: danny
+  status: proposed
   born_year: -29
   age_in_year:
     1: 30
   sex: m
-  build: ''
-  face: ''
-  hair: ''
-  eyes: ''
-  marks: ''
-  clothing: ''
+  build: rangy and long-limbed
+  face: a round, open face
+  hair: light brown, cropped short, a full beard
+  eyes: amber-brown
+  marks: sun-browned forearms; a gap between the front teeth
+  clothing: 'an olive-green wool mantle over undyed linen (House Theren: olive green and undyed linen)'
+  skin: olive
+  natural_hair: light brown
 Corin Theren:
   status: proposed
   born_year: -24
@@ -279,17 +291,20 @@ Corin Theren:
   skin: pale, quick to burn
   scene: among olive trees at harvest, lifting a full basket of olives onto his shoulder
 Soren of the Harbor:
-  status: danny
+  status: proposed
   born_year: -22
   age_in_year:
     1: 23
   sex: m
-  build: ''
-  face: ''
-  hair: ''
-  eyes: ''
-  marks: ''
-  clothing: ''
+  build: rangy and long-limbed
+  face: a round, open face
+  hair: light brown, thick and unruly, clean-shaven
+  eyes: amber-brown
+  marks: rope-burned hands and skin browned by sea wind; sun-browned forearms; a burn scar on the back of one hand
+  clothing: 'a harbour pilot''s sea-stained tunic and a short cloak, an olive-green Theren cord at the wrist (House Theren:
+    olive green)'
+  skin: light olive
+  natural_hair: light brown
 Gaius Valerius:
   status: proposed
   born_year: -55
@@ -306,17 +321,19 @@ Gaius Valerius:
   skin: deep olive
   scene: on the stern deck of a war galley in the harbour, one hand gripping the rail, giving orders to the oarsmen
 Lucan Valerius:
-  status: danny
+  status: proposed
   born_year: -26
   age_in_year:
     1: 27
   sex: m
-  build: ''
-  face: ''
-  hair: ''
-  eyes: ''
-  marks: ''
-  clothing: ''
+  build: of middling height, solid
+  face: a square jaw
+  hair: light brown, worn to the shoulder, clean-shaven
+  eyes: green
+  marks: skin browned by sea wind; a thin scar through the left eyebrow
+  clothing: 'a sea-blue cloak pinned with a bronze clasp over a white tunic (House Valerius: sea blue and bronze)'
+  skin: deep brown
+  natural_hair: light brown
 Drusilla Valerius:
   status: proposed
   born_year: -22

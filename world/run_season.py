@@ -38,6 +38,13 @@ def main() -> None:
     with clock.step("advance (yields, food, upkeep)"):
         fed = T.advance(con, R, year, season)
         T.resolve_talks(con, R, year, season, r)   # last season's marriage talks: a betrothal, or broken off
+    with clock.step("life (births, coming of age, deaths)"):
+        from world import life
+        wed = life.marriages(con, R, year, season, r)
+        born = life.births(con, R, year, season, r)
+        grown = life.coming_of_age(con, R, year, season)
+        died = life.deaths(con, R, year, season, r)
+        print(f"  born {len(born)}, came of age {len(grown)}, died {len(died)}")
     with clock.step("dreams (run 5)"):
         dreams = T.dream_all(con, R, year, season, clock, r)
     with clock.step("recall and sharing"):
@@ -58,6 +65,11 @@ def main() -> None:
     T.record_calls(con, year, season, "storyteller", llm.calls)
     with clock.step("validation and events"):
         results = T.validate_and_record(con, R, items, year, season, tick, r)
+    with clock.step("promotions and bios"):
+        promoted = life.promotions(con, R, year, season)
+        from world.bios import process_queue
+        written = process_queue(con, llm)     # births, comings of age and promotions get a bio (storyteller model)
+        print(f"  promoted {len(promoted)}, bios written {written}")
     with clock.step("beliefs, feelings, clients"):
         T.update_clients(con, R, year, season, fed, r)
         T.fade_beliefs(con, R)

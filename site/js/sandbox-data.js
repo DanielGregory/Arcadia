@@ -31,7 +31,7 @@ const cap = s => (s ? s[0].toUpperCase() + s.slice(1) : "");
 export async function loadWorld() {
   const names = ["sandbox_world", "sandbox_houses", "sandbox_people", "sandbox_places", "sandbox_events", "sandbox_beliefs",
                  "sandbox_dreams", "sandbox_house_clients", "sandbox_house_feelings", "sandbox_lineage", "sandbox_relationships",
-                 "sandbox_legends", "sandbox_symbols", "sandbox_chronicles", "sandbox_previews"];
+                 "sandbox_legends", "sandbox_symbols", "sandbox_chronicles", "sandbox_previews", "sandbox_trait_changes"];
   const queries = { sandbox_events: "select=*&order=id", sandbox_beliefs: "select=*&order=id", sandbox_dreams: "select=*&order=id",
                     sandbox_house_clients: "select=*&order=id", sandbox_chronicles: "select=*&order=id", sandbox_previews: "select=*&order=id" };
   const got = await Promise.all(names.map(n => table(n, queries[n]).catch(() => [])));
@@ -77,6 +77,7 @@ export function makeWorld(T) {
   W.paintingOf = d => { const pv = previewOf.get(d.id); return pv ? STORAGE + pv.image : null; };
   W.dream = id => T.dreams.find(d => d.id === id);
   W.clientsOf = hid => T.house_clients.filter(c => c.house_id === hid).at(-1) || null;
+  W.changesOf = id => (T.trait_changes || []).filter(c => c.person_id === id).slice().reverse();
   W.feelingsOf = hid => T.house_feelings.filter(f => f.from_house === hid);
   W.when = x => `${cap(x.season)}, year ${x.year}`;
   W.nowLabel = () => `${cap(W.now.season)}, year ${W.now.year}`;
@@ -106,6 +107,24 @@ export function makeWorld(T) {
       <path d="M10 98c2-24 14-34 30-34s28 10 30 34z" fill="${esc(c)}" opacity=".55"/></svg>`;
   };
   return W;
+}
+
+// Their nature (procedural traits, world/traits.py): the four humours as bars, what they value, their quirks,
+// what the seed story fixes, and how life has changed them (each change with its cause).
+function natureHtml(p, W) {
+  const t = p.traits;
+  if (!t) return "";
+  const H = { sanguine: "#d9a23a", choleric: "#b8483a", melancholic: "#4a5f8a", phlegmatic: "#5d8a6a" };
+  const bars = Object.entries(t.humors).sort((a, b) => b[1] - a[1]).map(([k, v]) =>
+    `<span title="${k} ${Math.round(v * 100)}%" style="display:inline-block;height:8px;width:${Math.max(2, v * 100)}%;background:${H[k]}"></span>`).join("");
+  const values = Object.entries(t.values).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k).join(", ");
+  const changes = W.changesOf(p.id).slice(0, 6);
+  return `<h4>Nature <small>${t.seed_fixed ? "fixed by the seed story in part" : "procedural (proposed)"}</small></h4>
+    <div style="display:flex;width:100%;border-radius:4px;overflow:hidden;margin:2px 0 4px">${bars}</div>
+    <p class="sub">${Object.entries(t.humors).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(" · ")}</p>
+    <p class="sub">Values most: ${esc(values)}${t.quirks?.length ? ` · ${esc(t.quirks.join(", "))}` : ""}</p>
+    ${t.seed_fixed ? `<p class="sub">From the seed story: <em>${esc(t.seed_fixed.join("; "))}</em></p>` : ""}
+    ${changes.length ? `<p class="sub">Changed by life: ${changes.map(c => `${esc(c.trait.split(".")[1])} ${c.after > c.before ? "↑" : "↓"} (${esc(c.reason)}, ${esc(c.season)} y${c.year})`).join("; ")}</p>` : ""}`;
 }
 
 // One person, in full: portrait, house, family links, patron, recent actions, public beliefs, dream gallery.
@@ -138,8 +157,11 @@ export function personHtml(W, p, { codexLink = true, maxDreams = 12 } = {}) {
           <p class="sub">${p.absent ? "Missing from Corva since the autumn of year 0" : place ? "Now at " + esc(place.name) : ""}</p>
           ${p.proposed ? `<p class="sub"><em>a placeholder character (proposed)</em></p>` : ""}
           ${codexLink ? `<p class="sub"><a href="${W.codexLink(p)}">Codex entry ↗</a></p>` : ""}</div></div>
+      ${p.bio ? `<h4>Life <small>${p.bio_status === "danny" ? "" : "written by the engine (proposed)"}</small></h4><p>${esc(p.bio)}</p>` : ""}
+      ${natureHtml(p, W)}
       ${p.appearance && p.appearance.build ? `<h4>Appearance <small>${p.appearance.status === "proposed" ? "a draft (proposed)" : ""}</small></h4>
-        <p class="sub" style="font-size:14px">${esc(["build", "face", "hair", "eyes", "marks", "clothing"].map(k => p.appearance[k]).filter(Boolean).join("; "))}.</p>` : ""}
+        ${p.appearance.description ? `<p>${esc(p.appearance.description)}</p>` : ""}
+        <p class="sub" style="font-size:14px">${esc(["skin", "build", "face", "hair", "eyes", "marks", "clothing"].map(k => p.appearance[k]).filter(Boolean).join("; "))}.</p>` : ""}
       ${famItems.length ? `<h4>Family and ties</h4><ul class="links">${famItems.map(x => `<li>${x}</li>`).join("")}</ul>` : ""}
       ${patron ? `<h4>Patron</h4><p>${link(patron)}, head of House ${esc(h?.name)}</p>` : ""}
       <h4>Recent actions</h4>

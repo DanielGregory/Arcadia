@@ -238,6 +238,40 @@ private truths). They go to Supabase when the sandbox does.
   house's colours and dress, each person's own seed; stored on the person's record (`people.portrait`, a path in
   the public bucket under `sandbox/portraits/`). Sex is read from the first name (`people.sex`, PROPOSED).
 
+## 8e. Procedural personalities and life (Danny's decisions, PROPOSED details)
+
+Nobody writes bios by hand: every person's nature, looks and life story are generated, and Danny may override any.
+
+- **Traits** (`world/traits.py`, `people.traits`): a four-humours mix (sanguine, choleric, melancholic, phlegmatic,
+  summing to 1), six values (honor, faith, family, ambition, love, wealth), two dispositions life pushes (fear,
+  suspicion), and one or two quirks (superstitious, a liar, generous to strangers, holds grudges, afraid of the sea...).
+  The older numbers (openness, caution, warmth, pride, piety) and the dream voice are now *derived* from these, so they
+  drive everything temperament drove: dream tags, dream recall (by humour, plus superstition and faith), the
+  interpretation lens (the interpreter's nature in plain words), the storyteller's view of each member, drives (the
+  strongest value adds one; "holds grudges" puts the old score first), and the chances of actions (quirks add or
+  subtract a little per action family). The six dream voices come out about evenly (a small calibrated offset).
+- **The eight seed characters**: what `docs/seed_history.md` states is fixed (`traits.seed_fixed`): Livia clever,
+  spirited, defiant; Lucan proud, disciplined, dutiful, neither cruel nor dishonorable; Soren courageous, witty,
+  stubbornly loyal; Marius aging; Galen kind but guarded; Tiberon resentful of Soren; Neria fearful of discovery;
+  Theodric high priest. The rest of their traits and their looks are filled in like everyone's.
+- **Inheritance** (`world/life.py`): a child blends the parents' traits with noise, nudged toward the house's
+  culture; inherits hair, eyes and skin from a parent; is named in the house's style, often after a grandparent.
+- **Life**: everyday marriages between side characters of marrying age (houses not hostile), births (two seasons
+  after a wedding at the earliest), coming of age at 16, promotion of side characters who keep acting (to principal,
+  while there are fewer than 30), deaths of the old among side characters (principals and the seed story's witnesses
+  only die by events). Each is an event.
+- **Life shapes traits**, slowly, each change logged with its cause (`trait_changes`): threats make people more
+  fearful, slander more suspicious (betrayal by a trusted house much more), famine more fearful and careful of
+  wealth, a spouse's death more melancholic, a wedding warmer.
+- **Bios** (`world/bios.py`): at birth, coming of age and promotion (and once for everyone), the storyteller model
+  writes a 2-3 sentence bio and a 1-2 sentence description of their looks, from their traits, family, public history
+  and appearance record; never from private memories. Checked like the chronicles (out-of-world words, wrong family
+  ties). Danny's own bios go in `world/bios.yaml` and are never rewritten.
+- **Portraits**: Danny's chosen style (test 2's Ysolde Veyra row: loose wet watercolour over ink, the house's colour
+  bleeding through) with one of those plates as an IP-Adapter style reference for every portrait; built from the
+  appearance record, age and role; age spelled out for the old. Anyone promoted to principal gets one automatically
+  in the nightly run (four candidates; the first adopted until Danny picks).
+
 ## 9. The seasonal tick (PROPOSED; v0 runs all of it)
 
 1. **Advance:** land yields by season, members and clients eat; whether each house could feed its clients.

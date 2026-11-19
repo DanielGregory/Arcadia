@@ -462,6 +462,13 @@ def auto_portraits(con) -> int:
     ids = needing_portraits(con)
     if not ids:
         return 0
+    # the nightly session may not have Kaggle set up: its key is injected by the environment's network proxy, so the
+    # config file only needs the account name and a placeholder (as the morning job's setup writes it)
+    cfg = Path.home() / ".kaggle/kaggle.json"
+    if not cfg.exists():
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        cfg.write_text(json.dumps({"username": "danieltgregory", "key": "proxy-injected"}))
+        cfg.chmod(0o600)
     import argparse as _a
     paint(con, _a.Namespace(style="wash", candidates=4, only=ids, dry_run=False, no_push=False, test=False))
     for pid in ids:

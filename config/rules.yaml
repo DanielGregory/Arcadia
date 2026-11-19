@@ -176,3 +176,21 @@ chroniclers:
   - {name: "Basil Marcellan", title: "merchant of the counting house on the quay", voice: "shrewd and wry; counts every quarrel in coin, cargo and favours owed, and admires whoever profits"}
 chronicle_words: [220, 300]
 
+
+# Life (world/life.py, PROPOSED): births, coming of age (population.adult_age), promotion, deaths of the old
+life:
+  birth_chance: 0.04          # per season, for a married couple whose wife is of child-bearing age
+  mother_age: [18, 42]
+  max_principals: 30          # promotion stops when there are this many principals
+  promote_after_events: 2     # a side character who has been the named actor of this many events rises
+  promotions_per_season: 1
+  old_age: 60                 # side characters from this age may die of age (principals only die by events, for now)
+  death_per_year_past_old_age: 0.002   # per season: chance = (age - old_age + 1) x this (a 70-year-old: ~9% a year)
+  marriages_per_season: 0.6   # chance of one everyday marriage a season
+  marrying_age: [18, 35]
+
+# Traits (world/traits.py): dream recall by humour, replacing recall by dream voice (dreaming.recall)
+traits:
+  recall_by_humor: {melancholic: 0.75, sanguine: 0.5, choleric: 0.3, phlegmatic: 0.2}
+  recall_superstitious: 0.15
+  recall_faith: 0.1

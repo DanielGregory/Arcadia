@@ -11,6 +11,8 @@ situation holds (Marius's lasts while Livia is missing...). Everything derived i
 
 from __future__ import annotations
 
+import json
+
 from world.db import insert, one, rows
 
 STORY_DRIVES = {   # Danny's: they hold while the situation holds
@@ -28,6 +30,10 @@ HOUSE_AIMS = {
     "Severin": "keep the peace through judgment", "Damaris": "keep the city's secrets, and its trust",
     "Veyra": "keep Corva's quarrels off the mountain", "Solenne": "find a way back into the council",
 }
+# what a person's strongest value makes them want this season (from their traits; PROPOSED)
+VALUE_DRIVES = {"honor": "defend the house's honour in public", "faith": "seek the sea's favour and the temple's blessing",
+                "family": "protect their own kin above all", "ambition": "rise in standing in the council",
+                "love": "stand by the people they love", "wealth": "profit from the city's troubles"}
 FLIGHT_DRIVES = {   # from a person's own reading of the Flight
     "carried Livia off": "make Soren of the Harbor and House Theren answer for taking Livia",
     "arranged the escape": "expose House Theren's part in the Flight",
@@ -67,8 +73,17 @@ def compute_drives(con, year: int, season: str, max_per_person: int = 3) -> dict
                         "join events e on e.id = b.subject_id and b.subject_type = 'event' "
                         "where b.holder_id = ? and b.stance < -0.3 and h.id != ? and e.kind != 'departure' "
                         "order by b.stance * b.confidence limit 1", p["id"], p["house_id"])
+        t = json.loads(p["traits"]) if p.get("traits") else None
         if cold:
-            drives.append((f"settle the old score with House {cold['name']}", "grievance"))
+            # someone who holds grudges puts the old score first
+            grudge = (f"settle the old score with House {cold['name']}", "grievance")
+            if t and "holds grudges" in t.get("quirks", []):
+                drives.insert(0, grudge)
+            else:
+                drives.append(grudge)
+        if t:   # their strongest value
+            top = max(t["values"], key=t["values"].get)
+            drives.append((VALUE_DRIVES[top], "value"))
         # what last season's dream left them meaning to do
         intent = one(con, "select text from memories where person_id = ? and text like 'I mean to:%' order by id desc limit 1", p["id"])
         if intent:

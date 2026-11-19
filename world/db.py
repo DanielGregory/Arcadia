@@ -14,11 +14,13 @@ Small additions here that Supabase doesn't have yet (PROPOSED):
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = ROOT / "data/world/sandbox.db"
+# WORLD_DB points the engine at another sandbox file (a test copy); the default is the real one
+DB_PATH = Path(os.environ.get("WORLD_DB") or ROOT / "data/world/sandbox.db")
 
 SCHEMA = """
 create table people (
@@ -86,6 +88,10 @@ create table if not exists drives (
   id integer primary key, year int not null, season text not null, person_id int not null, text text not null, source text);
 create table if not exists portrait_candidates (
   id integer primary key, person_id int not null, k int not null, seed int, prompt text, image text not null, made_at text);
+create table if not exists trait_changes (
+  id integer primary key, year int, season text, person_id int not null, trait text not null, before real, after real,
+  event_id int, reason text);
+create table if not exists bio_queue (id integer primary key, person_id int not null, occasion text not null, year int, season text);
 create table if not exists model_calls (
   id integer primary key, year int not null, season text not null, step text not null, prompt_tokens int,
   output_tokens int, seconds real);
@@ -97,7 +103,9 @@ create table if not exists chronicles (
 
 # Columns added later (to older sandboxes on connect): people.portrait (a path in the public bucket) and
 # people.sex (PROPOSED: read from the first name; see world/portraits.py)
-LATER_COLUMNS = {"people": [("portrait", "text"), ("sex", "text"), ("appearance", "text"), ("portrait_ref", "text")], "chronicles": [("title", "text")]}
+LATER_COLUMNS = {"people": [("portrait", "text"), ("sex", "text"), ("appearance", "text"), ("portrait_ref", "text"),
+                            ("traits", "text"), ("bio", "text"), ("bio_status", "text"), ("bio_occasion", "text")],
+                 "chronicles": [("title", "text")]}
 
 
 def connect(path: Path = DB_PATH) -> sqlite3.Connection:

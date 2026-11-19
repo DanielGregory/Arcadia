@@ -110,6 +110,9 @@ def advance(con, R, year, season):
         con.execute("update houses set food = ?, goods = ?, materials = ? where id = ?",
                     (round(max(0.0, food), 2), round(h["goods"] + y["goods"] * f, 2), round(h["materials"] + y["materials"] * f, 2), h["id"]))
         report[h["name"]] = {"fed": fed, "food": round(max(0.0, food), 1), "need": round(need, 1)}
+        if not fed:
+            from world.traits import on_hunger
+            on_hunger(con, h, year, season)
     return report
 
 
@@ -215,7 +218,14 @@ def recall_and_share(con, R, dreams, r, year, season):
             con.execute("update dreams set recalled = 1 where id = ?", (d["id"],))
             remembered.append(d)
             continue
-        chance = D["recall"][d["temper"]] * (1 - D["vividness_weight"] + D["vividness_weight"] * d["vividness"])
+        t = json.loads(p["traits"]) if p.get("traits") else None
+        if t:   # by the humours: melancholics remember their dreams, phlegmatics hardly ever; superstition and faith help
+            Tr = R["traits"]
+            base = sum(t["humors"][k] * Tr["recall_by_humor"][k] for k in t["humors"])
+            base += Tr["recall_superstitious"] * ("superstitious" in t.get("quirks", [])) + Tr["recall_faith"] * t["values"]["faith"]
+        else:
+            base = D["recall"][d["temper"]]
+        chance = min(0.95, base) * (1 - D["vividness_weight"] + D["vividness_weight"] * d["vividness"])
         rec = r.random() < chance
         con.execute("update dreams set recalled = ? where id = ?", (1 if rec else 0, d["id"]))
         if not rec:
@@ -327,8 +337,10 @@ def person_sketch(con, p, year=None, season=None) -> str:
                      "on m.person_id = b.holder_id join houses hh on hh.id = b.about_house where m.house_id = ? and b.stance is not null "
                      "and b.about_house != ? group by hh.name order by f", house["id"], house["id"])
     drives = rows(con, "select text from drives where person_id = ? and year = ? and season = ?", p["id"], year, season) if year is not None else []
+    from world.traits import describe
+    nature = describe(json.loads(p["traits"])) if p.get("traits") else p["dream_temperament"]
     lines = [f"{p['name']}, {role} of House {house['name']} (its right: {house['claim']})"
-             f"{'; ' + p['note'] if p.get('note') else ''}. Temperament: {p['dream_temperament']}. Traits: {traits}."]
+             f"{'; ' + p['note'] if p.get('note') else ''}. Their nature: {nature}. Traits: {traits}."]
     if feel:
         cold = [f"{f['name']} ({f['f']:+.1f})" for f in feel if f["f"] < -0.2][:3]
         warm = [f"{f['name']} ({f['f']:+.1f})" for f in feel[::-1] if f["f"] > 0.2][:2]
@@ -548,7 +560,10 @@ def house_context(con, R, h, year, season, drives, used_kinds, last_events, lege
              "Members who can act (id, name, role, age, drives this season):"]
     for m in adults[:9]:
         d = drives.get(m["id"])
-        lines.append(f"  p{m['id']} {m['name']} ({m['role']}, {age(m, year)})" + (": " + "; ".join(d) if d else ""))
+        from world.traits import describe
+        nature = describe(json.loads(m["traits"])) if m.get("traits") else ""
+        lines.append(f"  p{m['id']} {m['name']} ({m['role']}, {age(m, year)}" + (f"; {nature}" if nature else "") + ")"
+                     + (": " + "; ".join(d) if d else ""))
     if absent:
         lines.append("Missing from Corva: " + ", ".join(a["name"] for a in absent) + " (whereabouts unknown to everyone).")
     lines.append(f"Groups that can act: h{h['id']} (House {h['name']} as a family), c{h['id']} (its {clients['count']} clients).")
@@ -796,6 +811,10 @@ def validate_and_record(con, R, items, year, season, tick, r):
                     ("rejected", f"{actor['name']} cannot turn this against {target['name']}, of their own house", "aimed at own house")
             elif target and tkind == "house" and target["id"] == h["id"] and family in NEEDS_TARGET:
                 status, reason, rule = "rejected", "a house cannot aim this at itself", "aimed at itself"
+            elif family in ("marriage", "alliance") and target and (target["id"] == h["id"] if tkind == "house" else target.get("house_id") == h["id"]):
+                status, reason, rule = "rejected", f"a {family} is made with another house, not within House {h['name']}", "within own house"
+            elif family in ("confess", "flee") and group_key:
+                status, reason, rule = "rejected", f"only a person can {family}, not {actor['name']} as a group", "group cannot do this"
             elif V["one_action_per_actor"] and (group_key in acted if group_key else actor["id"] in acted):
                 status, reason, rule = "rejected", f"{actor['name']} already acts this season, and nobody else of the house is free", "already acting"
             elif family in NEEDS_TARGET and not target:
@@ -827,6 +846,11 @@ def validate_and_record(con, R, items, year, season, tick, r):
                     chance *= V["repeat_penalty"] ** own * V.get("repeat_penalty_city", V["repeat_penalty"]) ** others
                     fam_count[(h["id"], family)] += 1
                     fam_count[family] += 1
+                    # the actor's quirks colour it (world/traits.py QUIRK_EFFECTS)
+                    if actor.get("traits"):
+                        from world.traits import QUIRK_EFFECTS
+                        for q in json.loads(actor["traits"]).get("quirks", []):
+                            chance += QUIRK_EFFECTS.get(q, {}).get(family, 0)
                     # a principal acting on one of their own drives pushes harder
                     drive = drive_behind(drives_now.get(actor["id"] or -1, []), p, target, place, R)
                     if drive:
@@ -868,6 +892,8 @@ def validate_and_record(con, R, items, year, season, tick, r):
                         reason += f"; carried out by {actor['name']}, as {stood_in} already acts this season"
                         payload["stood_in_for"] = stood_in
                     effects(con, R, family, outcome, h, thouse, actor, target if tkind == "person" else None, ev, year, season, r)
+                    from world.traits import on_event
+                    on_event(con, ev, family, outcome, h, thouse, actor, target if tkind == "person" else None, year, season)
                     move_actors(con, ([actor["id"]] if actor["id"] else []) + ([target["id"]] if tkind == "person" else []), place)
         pid = insert(con, "storyteller_proposals", year=year, season=season, tick=tick, house_id=h["id"],
                      kind=str((p or {}).get("kind") or "?"), payload=payload, wording=json.dumps(p or {}, ensure_ascii=False),
