@@ -263,13 +263,49 @@ def card_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tup
     return out, waiting
 
 
+def plate_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tuple[list[dict], list[str]]:
+    """The fallback card (Danny's call if test 3 missed): test 1's plate, which had the one consistent look, with
+    watercolour washes in the house's colours instead of sepia, and one prop of their role in their hands. No scene,
+    no pose: a half-body figure with their prop, their mood, their clothes."""
+    from world.appearance import HOUSE_DRESS
+    year = rows(con, "select max(year) y from storyteller_proposals")[0]["y"] or 0
+    out, waiting = [], []
+    for p in rows(con, "select p.id, p.name, p.born_year, p.note, p.dream_temperament, p.appearance, p.portrait_ref, m.role, "
+                       "h.name house from people p join house_members m on m.person_id = p.id join houses h on h.id = m.house_id "
+                       "where p.tier = 'principal' order by p.id"):
+        if only and p["id"] not in only:
+            continue
+        a = json.loads(p["appearance"] or "{}")
+        if not any(a.get(f) for f in ("build", "face", "hair")):
+            waiting.append(p["name"])
+            continue
+        sex = a.get("sex") or sex_of(p["name"])
+        age = year - p["born_year"]
+        noun = ("girl" if sex == "f" else "boy") if age < 16 else ("woman" if sex == "f" else "man")
+        _, prop = scene_for(p["note"], p["role"], p["house"])
+        colours = HOUSE_DRESS[p["house"]][0]
+        clothing = re.sub(r"\s*\(House [^)]*\)", "", a["clothing"]).split(",")[0]
+        mood = TEMPERAMENT.get(p["dream_temperament"], "").split(",")[0]
+        prompt = f"{age_phrase(age, noun)}, half-body figure holding {prop}, {mood}, wearing {clothing}"
+        prompt_2 = (f"ink and wash illustration, a loose painted sketch, a character plate from an old illustrated book, "
+                    f"expressive pen linework, light watercolour washes of {colours} on warm cream paper; "
+                    f"{a.get('skin', 'olive')} skin, {a['face']}, hair {a['hair'].split(',')[0]}, {a['eyes']} eyes")
+        negative = CARD_NEGATIVE.replace(", sepia, monochrome, brown tint, grayscale", ", monochrome, grayscale") + (
+            ", " + YOUNG_NEGATIVE if age < 40 else "")
+        for k in range(candidates):
+            out.append({"id": p["id"], "k": k, "name": p["name"], "sex": sex, "prompt": prompt, "prompt_2": prompt_2,
+                        "style": CARD_STYLE, "negative": negative, "seed": 7000 + p["id"] * 10 + k,
+                        "reference": (STORAGE_PUBLIC + p["portrait_ref"]) if p["portrait_ref"] else None})
+    return out, waiting
+
+
 STORAGE_PUBLIC = "https://dbrtvwhslxkdpmuawrgd.supabase.co/storage/v1/object/public/arcadia/"
 JOB = {"notebook": "notebooks/kaggle_portraits.ipynb", "slug": "arcadia-portraits", "title": "Arcadia Portraits"}
 
 
 def paint(con, args) -> None:
     """Candidates on Kaggle -> the public bucket (sandbox/portraits/candidates/) -> portrait_candidates (engine record)."""
-    batch, waiting = (card_prompts if args.style == "card" else prompts)(con, args.candidates, args.only)
+    batch, waiting = {"card": card_prompts, "plate": plate_prompts, "head": prompts}[args.style](con, args.candidates, args.only)
     if waiting:
         print("waiting for their appearance to be written: " + ", ".join(waiting))
     if args.dry_run:
@@ -347,7 +383,8 @@ def main() -> None:
     ap.add_argument("--no_push", action="store_true")
     ap.add_argument("--candidates", type=int, default=4)
     ap.add_argument("--only", type=lambda s: [int(x) for x in s.split(",")], help="person ids, e.g. 2,6")
-    ap.add_argument("--style", choices=["card", "head"], default="card", help="card: half-body character plates (v2); head: v1")
+    ap.add_argument("--style", choices=["card", "plate", "head"], default="card",
+                    help="card: scene cards (v2, test 3); plate: test-1 plates with house-colour washes and a prop; head: v1")
     ap.add_argument("--test", action="store_true", help="a trial: download to out/portrait_tests, upload and record nothing")
     args = ap.parse_args()
     con = connect()
