@@ -252,7 +252,8 @@ def wash_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tup
         clothing = re.sub(r"\s*\(House [^)]*\)", "", a["clothing"]).split(",")[0]
         mood = TEMPERAMENT.get(p["dream_temperament"], "").split(",")[0]
         # age leads both prompts, spelled out for the old (the young style reference pulls everyone younger)
-        aged = (f"a very old {noun} of {age}, white hair, deeply lined skin, sunken cheeks, age spots" if age >= 65 else
+        aged = (f"a very old {noun} of {age}, white hair, deeply lined skin, sunken cheeks, age spots" if age >= 75 else
+                f"an old {noun} of {age}, white hair, lined weathered face" if age >= 65 else
                 f"an older {noun} of {age}, grey-streaked hair, lined face" if age >= 55 else age_phrase(age, noun))
         prompt = (f"{aged}, half-length portrait with shoulders and hands in frame" + (f", {station}" if station else "")
                   + f", holding {prop}, {mood}, fully clothed in {clothing}")
@@ -446,6 +447,29 @@ def adopt(con=None) -> int:
     con.commit()
     print(f"{n} portrait(s) adopted from the review page's picks")
     return n
+
+
+def needing_portraits(con) -> list[int]:
+    """Principals (e.g. just promoted) with an appearance record and neither a portrait nor candidates yet."""
+    return [r["id"] for r in rows(con, "select id, appearance from people where tier = 'principal' and alive = 1 and portrait is null "
+                                       "and appearance is not null and id not in (select person_id from portrait_candidates)")
+            if json.loads(r["appearance"]).get("build")]
+
+
+def auto_portraits(con) -> int:
+    """Anyone promoted to principal gets a portrait automatically, in the chosen style: 4 candidates are painted (the
+    review page's Portraits tab, for Danny to repick) and the first becomes their portrait at once."""
+    ids = needing_portraits(con)
+    if not ids:
+        return 0
+    import argparse as _a
+    paint(con, _a.Namespace(style="wash", candidates=4, only=ids, dry_run=False, no_push=False, test=False))
+    for pid in ids:
+        c = rows(con, "select image from portrait_candidates where person_id = ? order by k limit 1", pid)
+        if c:
+            con.execute("update people set portrait = ? where id = ? and portrait is null", (c[0]["image"], pid))
+    con.commit()
+    return len(ids)
 
 
 def main() -> None:

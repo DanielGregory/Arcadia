@@ -72,6 +72,18 @@ def main() -> None:
         state.push(f"world: after season {tick} ({season}, year {year})")
         if season == "winter":
             break                              # the year is done: one day, one year
+    # anyone promoted to principal tonight gets a portrait in the chosen style (Kaggle GPU; first candidate adopted)
+    try:
+        from world.db import connect as _c
+        from world.portraits import auto_portraits
+        if time.time() - t0 < args.ceiling - 20 * 60:
+            n = auto_portraits(_c())
+            if n:
+                print(f"portraits painted for {n} new principal(s)", flush=True)
+                state.push("world: portraits for new principals")
+                done = done or [{"tick": None, "season": "portraits", "year": None, "minutes": 0}]
+    except BaseException as err:  # noqa: BLE001  (Kaggle unavailable, say: never lose a night's seasons to it)
+        print(f"new principals' portraits not painted: {err}", flush=True)
     # portraits Danny picked on the review page since the last run become the people's portraits and references
     try:
         from world.portraits import adopt
