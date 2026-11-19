@@ -133,10 +133,13 @@ def prompts(con, candidates: int = 4, only: list[int] | None = None) -> tuple[li
 
 
 # --- character cards (portraits v2): the person in their element, doing what they do ------------------------------
-CARD_STYLE = ("ink and wash illustration, a loose painted sketch, a character plate from an old illustrated book, "
-              "expressive pen linework, transparent watercolour washes, sepia ink on warm cream paper, half-body figure")
+# (test 1 used sepia ink on cream paper: it drained every house to one brown; since test 2, colour washes in the
+#  house's own colours, and sepia is in the negative prompt)
+CARD_STYLE = ("loose ink line drawing with transparent watercolour washes, a character plate from an old illustrated book, "
+              "expressive pen linework, white paper showing through")
 CARD_NEGATIVE = ("photo, photograph, 3d render, glossy digital painting, anime, cartoon mascot, modern clothes, glasses, "
-                 "text, letters, watermark, frame border, two people, crowd, deformed hands, extra fingers, blurry")
+                 "text, letters, watermark, frame border, deformed hands, extra fingers, blurry, sepia, monochrome, "
+                 "brown tint, grayscale, close-up headshot")
 YOUNG_NEGATIVE = "wrinkles, grey hair, gray hair, white hair, aged skin, old, elderly, sagging skin, crow's feet"
 # what they do and the one prop of their role, matched on their note and role (first match wins), then by house
 SCENES = [
@@ -225,12 +228,26 @@ def card_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tup
         sex = a.get("sex") or sex_of(p["name"])
         age = year - p["born_year"]
         noun = ("girl" if sex == "f" else "boy") if age < 16 else ("woman" if sex == "f" else "man")
-        action, prop = scene_for(p["note"], p["role"], p["house"])
+        from world.appearance import HOUSE_DRESS
+        if a.get("scene"):
+            scene = a["scene"]
+        else:
+            action, prop = scene_for(p["note"], p["role"], p["house"])
+            scene = f"{action}, holding {prop}"
         clothing = re.sub(r"\s*\(House [^)]*\)", "", a["clothing"])
-        prompt = (f"{age_phrase(age, noun)}, {action}, holding {prop}, {TEMPERAMENT.get(p['dream_temperament'], '')}, "
-                  f"wearing {clothing}")
-        prompt_2 = (f"{CARD_STYLE}; {a.get('skin', 'olive')} skin, {a['face']}, hair {a['hair']}, {a['eyes']} eyes, "
-                    f"{a['build']}; {HOUSE_LIGHT[p['house']]}")
+        colours = HOUSE_DRESS[p["house"]][0]
+        # encoder 1: the SCENE first (what they are doing, with their prop), the figure at half length, then who
+        # they are; younger women also get their own face and skin here, so they don't drift to one generic face
+        # (each encoder reads only 77 tokens: short age words, the first clause of the mood and of the clothes)
+        own_face = f", {a['face']}" if sex == "f" and age < 40 else ""
+        short_age = (f"a young {noun} of {age}" if age < 30 else f"a {noun} of {age}" if age < 55 else
+                     f"an old {noun} of {age}, white-haired and lined" if age >= 68 else f"an older {noun} of {age}, greying")
+        mood = TEMPERAMENT.get(p["dream_temperament"], "").split(",")[0]
+        prompt = f"{scene}; half-length, {short_age}{own_face}, {mood}, wearing {clothing.split(',')[0]}"
+        # encoder 2: the style (washes in the house's colours), then skin, face, hair, eyes, and the house's light
+        prompt_2 = (f"ink line and watercolour washes of {colours}, old illustrated book plate, loose pen lines, white paper; "
+                    f"{a.get('skin', 'olive')} skin, {a['face']}, hair {a['hair'].split(',')[0]}, {a['eyes']} eyes; "
+                    f"{HOUSE_LIGHT[p['house']]}")
         negative = CARD_NEGATIVE + (", " + YOUNG_NEGATIVE if age < 40 else "")
         for k in range(candidates):
             out.append({"id": p["id"], "k": k, "name": p["name"], "sex": sex, "prompt": prompt, "prompt_2": prompt_2,

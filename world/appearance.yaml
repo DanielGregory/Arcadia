@@ -3,6 +3,7 @@
 # age_in_year: the age this describes, by year (the portrait uses their age in the year it is painted).
 # natural_hair: their hair colour before any grey (their children are drafted with it).
 # Change anything; then: python -m world.appearance load
+# scene: (optional) what their character card shows them doing, with the prop of their role; it leads the card's prompt.
 
 Ismene:
   status: proposed
@@ -18,6 +19,7 @@ Ismene:
   clothing: 'white priestly robes with a sea-blue stole and a shell pendant (House Aurelian: white and sea blue)'
   natural_hair: black
   skin: golden brown
+  scene: tending the sacred flame in a bronze brazier in the sea temple, feeding it a sprig of herbs
 Theodric Aurelian:
   status: danny
   born_year: -59
@@ -65,13 +67,14 @@ Brenna Cassian:
     1: 27
   sex: f
   build: of middling height, straight-backed
-  face: a long face with a high forehead
+  face: a heart-shaped face with a pointed chin, a strong straight nose and thick dark brows
   hair: light brown, coiled at the nape
   eyes: black
   marks: stone-cut scars across the knuckles; freckles across the nose
   clothing: 'a grey tunic with a rust-red border, dusted with stone (House Cassian: stone grey and rust)'
   natural_hair: light brown
   skin: light olive
+  scene: on a wooden scaffold over stone terraces, pointing and directing workers below, a plumb line in her other hand
 Marius Corvane:
   status: danny
   born_year: -61
@@ -164,6 +167,7 @@ Nikias Marcellan:
   clothing: 'rich saffron-orange robes, rings on several fingers (House Marcellan: saffron orange and brown)'
   natural_hair: dark brown
   skin: sun-darkened bronze
+  scene: at the helm of his merchant ship at sea, both hands on the steering oar, a full sail and spray behind him
 Aldric Severin:
   status: proposed
   born_year: -67
@@ -178,6 +182,8 @@ Aldric Severin:
   clothing: 'a violet judge''s mantle over pale linen (House Severin: violet and pale linen)'
   natural_hair: dark brown
   skin: sun-darkened bronze
+  scene: seated high on a judge's bench raised above a stone courtroom, holding a carved staff of office, looking down at
+    the petitioners
 Quintus Severin:
   status: proposed
   born_year: -41
@@ -331,13 +337,14 @@ Ysolde Veyra:
     1: 24
   sex: f
   build: sturdy and broad-hipped
-  face: a long face with a high forehead
+  face: a broad square face with high wide cheekbones, a snub nose and a wide mouth, freckled
   hair: black, bound in a plain cloth
   eyes: black
   marks: a weathered, windburned face; a gap between the front teeth
   clothing: 'rust-red hunter''s leathers with a fur collar (House Veyra: rust red and fur)'
   natural_hair: black
-  skin: pale, quick to burn
+  skin: pale, windburned red across the cheeks
+  scene: drawing a hunting bow, arrow nocked, in a misty mountain forest of pines
 Philo:
   status: proposed
   born_year: -68
