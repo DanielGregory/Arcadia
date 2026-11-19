@@ -78,7 +78,7 @@ def main() -> None:
             call["controlnet_conditioning_scale"] = POSE_SCALE if b.get("pose") else 0.0
         if with_ref and b.get("style_ref") and not b.get("reference"):
             # the shared look: the style plate steers only the style block (InstantStyle), not the face or the scene
-            pipe.set_ip_adapter_scale({"up": {"block_0": [0.0, STYLE_SCALE, 0.0]}})
+            pipe.set_ip_adapter_scale({"up": {"block_0": [0.0, b.get("style_scale", STYLE_SCALE), 0.0]}})
             call["ip_adapter_image"] = fetch(b["style_ref"])
         elif with_ref:
             if b.get("reference"):

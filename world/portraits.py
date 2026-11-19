@@ -93,7 +93,7 @@ def age_words(age: int, sex: str) -> str:
 def role_words(p) -> str:
     """Their station, from the public note (the parts that are not visible, what they said or did, left out)."""
     what = (p["note"] or "").split(";")[0]
-    what = "" if any(k in what for k in ("said", "swore", "believes", "fled", "took ", "spouse of")) else what
+    what = "" if any(k in what for k in ("said", "swore", "believes", "fled", "took ", "spouse of", "dreamed")) else what
     return what.removeprefix("his ").removeprefix("her ")
 
 
@@ -221,6 +221,49 @@ SKETCH_STYLE = ("expressive watercolour and ink sketch, wet washes of {colours} 
                 "bold ink lines, drips and splatters")
 
 
+# THE STYLE (Danny's choice): the Ysolde Veyra row of test 2: loose wet watercolour over ink, the house's colour
+# bleeding through, moody. One of those plates is the IP-Adapter style reference for every portrait, so the whole
+# cast shares the look and only the wash colour changes per house.
+WASH_REF = "https://dbrtvwhslxkdpmuawrgd.supabase.co/storage/v1/object/public/arcadia/sandbox/portraits/style/wash_ref.png"
+WASH_STYLE = "loose wet watercolour over ink, washes of {colours} bleeding through, moody, expressive"
+OLD_NEGATIVE = "young, youthful, smooth skin, glamorous, beautiful model, makeup, airbrushed"
+WASH_STYLE_SCALE = 0.45   # the reference is a young woman: kept moderate so her face and age don't carry over
+
+
+def wash_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tuple[list[dict], list[str]]:
+    """Portraits in the chosen style, from the appearance record, age and role, at half length."""
+    from world.appearance import HOUSE_DRESS
+    year = rows(con, "select max(year) y from storyteller_proposals")[0]["y"] or 0
+    out, waiting = [], []
+    for p in rows(con, "select p.id, p.name, p.born_year, p.note, p.dream_temperament, p.appearance, p.portrait_ref, m.role, "
+                       "h.name house from people p join house_members m on m.person_id = p.id join houses h on h.id = m.house_id "
+                       "where p.tier = 'principal' order by p.id"):
+        if only and p["id"] not in only:
+            continue
+        a = json.loads(p["appearance"] or "{}")
+        if not any(a.get(f) for f in ("build", "face", "hair")):
+            waiting.append(p["name"])
+            continue
+        sex = a.get("sex") or sex_of(p["name"])
+        age = year - p["born_year"]
+        noun = ("girl" if sex == "f" else "boy") if age < 16 else ("woman" if sex == "f" else "man")
+        _, prop = scene_for(p["note"], p["role"], p["house"])
+        station = role_words(p)
+        clothing = re.sub(r"\s*\(House [^)]*\)", "", a["clothing"]).split(",")[0]
+        mood = TEMPERAMENT.get(p["dream_temperament"], "").split(",")[0]
+        prompt = (f"half-length portrait of {age_phrase(age, noun)}" + (f", {station}" if station else "")
+                  + f", holding {prop}, {mood}, fully clothed in {clothing}")
+        prompt_2 = (WASH_STYLE.format(colours=HOUSE_DRESS[p["house"]][0]) + f"; {a.get('skin', 'olive')} skin, "
+                    + ", ".join(a["face"].split(", ")[:2]) + f", hair {a['hair'].split(',')[0]}, {a['eyes']} eyes")
+        negative = (CARD_NEGATIVE + (", " + YOUNG_NEGATIVE if age < 40 else "") + (", " + OLD_NEGATIVE if age >= 55 else ""))
+        for k in range(candidates):
+            out.append({"id": p["id"], "k": k, "name": p["name"], "sex": sex, "prompt": prompt, "prompt_2": prompt_2,
+                        "style": WASH_STYLE, "negative": negative, "seed": 9000 + p["id"] * 10 + k, "guidance": 7.0,
+                        "style_ref": WASH_REF, "style_scale": WASH_STYLE_SCALE,
+                        "reference": (STORAGE_PUBLIC + p["portrait_ref"]) if p["portrait_ref"] else None})
+    return out, waiting
+
+
 def sketch_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tuple[list[dict], list[str]]:
     """Test 4: test 3's scene (in both encoders) and pose, in Danny's chosen sketch style; no style plate (it leaked
     its face into everyone in test 3)."""
@@ -328,7 +371,7 @@ JOB = {"notebook": "notebooks/kaggle_portraits.ipynb", "slug": "arcadia-portrait
 
 def paint(con, args) -> None:
     """Candidates on Kaggle -> the public bucket (sandbox/portraits/candidates/) -> portrait_candidates (engine record)."""
-    batch, waiting = {"card": card_prompts, "sketch": sketch_prompts, "plate": plate_prompts, "head": prompts}[args.style](
+    batch, waiting = {"wash": wash_prompts, "card": card_prompts, "sketch": sketch_prompts, "plate": plate_prompts, "head": prompts}[args.style](
         con, args.candidates, args.only)
     if waiting:
         print("waiting for their appearance to be written: " + ", ".join(waiting))
@@ -407,7 +450,7 @@ def main() -> None:
     ap.add_argument("--no_push", action="store_true")
     ap.add_argument("--candidates", type=int, default=4)
     ap.add_argument("--only", type=lambda s: [int(x) for x in s.split(",")], help="person ids, e.g. 2,6")
-    ap.add_argument("--style", choices=["sketch", "card", "plate", "head"], default="sketch",
+    ap.add_argument("--style", choices=["wash", "sketch", "card", "plate", "head"], default="wash",
                     help="card: scene cards (v2, test 3); plate: test-1 plates with house-colour washes and a prop; head: v1")
     ap.add_argument("--test", action="store_true", help="a trial: download to out/portrait_tests, upload and record nothing")
     args = ap.parse_args()
