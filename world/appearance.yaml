@@ -17,6 +17,7 @@ Ismene:
   marks: calloused, ink-stained fingers
   clothing: 'white priestly robes with a sea-blue stole and a shell pendant (House Aurelian: white and sea blue)'
   natural_hair: black
+  skin: golden brown
 Theodric Aurelian:
   status: danny
   born_year: -59
@@ -42,6 +43,7 @@ Iola Aurelian:
   marks: a gap between the front teeth
   clothing: 'white priestly robes with a sea-blue stole and a shell pendant (House Aurelian: white and sea blue)'
   natural_hair: auburn
+  skin: warm brown
 Rufus Cassian:
   status: proposed
   born_year: -51
@@ -55,6 +57,7 @@ Rufus Cassian:
   marks: stone-cut scars across the knuckles; a burn scar on the back of one hand
   clothing: 'a grey tunic with a rust-red border, dusted with stone (House Cassian: stone grey and rust)'
   natural_hair: light brown
+  skin: olive
 Brenna Cassian:
   status: proposed
   born_year: -26
@@ -68,6 +71,7 @@ Brenna Cassian:
   marks: stone-cut scars across the knuckles; freckles across the nose
   clothing: 'a grey tunic with a rust-red border, dusted with stone (House Cassian: stone grey and rust)'
   natural_hair: light brown
+  skin: light olive
 Marius Corvane:
   status: danny
   born_year: -61
@@ -93,6 +97,7 @@ Decimus Corvane:
   marks: a thin scar through the left eyebrow
   clothing: 'a long black robe banded in gold, a gold signet ring (House Corvane: black and deep gold)'
   natural_hair: dark, tightly curled
+  skin: deep brown
 Livia Corvane:
   status: danny
   born_year: -20
@@ -118,6 +123,7 @@ Hesione Damaris:
   marks: hands that smell of rosemary and myrrh; deep lines at the eyes
   clothing: 'teal healer''s robes with a white headcloth, a satchel of herbs (House Damaris: teal and white)'
   natural_hair: chestnut
+  skin: sun-darkened bronze
 Neria:
   status: danny
   born_year: -34
@@ -143,6 +149,7 @@ Octavia Marcellan:
   marks: a crooked nose, once broken
   clothing: 'rich saffron-orange robes, rings on several fingers (House Marcellan: saffron orange and brown)'
   natural_hair: dark brown
+  skin: pale, quick to burn
 Nikias Marcellan:
   status: proposed
   born_year: -28
@@ -156,6 +163,7 @@ Nikias Marcellan:
   marks: a gap between the front teeth
   clothing: 'rich saffron-orange robes, rings on several fingers (House Marcellan: saffron orange and brown)'
   natural_hair: dark brown
+  skin: sun-darkened bronze
 Aldric Severin:
   status: proposed
   born_year: -67
@@ -169,6 +177,7 @@ Aldric Severin:
   marks: a mole on the right cheek
   clothing: 'a violet judge''s mantle over pale linen (House Severin: violet and pale linen)'
   natural_hair: dark brown
+  skin: sun-darkened bronze
 Quintus Severin:
   status: proposed
   born_year: -41
@@ -182,6 +191,7 @@ Quintus Severin:
   marks: a missing fingertip on the left hand
   clothing: 'a violet judge''s mantle over pale linen (House Severin: violet and pale linen)'
   natural_hair: dark brown
+  skin: sun-darkened bronze
 Seraphine Solenne:
   status: proposed
   born_year: -71
@@ -195,6 +205,7 @@ Seraphine Solenne:
   marks: a missing fingertip on the left hand
   clothing: 'faded rose silk, once very fine, now worn at the seams, an old silver brooch (House Solenne: faded rose and silver)'
   natural_hair: black
+  skin: ruddy
 Silvan Solenne:
   status: proposed
   born_year: -19
@@ -208,6 +219,7 @@ Silvan Solenne:
   marks: a mole on the right cheek
   clothing: 'faded rose silk, once very fine, now worn at the seams, an old silver brooch (House Solenne: faded rose and silver)'
   natural_hair: dark brown
+  skin: deep olive
 Galen Theren:
   status: danny
   born_year: -58
@@ -245,6 +257,7 @@ Corin Theren:
   marks: a crooked nose, once broken
   clothing: 'an olive-green wool mantle over undyed linen (House Theren: olive green and undyed linen)'
   natural_hair: dark, tightly curled
+  skin: pale, quick to burn
 Soren of the Harbor:
   status: danny
   born_year: -22
@@ -270,6 +283,7 @@ Gaius Valerius:
   marks: skin browned by sea wind; freckles across the nose
   clothing: 'a sea-blue cloak pinned with a bronze clasp over a white tunic (House Valerius: sea blue and bronze)'
   natural_hair: light brown
+  skin: deep olive
 Lucan Valerius:
   status: danny
   born_year: -26
@@ -295,6 +309,7 @@ Drusilla Valerius:
   marks: a missing fingertip on the left hand
   clothing: 'a sea-blue cloak pinned with a bronze clasp over a white tunic (House Valerius: sea blue and bronze)'
   natural_hair: light brown
+  skin: golden brown
 Kael Veyra:
   status: proposed
   born_year: -45
@@ -308,6 +323,7 @@ Kael Veyra:
   marks: a weathered, windburned face; a crooked nose, once broken
   clothing: 'rust-red hunter''s leathers with a fur collar (House Veyra: rust red and fur)'
   natural_hair: black
+  skin: sun-darkened bronze
 Ysolde Veyra:
   status: proposed
   born_year: -23
@@ -321,6 +337,7 @@ Ysolde Veyra:
   marks: a weathered, windburned face; a gap between the front teeth
   clothing: 'rust-red hunter''s leathers with a fur collar (House Veyra: rust red and fur)'
   natural_hair: black
+  skin: pale, quick to burn
 Philo:
   status: proposed
   born_year: -68
@@ -334,6 +351,7 @@ Philo:
   marks: a burn scar on the back of one hand
   clothing: 'a plain white temple tunic with a blue cord (House Aurelian: white and sea blue)'
   natural_hair: chestnut
+  skin: pale, quick to burn
 Calla Aurelian:
   status: proposed
   born_year: -59
@@ -347,6 +365,7 @@ Calla Aurelian:
   marks: freckles across the nose
   clothing: 'white priestly robes with a sea-blue stole and a shell pendant (House Aurelian: white and sea blue)'
   natural_hair: light brown
+  skin: deep brown
 Corvin:
   status: proposed
   born_year: -36
@@ -360,6 +379,7 @@ Corvin:
   marks: a mole on the right cheek
   clothing: 'a plain white temple tunic with a blue cord (House Aurelian: white and sea blue)'
   natural_hair: chestnut
+  skin: golden brown
 Silas Aurelian:
   status: proposed
   born_year: -23
@@ -373,6 +393,7 @@ Silas Aurelian:
   marks: a burn scar on the back of one hand
   clothing: 'a plain white temple tunic with a blue cord (House Aurelian: white and sea blue)'
   natural_hair: chestnut
+  skin: sun-darkened bronze
 Xenia Cassian:
   status: proposed
   born_year: -59
@@ -386,6 +407,7 @@ Xenia Cassian:
   marks: stone-cut scars across the knuckles; a mole on the right cheek
   clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
   natural_hair: light brown
+  skin: light olive
 Sabina Cassian:
   status: proposed
   born_year: -49
@@ -399,6 +421,7 @@ Sabina Cassian:
   marks: stone-cut scars across the knuckles; a missing fingertip on the left hand
   clothing: 'a grey tunic with a rust-red border, dusted with stone (House Cassian: stone grey and rust)'
   natural_hair: chestnut
+  skin: light olive
 Julia (p78):
   status: proposed
   born_year: -41
@@ -412,6 +435,7 @@ Julia (p78):
   marks: stone-cut scars across the knuckles; a missing fingertip on the left hand
   clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
   natural_hair: auburn
+  skin: deep brown
 Rhea:
   status: proposed
   born_year: -38
@@ -425,6 +449,7 @@ Rhea:
   marks: stone-cut scars across the knuckles; a burn scar on the back of one hand
   clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
   natural_hair: light brown
+  skin: golden brown
 Cyra:
   status: proposed
   born_year: -33
@@ -438,6 +463,7 @@ Cyra:
   marks: stone-cut scars across the knuckles; a burn scar on the back of one hand
   clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
   natural_hair: chestnut
+  skin: sun-darkened bronze
 Elara Cassian:
   status: proposed
   born_year: -26
@@ -451,6 +477,7 @@ Elara Cassian:
   marks: freckles across the nose
   clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
   natural_hair: light brown
+  skin: tawny
 Felix Cassian:
   status: proposed
   born_year: -10
@@ -464,6 +491,7 @@ Felix Cassian:
   marks: a burn scar on the back of one hand
   clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
   natural_hair: light brown
+  skin: deep olive
 Clio Cassian:
   status: proposed
   born_year: -10
@@ -477,6 +505,7 @@ Clio Cassian:
   marks: a mole on the right cheek
   clothing: 'a grey leather apron over a rough tunic (House Cassian: stone grey and rust)'
   natural_hair: light brown
+  skin: deep brown
 Calla Corvane:
   status: proposed
   born_year: -58
@@ -490,6 +519,7 @@ Calla Corvane:
   marks: a thin scar through the left eyebrow
   clothing: 'plain black wool with a gold-thread hem (House Corvane: black and deep gold)'
   natural_hair: dark brown
+  skin: warm brown
 Aelia Corvane:
   status: proposed
   born_year: -52
@@ -503,6 +533,7 @@ Aelia Corvane:
   marks: a mole on the right cheek
   clothing: 'a long black robe banded in gold, a gold signet ring (House Corvane: black and deep gold)'
   natural_hair: black
+  skin: deep brown
 Theon Corvane:
   status: proposed
   born_year: -49
@@ -516,6 +547,7 @@ Theon Corvane:
   marks: a missing fingertip on the left hand
   clothing: 'plain black wool with a gold-thread hem (House Corvane: black and deep gold)'
   natural_hair: dark brown
+  skin: ruddy
 Elara Corvane:
   status: proposed
   born_year: -28
@@ -529,6 +561,7 @@ Elara Corvane:
   marks: a thin scar through the left eyebrow
   clothing: 'plain black wool with a gold-thread hem (House Corvane: black and deep gold)'
   natural_hair: dark brown
+  skin: light olive
 Nerva Corvane:
   status: proposed
   born_year: -12
@@ -542,6 +575,7 @@ Nerva Corvane:
   marks: deep lines at the eyes
   clothing: 'plain black wool with a gold-thread hem (House Corvane: black and deep gold)'
   natural_hair: dark, tightly curled
+  skin: golden brown
 Selene Damaris:
   status: proposed
   born_year: -67
@@ -555,6 +589,7 @@ Selene Damaris:
   marks: hands that smell of rosemary and myrrh; a gap between the front teeth
   clothing: 'a teal smock, a bundle of dried herbs at the belt (House Damaris: teal and white)'
   natural_hair: dark, tightly curled
+  skin: sun-darkened bronze
 Aulus Damaris:
   status: proposed
   born_year: -54
@@ -568,6 +603,7 @@ Aulus Damaris:
   marks: hands that smell of rosemary and myrrh; a burn scar on the back of one hand
   clothing: 'teal healer''s robes with a white headcloth, a satchel of herbs (House Damaris: teal and white)'
   natural_hair: chestnut
+  skin: pale, quick to burn
 Selene:
   status: proposed
   born_year: -48
@@ -581,6 +617,7 @@ Selene:
   marks: hands that smell of rosemary and myrrh; freckles across the nose
   clothing: 'a teal smock, a bundle of dried herbs at the belt (House Damaris: teal and white)'
   natural_hair: black
+  skin: sun-darkened bronze
 Tamsin:
   status: proposed
   born_year: -43
@@ -594,6 +631,7 @@ Tamsin:
   marks: hands that smell of rosemary and myrrh; freckles across the nose
   clothing: 'a teal smock, a bundle of dried herbs at the belt (House Damaris: teal and white)'
   natural_hair: dark brown
+  skin: sun-darkened bronze
 Varro Damaris:
   status: proposed
   born_year: -35
@@ -607,6 +645,7 @@ Varro Damaris:
   marks: hands that smell of rosemary and myrrh; freckles across the nose
   clothing: 'a teal smock, a bundle of dried herbs at the belt (House Damaris: teal and white)'
   natural_hair: auburn
+  skin: warm brown
 Doros Marcellan:
   status: proposed
   born_year: -66
@@ -620,6 +659,7 @@ Doros Marcellan:
   marks: a thin scar through the left eyebrow
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: chestnut
+  skin: pale, quick to burn
 Sabina Marcellan:
   status: proposed
   born_year: -46
@@ -633,6 +673,7 @@ Sabina Marcellan:
   marks: a missing fingertip on the left hand
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: chestnut
+  skin: pale, quick to burn
 Hesper:
   status: proposed
   born_year: -44
@@ -646,6 +687,7 @@ Hesper:
   marks: a gap between the front teeth
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: dark, tightly curled
+  skin: olive
 Basil Marcellan:
   status: proposed
   born_year: -43
@@ -659,6 +701,7 @@ Basil Marcellan:
   marks: a burn scar on the back of one hand
   clothing: 'rich saffron-orange robes, rings on several fingers (House Marcellan: saffron orange and brown)'
   natural_hair: black
+  skin: olive
 Dion:
   status: proposed
   born_year: -37
@@ -672,6 +715,7 @@ Dion:
   marks: a thin scar through the left eyebrow
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: chestnut
+  skin: sun-darkened bronze
 Milo Marcellan:
   status: proposed
   born_year: -35
@@ -685,6 +729,7 @@ Milo Marcellan:
   marks: freckles across the nose
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: dark brown
+  skin: pale, quick to burn
 Delia Marcellan:
   status: proposed
   born_year: -33
@@ -698,6 +743,7 @@ Delia Marcellan:
   marks: a crooked nose, once broken
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: black
+  skin: tawny
 Lysias Marcellan:
   status: proposed
   born_year: -28
@@ -711,6 +757,7 @@ Lysias Marcellan:
   marks: a crooked nose, once broken
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: dark brown
+  skin: olive
 Ione Marcellan:
   status: proposed
   born_year: -25
@@ -724,6 +771,7 @@ Ione Marcellan:
   marks: freckles across the nose
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: chestnut
+  skin: golden brown
 Lavinia (p66):
   status: proposed
   born_year: -25
@@ -737,6 +785,7 @@ Lavinia (p66):
   marks: a mole on the right cheek
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: light brown
+  skin: tawny
 Orin Marcellan:
   status: proposed
   born_year: -23
@@ -750,6 +799,7 @@ Orin Marcellan:
   marks: no marks of note
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: dark brown
+  skin: light olive
 Daphne Marcellan:
   status: proposed
   born_year: -20
@@ -763,6 +813,7 @@ Daphne Marcellan:
   marks: a missing fingertip on the left hand
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: dark brown
+  skin: golden brown
 Zoe:
   status: proposed
   born_year: -17
@@ -776,6 +827,7 @@ Zoe:
   marks: deep lines at the eyes
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: chestnut
+  skin: ruddy
 Rhea Marcellan:
   status: proposed
   born_year: -15
@@ -789,6 +841,7 @@ Rhea Marcellan:
   marks: a burn scar on the back of one hand
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: dark brown
+  skin: golden brown
 Lysandra Marcellan:
   status: proposed
   born_year: -9
@@ -802,6 +855,7 @@ Lysandra Marcellan:
   marks: a crooked nose, once broken
   clothing: 'a brown tunic with an orange sash and a purse at the belt (House Marcellan: saffron orange and brown)'
   natural_hair: dark brown
+  skin: deep olive
 Fausta:
   status: proposed
   born_year: -63
@@ -815,6 +869,7 @@ Fausta:
   marks: a mole on the right cheek
   clothing: 'pale linen with a violet cord at the waist (House Severin: violet and pale linen)'
   natural_hair: chestnut
+  skin: deep olive
 Phaedra Severin:
   status: proposed
   born_year: -62
@@ -828,6 +883,7 @@ Phaedra Severin:
   marks: a gap between the front teeth
   clothing: 'a violet judge''s mantle over pale linen (House Severin: violet and pale linen)'
   natural_hair: auburn
+  skin: light olive
 Zoe Severin:
   status: proposed
   born_year: -51
@@ -841,6 +897,7 @@ Zoe Severin:
   marks: a burn scar on the back of one hand
   clothing: 'pale linen with a violet cord at the waist (House Severin: violet and pale linen)'
   natural_hair: dark brown
+  skin: sun-darkened bronze
 Thalia Severin:
   status: proposed
   born_year: -45
@@ -854,6 +911,7 @@ Thalia Severin:
   marks: a thin scar through the left eyebrow
   clothing: 'pale linen with a violet cord at the waist (House Severin: violet and pale linen)'
   natural_hair: dark brown
+  skin: olive
 Damon Severin:
   status: proposed
   born_year: -10
@@ -867,6 +925,7 @@ Damon Severin:
   marks: a gap between the front teeth
   clothing: 'pale linen with a violet cord at the waist (House Severin: violet and pale linen)'
   natural_hair: dark brown
+  skin: pale, quick to burn
 Isidor Solenne:
   status: proposed
   born_year: -71
@@ -880,6 +939,7 @@ Isidor Solenne:
   marks: freckles across the nose
   clothing: 'faded rose silk, once very fine, now worn at the seams, an old silver brooch (House Solenne: faded rose and silver)'
   natural_hair: black
+  skin: warm brown
 Petros Theren:
   status: proposed
   born_year: -64
@@ -893,6 +953,7 @@ Petros Theren:
   marks: sun-browned forearms; deep lines at the eyes
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: chestnut
+  skin: olive
 Xenia Theren:
   status: proposed
   born_year: -63
@@ -906,6 +967,7 @@ Xenia Theren:
   marks: sun-browned forearms; calloused, ink-stained fingers
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: chestnut
+  skin: pale, quick to burn
 Cyra Theren:
   status: proposed
   born_year: -56
@@ -919,6 +981,7 @@ Cyra Theren:
   marks: sun-browned forearms; a gap between the front teeth
   clothing: 'an olive-green wool mantle over undyed linen (House Theren: olive green and undyed linen)'
   natural_hair: light brown
+  skin: pale, quick to burn
 Maia Theren:
   status: proposed
   born_year: -42
@@ -932,6 +995,7 @@ Maia Theren:
   marks: sun-browned forearms; deep lines at the eyes
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: chestnut
+  skin: golden brown
 Julia (p62):
   status: proposed
   born_year: -41
@@ -945,6 +1009,7 @@ Julia (p62):
   marks: sun-browned forearms; a missing fingertip on the left hand
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: auburn
+  skin: deep brown
 Kleon:
   status: proposed
   born_year: -35
@@ -958,6 +1023,7 @@ Kleon:
   marks: sun-browned forearms; calloused, ink-stained fingers
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: black
+  skin: golden brown
 Lavinia (p87):
   status: proposed
   born_year: -31
@@ -971,6 +1037,7 @@ Lavinia (p87):
   marks: sun-browned forearms; a mole on the right cheek
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: light brown
+  skin: tawny
 Varro Theren:
   status: proposed
   born_year: -29
@@ -984,6 +1051,7 @@ Varro Theren:
   marks: sun-browned forearms; a burn scar on the back of one hand
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: chestnut
+  skin: light olive
 Junius Theren:
   status: proposed
   born_year: -28
@@ -997,6 +1065,7 @@ Junius Theren:
   marks: sun-browned forearms
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: black
+  skin: tawny
 Zoe Theren:
   status: proposed
   born_year: -20
@@ -1010,6 +1079,7 @@ Zoe Theren:
   marks: a missing fingertip on the left hand
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: chestnut
+  skin: sun-darkened bronze
 Daphne Theren:
   status: proposed
   born_year: -20
@@ -1023,6 +1093,7 @@ Daphne Theren:
   marks: no marks of note
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: auburn
+  skin: sun-darkened bronze
 Lysandra Theren:
   status: proposed
   born_year: -11
@@ -1036,6 +1107,7 @@ Lysandra Theren:
   marks: a gap between the front teeth
   clothing: 'a green-bordered working tunic, sleeves rolled (House Theren: olive green and undyed linen)'
   natural_hair: dark, tightly curled
+  skin: ruddy
 Otho Valerius:
   status: proposed
   born_year: -61
@@ -1049,6 +1121,7 @@ Otho Valerius:
   marks: skin browned by sea wind; a burn scar on the back of one hand
   clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
   natural_hair: light brown
+  skin: sun-darkened bronze
 Daphne:
   status: proposed
   born_year: -60
@@ -1062,6 +1135,7 @@ Daphne:
   marks: skin browned by sea wind; a crooked nose, once broken
   clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
   natural_hair: chestnut
+  skin: warm brown
 Nyssa Valerius:
   status: proposed
   born_year: -58
@@ -1075,6 +1149,7 @@ Nyssa Valerius:
   marks: skin browned by sea wind; freckles across the nose
   clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
   natural_hair: chestnut
+  skin: tawny
 Rhea Valerius:
   status: proposed
   born_year: -55
@@ -1088,6 +1163,7 @@ Rhea Valerius:
   marks: skin browned by sea wind; a gap between the front teeth
   clothing: 'a sea-blue cloak pinned with a bronze clasp over a white tunic (House Valerius: sea blue and bronze)'
   natural_hair: auburn
+  skin: tawny
 Sabina Valerius:
   status: proposed
   born_year: -51
@@ -1101,6 +1177,7 @@ Sabina Valerius:
   marks: skin browned by sea wind; a mole on the right cheek
   clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
   natural_hair: light brown
+  skin: tawny
 Cato:
   status: proposed
   born_year: -44
@@ -1114,6 +1191,7 @@ Cato:
   marks: skin browned by sea wind; a gap between the front teeth
   clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
   natural_hair: chestnut
+  skin: tawny
 Clio Valerius:
   status: proposed
   born_year: -24
@@ -1127,6 +1205,7 @@ Clio Valerius:
   marks: skin browned by sea wind; freckles across the nose
   clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
   natural_hair: light brown
+  skin: deep olive
 Bion:
   status: proposed
   born_year: -17
@@ -1140,6 +1219,7 @@ Bion:
   marks: skin browned by sea wind; freckles across the nose
   clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
   natural_hair: light brown
+  skin: olive
 Xanthos Valerius:
   status: proposed
   born_year: -13
@@ -1153,6 +1233,7 @@ Xanthos Valerius:
   marks: a gap between the front teeth
   clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
   natural_hair: light brown
+  skin: olive
 Lavinia Valerius:
   status: proposed
   born_year: -12
@@ -1166,6 +1247,7 @@ Lavinia Valerius:
   marks: no marks of note
   clothing: 'a short blue tunic and a bronze-studded belt (House Valerius: sea blue and bronze)'
   natural_hair: light brown
+  skin: warm brown
 Clio Veyra:
   status: proposed
   born_year: -69
@@ -1179,6 +1261,7 @@ Clio Veyra:
   marks: a weathered, windburned face
   clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
   natural_hair: chestnut
+  skin: golden brown
 Evander:
   status: proposed
   born_year: -51
@@ -1192,6 +1275,7 @@ Evander:
   marks: a weathered, windburned face; deep lines at the eyes
   clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
   natural_hair: dark brown
+  skin: olive
 Helia Veyra:
   status: proposed
   born_year: -41
@@ -1205,6 +1289,7 @@ Helia Veyra:
   marks: a weathered, windburned face; a crooked nose, once broken
   clothing: 'rust-red hunter''s leathers with a fur collar (House Veyra: rust red and fur)'
   natural_hair: light brown
+  skin: light olive
 Aelia Veyra:
   status: proposed
   born_year: -27
@@ -1218,6 +1303,7 @@ Aelia Veyra:
   marks: a weathered, windburned face; freckles across the nose
   clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
   natural_hair: chestnut
+  skin: warm brown
 Selene Veyra:
   status: proposed
   born_year: -25
@@ -1231,6 +1317,7 @@ Selene Veyra:
   marks: no marks of note
   clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
   natural_hair: black
+  skin: deep olive
 Lysandra Veyra:
   status: proposed
   born_year: -24
@@ -1244,6 +1331,7 @@ Lysandra Veyra:
   marks: no marks of note
   clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
   natural_hair: black
+  skin: olive
 Irene Veyra:
   status: proposed
   born_year: -22
@@ -1257,6 +1345,7 @@ Irene Veyra:
   marks: a missing fingertip on the left hand
   clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
   natural_hair: black
+  skin: golden brown
 Titus:
   status: proposed
   born_year: -21
@@ -1270,6 +1359,7 @@ Titus:
   marks: a weathered, windburned face; a mole on the right cheek
   clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
   natural_hair: dark, tightly curled
+  skin: olive
 Laurent Veyra:
   status: proposed
   born_year: -18
@@ -1283,6 +1373,7 @@ Laurent Veyra:
   marks: a weathered, windburned face; a burn scar on the back of one hand
   clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
   natural_hair: auburn
+  skin: deep brown
 Fausta Veyra:
   status: proposed
   born_year: -10
@@ -1296,3 +1387,4 @@ Fausta Veyra:
   marks: calloused, ink-stained fingers
   clothing: 'a red wool cloak over leathers, a horn at the belt (House Veyra: rust red and fur)'
   natural_hair: black
+  skin: golden brown

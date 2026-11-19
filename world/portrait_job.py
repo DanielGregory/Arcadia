@@ -63,7 +63,9 @@ def main() -> None:
             else:   # no reference for this person: the adapter is loaded but must not steer them
                 pipe.set_ip_adapter_scale(0.0)
                 call["ip_adapter_image"] = Image.new("RGB", (224, 224), (40, 32, 24))
-        img = pipe(prompt=f"{b['prompt']}, {b['style']}", prompt_2=f"{b['style']}: {b['prompt']}",
+        p1 = b["prompt"] if b.get("prompt_2") else f"{b['prompt']}, {b['style']}"
+        p2 = b.get("prompt_2") or f"{b['style']}: {b['prompt']}"
+        img = pipe(prompt=p1, prompt_2=p2,
                    negative_prompt=b["negative"], negative_prompt_2=b["negative"], width=832, height=1024,
                    num_inference_steps=args.steps, guidance_scale=6.5,
                    generator=torch.Generator(device="cuda").manual_seed(b["seed"]), **call).images[0]

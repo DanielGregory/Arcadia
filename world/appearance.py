@@ -32,7 +32,7 @@ from world.db import connect, rows  # noqa: E402
 PATH = ROOT / "world/appearance.yaml"
 DANNY = ["Livia Corvane", "Soren of the Harbor", "Lucan Valerius", "Marius Corvane", "Galen Theren", "Tiberon Theren",
          "Neria", "Theodric Aurelian"]
-FIELDS = ["build", "face", "hair", "eyes", "marks", "clothing"]
+FIELDS = ["skin", "build", "face", "hair", "eyes", "marks", "clothing"]
 
 # --- the house's colours and dress, by station (PROPOSED) -------------------------------------------------------
 HOUSE_DRESS = {
@@ -56,6 +56,8 @@ FACE = ["a long face with a high forehead", "a broad face with heavy cheekbones"
 HAIR = ["black", "dark brown", "chestnut", "auburn", "light brown", "dark, tightly curled"]
 HAIR_STYLE = {"m": ["cropped short", "worn to the shoulder", "tied back", "thick and unruly"],
               "f": ["braided and pinned up", "worn long and loose", "bound in a plain cloth", "coiled at the nape"]}
+SKIN = ["olive", "light olive", "deep olive", "warm brown", "deep brown", "sun-darkened bronze", "pale, quick to burn", "ruddy",
+        "golden brown", "tawny"]
 EYES = ["dark brown", "black", "hazel", "grey", "green", "amber-brown"]
 MARKS = ["a thin scar through the left eyebrow", "a crooked nose, once broken", "a mole on the right cheek", "deep lines at the eyes",
          "calloused, ink-stained fingers", "a missing fingertip on the left hand", "a burn scar on the back of one hand",
@@ -93,7 +95,7 @@ def draft_one(p: dict, house: str, role: str, year: int, parent: dict | None) ->
     else:
         build = pick(BUILD[sex], k, "build") + (", stooped a little with age" if age >= 65 else "")
     return {"status": "proposed", "born_year": p["born_year"], "age_in_year": {year: age}, "sex": sex,
-            "build": build, "face": pick(FACE, k, "face") + (", weathered" if age >= 50 else ""),
+            "skin": pick(SKIN, k, "skin"), "build": build, "face": pick(FACE, k, "face") + (", weathered" if age >= 50 else ""),
             "hair": hair_words, "eyes": (parent or {}).get("eye_colour") or pick(EYES, k, "eyes"), "marks": marks,
             "clothing": f"{station} (House {house}: {colours})", "natural_hair": hair}
 
@@ -118,6 +120,8 @@ def draft() -> None:
     key = lambda p: p["name"] if dup[p["name"]] == 1 else f"{p['name']} (p{p['id']})"   # two Julias: told apart by id
     for p in people:   # eldest first, so parents are drafted before their children
         p["key"] = key(p)
+        if p["key"] in have and have[p["key"]].get("status") == "proposed" and not have[p["key"]].get("skin"):
+            have[p["key"]]["skin"] = pick(SKIN, p["name"], "skin")   # older drafts get the newer field
         if p["key"] in have:
             made[p["id"]] = {"hair_colour": have[p["key"]].get("natural_hair"), "eye_colour": have[p["key"]].get("eyes")}
             continue

@@ -132,19 +132,126 @@ def prompts(con, candidates: int = 4, only: list[int] | None = None) -> tuple[li
     return out, waiting
 
 
+# --- character cards (portraits v2): the person in their element, doing what they do ------------------------------
+CARD_STYLE = ("ink and wash illustration, a loose painted sketch, a character plate from an old illustrated book, "
+              "expressive pen linework, transparent watercolour washes, sepia ink on warm cream paper, half-body figure")
+CARD_NEGATIVE = ("photo, photograph, 3d render, glossy digital painting, anime, cartoon mascot, modern clothes, glasses, "
+                 "text, letters, watermark, frame border, two people, crowd, deformed hands, extra fingers, blurry")
+YOUNG_NEGATIVE = "wrinkles, grey hair, gray hair, white hair, aged skin, old, elderly, sagging skin, crow's feet"
+# what they do and the one prop of their role, matched on their note and role (first match wins), then by house
+SCENES = [
+    ("harbour pilot", "standing at a ship's steering oar, eyes on the harbour mouth", "a coil of rope over one shoulder"),
+    ("ship's captain", "on a ship's deck with one hand on the rigging", "a weathered sea chart"),
+    ("priestess", "kneeling at a sea altar lit by oil lamps", "a large conch shell"),
+    ("high priest", "raising a bronze bowl of sea water before an altar", "a bronze libation bowl"),
+    ("judges", "seated in judgment on a stone bench, leaning forward to listen", "a carved staff of office"),
+    ("judge", "seated in judgment on a stone bench, weighing a case", "a wax tablet and stylus"),
+    ("healers", "grinding herbs in a stone mortar at a cluttered table", "a stone mortar and pestle"),
+    ("servant", "carrying a water jar through a courtyard", "a clay water jar"),
+    ("herders", "leaning on a crook on a windy mountain slope with sheep behind", "a shepherd's crook"),
+    ("huntress", "drawing a bow on a misty mountain path", "a short hunting bow"),
+    ("quarries", "inspecting a block of cut stone in a quarry", "an iron chisel"),
+    ("builder", "measuring a wall with a plumb line on a scaffold", "a plumb line"),
+    ("merchant", "counting coins at a table in a counting house", "a ledger of wax tablets"),
+    ("matriarch", "seated in a faded hall among old heirlooms", "an old silver brooch held in the hand"),
+    ("heir", "standing on a terrace above the city, hand on a sword hilt", "a sheathed short sword"),
+    ("lord", "standing in a council hall, one hand raised to speak", "a gold signet ring"),
+    ("head", "standing in the house's hall, receiving a petitioner", "a seal ring"),
+]
+HOUSE_SCENES = {
+    "Corvane": ("standing on the citadel terrace above the city", "a gold signet ring"),
+    "Valerius": ("on the deck of a war galley in the harbour", "a bronze helmet held under the arm"),
+    "Theren": ("among olive trees in the hills at harvest", "a basket of olives"),
+    "Aurelian": ("on the steps of the sea temple", "a shell pendant held in the hand"),
+    "Marcellan": ("on the busy quay among bales of cargo", "a purse of coins"),
+    "Cassian": ("in the quarry under the ridge", "a mason's hammer"),
+    "Severin": ("in the stone hall of judgment", "a scroll of laws"),
+    "Damaris": ("in the herb garden by the western gate", "a bundle of dried herbs"),
+    "Veyra": ("on the mountain pastures in the wind", "a horn on a leather cord"),
+    "Solenne": ("in an old house with shuttered windows", "a faded silk fan"),
+}
+TEMPERAMENT = {
+    "mystic": "a distant dreaming gaze, head tilted as if listening to something far off",
+    "romantic": "a wistful half-smile, open and leaning forward",
+    "traditionalist": "stern and upright, chin raised, utterly composed",
+    "sage": "calm and thoughtful, a slight frown of concentration",
+    "pragmatist": "alert and purposeful, caught mid-gesture",
+    "skeptic": "one eyebrow raised, arms folded, a wry look",
+}
+HOUSE_LIGHT = {
+    "Corvane": "dim gold candlelight and heavy shadows", "Valerius": "cool bright sea light and wind",
+    "Theren": "warm afternoon sun through olive leaves", "Aurelian": "pale dawn light through incense haze",
+    "Marcellan": "warm lamplight glinting on coins", "Cassian": "hard dusty noon light",
+    "Severin": "cool even light of a stone hall", "Damaris": "soft green morning light",
+    "Veyra": "cold mountain light and drifting mist", "Solenne": "faded rose dusk light through shutters",
+}
+
+
+def scene_for(note: str, role: str, house: str) -> tuple[str, str]:
+    text = f"{note or ''} {role or ''}".lower()
+    for key, action, prop in SCENES:
+        if key in text:
+            return action, prop
+    return HOUSE_SCENES[house]
+
+
+def age_phrase(age: int, noun: str) -> str:
+    if age < 30:
+        return f"a young {noun} of {age}, smooth youthful face, no wrinkles"
+    if age < 40:
+        return f"a {noun} of {age} in the prime of life, firm unlined skin, dark hair"
+    if age < 55:
+        return f"a {noun} of {age}, middle-aged, first lines on the face"
+    if age < 68:
+        return f"an older {noun} of {age}, greying, lined face"
+    return f"an old {noun} of {age}, white-haired, deeply wrinkled, aged"
+
+
+def card_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tuple[list[dict], list[str]]:
+    """Portraits v2, character cards. Encoder 1 (prompt) gets who and what: age, action, prop, expression, clothes;
+    encoder 2 (prompt_2) gets the look and the style: face, skin, hair, eyes, build, the house's light, ink and wash.
+    Each is read up to 77 tokens, so splitting them lets more of the record reach the painting."""
+    year = rows(con, "select max(year) y from storyteller_proposals")[0]["y"] or 0
+    out, waiting = [], []
+    for p in rows(con, "select p.id, p.name, p.born_year, p.note, p.dream_temperament, p.appearance, p.portrait_ref, m.role, "
+                       "h.name house from people p join house_members m on m.person_id = p.id join houses h on h.id = m.house_id "
+                       "where p.tier = 'principal' order by p.id"):
+        if only and p["id"] not in only:
+            continue
+        a = json.loads(p["appearance"] or "{}")
+        if not any(a.get(f) for f in ("build", "face", "hair")):
+            waiting.append(p["name"])
+            continue
+        sex = a.get("sex") or sex_of(p["name"])
+        age = year - p["born_year"]
+        noun = ("girl" if sex == "f" else "boy") if age < 16 else ("woman" if sex == "f" else "man")
+        action, prop = scene_for(p["note"], p["role"], p["house"])
+        clothing = re.sub(r"\s*\(House [^)]*\)", "", a["clothing"])
+        prompt = (f"{age_phrase(age, noun)}, {action}, holding {prop}, {TEMPERAMENT.get(p['dream_temperament'], '')}, "
+                  f"wearing {clothing}")
+        prompt_2 = (f"{CARD_STYLE}; {a.get('skin', 'olive')} skin, {a['face']}, hair {a['hair']}, {a['eyes']} eyes, "
+                    f"{a['build']}; {HOUSE_LIGHT[p['house']]}")
+        negative = CARD_NEGATIVE + (", " + YOUNG_NEGATIVE if age < 40 else "")
+        for k in range(candidates):
+            out.append({"id": p["id"], "k": k, "name": p["name"], "sex": sex, "prompt": prompt, "prompt_2": prompt_2,
+                        "style": CARD_STYLE, "negative": negative, "seed": 7000 + p["id"] * 10 + k,
+                        "reference": (STORAGE_PUBLIC + p["portrait_ref"]) if p["portrait_ref"] else None})
+    return out, waiting
+
+
 STORAGE_PUBLIC = "https://dbrtvwhslxkdpmuawrgd.supabase.co/storage/v1/object/public/arcadia/"
 JOB = {"notebook": "notebooks/kaggle_portraits.ipynb", "slug": "arcadia-portraits", "title": "Arcadia Portraits"}
 
 
 def paint(con, args) -> None:
     """Candidates on Kaggle -> the public bucket (sandbox/portraits/candidates/) -> portrait_candidates (engine record)."""
-    batch, waiting = prompts(con, args.candidates, args.only)
+    batch, waiting = (card_prompts if args.style == "card" else prompts)(con, args.candidates, args.only)
     if waiting:
         print("waiting for their appearance to be written: " + ", ".join(waiting))
     if args.dry_run:
         for b in batch:
             if b["k"] == 0:
-                print(f"p{b['id']} {b['name']}: {b['prompt']}")
+                print(f"p{b['id']} {b['name']}: {b['prompt']}" + (f"\n    [2] {b['prompt_2']}" if b.get("prompt_2") else ""))
         return
     from kaggle_run import USER, gpu_minutes, kaggle, push, wait
     from memory_sync import client
@@ -156,7 +263,7 @@ def paint(con, args) -> None:
         time.sleep(30)
     status = wait(kernel)
     sb = client()
-    dest = ROOT / "out/portrait_candidates"
+    dest = ROOT / ("out/portrait_tests" if args.test else "out/portrait_candidates")
     with tempfile.TemporaryDirectory() as tmp:
         kaggle("kernels", "output", kernel, "-p", tmp, "--force")
         log = next(Path(tmp).glob("*.log"), None)
@@ -166,6 +273,9 @@ def paint(con, args) -> None:
             sys.exit(f"{kernel}: {status}, no portraits ({minutes:.1f} GPU minutes)")
         shutil.copytree(made, dest, dirs_exist_ok=True)
     done = json.loads((dest / "portraits.json").read_text())
+    if args.test:   # a trial: kept here to look at, not uploaded, not on the review page
+        print(f"{kernel}: {status} | {minutes:.1f} GPU minutes | {len(done)} test images in {dest.relative_to(ROOT)}")
+        return
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     for d in done:
         remote = f"sandbox/portraits/candidates/p{d['id']}_{d['k']}.jpg"
@@ -213,6 +323,8 @@ def main() -> None:
     ap.add_argument("--no_push", action="store_true")
     ap.add_argument("--candidates", type=int, default=4)
     ap.add_argument("--only", type=lambda s: [int(x) for x in s.split(",")], help="person ids, e.g. 2,6")
+    ap.add_argument("--style", choices=["card", "head"], default="card", help="card: half-body character plates (v2); head: v1")
+    ap.add_argument("--test", action="store_true", help="a trial: download to out/portrait_tests, upload and record nothing")
     args = ap.parse_args()
     con = connect()
     paint(con, args) if args.command == "paint" else adopt(con)
