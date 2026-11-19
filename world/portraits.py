@@ -225,7 +225,7 @@ SKETCH_STYLE = ("expressive watercolour and ink sketch, wet washes of {colours} 
 # bleeding through, moody. One of those plates is the IP-Adapter style reference for every portrait, so the whole
 # cast shares the look and only the wash colour changes per house.
 WASH_REF = "https://dbrtvwhslxkdpmuawrgd.supabase.co/storage/v1/object/public/arcadia/sandbox/portraits/style/wash_ref.png"
-WASH_STYLE = "loose wet watercolour over ink, washes of {colours} bleeding through, moody, expressive"
+WASH_STYLE = "washes of {colours} bleeding through loose wet watercolour over ink, moody, expressive"
 OLD_NEGATIVE = "young, youthful, smooth skin, glamorous, beautiful model, makeup, airbrushed"
 WASH_STYLE_SCALE = 0.45   # the reference is a young woman: kept moderate so her face and age don't carry over
 
@@ -251,15 +251,20 @@ def wash_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tup
         station = role_words(p)
         clothing = re.sub(r"\s*\(House [^)]*\)", "", a["clothing"]).split(",")[0]
         mood = TEMPERAMENT.get(p["dream_temperament"], "").split(",")[0]
-        prompt = (f"half-length portrait of {age_phrase(age, noun)}" + (f", {station}" if station else "")
+        # age leads both prompts, spelled out for the old (the young style reference pulls everyone younger)
+        aged = (f"a very old {noun} of {age}, white hair, deeply lined skin, sunken cheeks, age spots" if age >= 65 else
+                f"an older {noun} of {age}, grey-streaked hair, lined face" if age >= 55 else age_phrase(age, noun))
+        prompt = (f"{aged}, half-length portrait with shoulders and hands in frame" + (f", {station}" if station else "")
                   + f", holding {prop}, {mood}, fully clothed in {clothing}")
-        prompt_2 = (WASH_STYLE.format(colours=HOUSE_DRESS[p["house"]][0]) + f"; {a.get('skin', 'olive')} skin, "
-                    + ", ".join(a["face"].split(", ")[:2]) + f", hair {a['hair'].split(',')[0]}, {a['eyes']} eyes")
-        negative = (CARD_NEGATIVE + (", " + YOUNG_NEGATIVE if age < 40 else "") + (", " + OLD_NEGATIVE if age >= 55 else ""))
+        prompt_2 = (f"{aged.split(',')[0]}; " + WASH_STYLE.format(colours=HOUSE_DRESS[p["house"]][0])
+                    + f"; {a.get('skin', 'olive')} skin, " + ", ".join(a["face"].split(", ")[:2])
+                    + f", hair {a['hair'].split(',')[0]}, {a['eyes']} eyes")
+        negative = (CARD_NEGATIVE + (", " + YOUNG_NEGATIVE if age < 40 else "") + (", " + OLD_NEGATIVE if age >= 55 else "")
+                    + (", dark hair, brown hair, black hair" if age >= 65 else ""))
         for k in range(candidates):
             out.append({"id": p["id"], "k": k, "name": p["name"], "sex": sex, "prompt": prompt, "prompt_2": prompt_2,
                         "style": WASH_STYLE, "negative": negative, "seed": 9000 + p["id"] * 10 + k, "guidance": 7.0,
-                        "style_ref": WASH_REF, "style_scale": WASH_STYLE_SCALE,
+                        "style_ref": WASH_REF, "style_scale": WASH_STYLE_SCALE if age < 55 else 0.3,
                         "reference": (STORAGE_PUBLIC + p["portrait_ref"]) if p["portrait_ref"] else None})
     return out, waiting
 
