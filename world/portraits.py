@@ -139,7 +139,7 @@ CARD_STYLE = ("loose ink line drawing with transparent watercolour washes, a cha
               "expressive pen linework, white paper showing through")
 CARD_NEGATIVE = ("photo, photograph, 3d render, glossy digital painting, anime, cartoon mascot, modern clothes, glasses, "
                  "text, letters, watermark, frame border, deformed hands, extra fingers, blurry, sepia, monochrome, "
-                 "brown tint, grayscale, close-up headshot")
+                 "brown tint, grayscale, close-up headshot, nude, naked, topless, bare breasts, nipples, undressed")
 CARD_NEGATIVE_3 = ("Japanese, ukiyo-e, Asian clothing, Victorian, engraving, church, building only, architecture only, "
                    "empty room, landscape without a figure, close-up, headshot, portrait crop, face only")
 # the look every card shares: a test-1 plate (Aldric, the strongest ink line), given to the IP-Adapter in style-only mode
@@ -286,7 +286,7 @@ def plate_prompts(con, candidates: int = 4, only: list[int] | None = None) -> tu
         colours = HOUSE_DRESS[p["house"]][0]
         clothing = re.sub(r"\s*\(House [^)]*\)", "", a["clothing"]).split(",")[0]
         mood = TEMPERAMENT.get(p["dream_temperament"], "").split(",")[0]
-        prompt = f"{age_phrase(age, noun)}, half-body figure holding {prop}, {mood}, wearing {clothing}"
+        prompt = f"{age_phrase(age, noun)}, half-body figure holding {prop}, {mood}, fully clothed in {clothing}"
         prompt_2 = (f"ink and wash illustration, a loose painted sketch, a character plate from an old illustrated book, "
                     f"expressive pen linework, light watercolour washes of {colours} on warm cream paper; "
                     f"{a.get('skin', 'olive')} skin, {a['face']}, hair {a['hair'].split(',')[0]}, {a['eyes']} eyes")
