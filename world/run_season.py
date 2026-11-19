@@ -37,6 +37,7 @@ def main() -> None:
     clock = T.Clock(con, year, season)
     with clock.step("advance (yields, food, upkeep)"):
         fed = T.advance(con, R, year, season)
+        T.resolve_talks(con, R, year, season, r)   # last season's marriage talks: a betrothal, or broken off
     with clock.step("dreams (run 5)"):
         dreams = T.dream_all(con, R, year, season, clock, r)
     with clock.step("recall and sharing"):

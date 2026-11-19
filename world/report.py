@@ -21,6 +21,7 @@ import json
 import re
 
 from world.db import ROOT, one, rows
+from world.ties_check import Family, drop_wrong, rewrite_note, wrong_ties
 
 VOICE_SYSTEM = (
     "You are a person of Corva, an old island city ruled by ten noble houses, writing in your private journal at the end "
@@ -120,15 +121,25 @@ def account(con, llm, p, year, season, clock, evs=None, span=None):
     first = p["name"].split()[0]
     text = ""
     cut = 0
+    fam = Family(con)
     for attempt in range(2):
         clock.calls += 1
         text = finish(llm.chat(VOICE_SYSTEM, user, max_new_tokens=360))
         text, cut = drop_ties(text)
+        wrong = wrong_ties(con, text, fam)
+        if wrong:
+            user += rewrite_note(wrong)
+            TIE_FIXES.append((p["name"], [w["claim"] for w in wrong]))
+            continue
         third = re.search(rf"\b{re.escape(first)}\b", text) or re.search(r"^(He|She) ", text, re.M)
         if not third and cut <= 1:
             break
         user += (f"\n(Rewrite entirely in the first person: you are {first}, so say \"I\", never \"{first}\" or \"he\" / \"she\"."
                  if third else "\n(Rewrite without listing who is whose child, wife or heir: those ties are only for reference.)")
+    left = wrong_ties(con, text, fam)
+    if left:
+        text = drop_wrong(text, left)
+        TIE_FIXES.append((p["name"], ["(cut) " + w["claim"] for w in left]))
     # stored as this author's own account: their claims, never facts about the world
     from world.db import insert
     insert(con, "chronicles", year=year, season=season, author_id=p["id"], events=[e["id"] for e in evs if not e["sealed"]],
@@ -137,7 +148,8 @@ def account(con, llm, p, year, season, clock, evs=None, span=None):
     return text
 
 
-ACCOUNT_CUTS = []   # (author, tie sentences cut from their final account), for the log
+ACCOUNT_CUTS = []
+TIE_FIXES = []      # (author, [wrong family claims caught]), for the log   # (author, tie sentences cut from their final account), for the log
 
 
 def town_talk(con, llm, year, season, clock, evs=None):
@@ -243,6 +255,7 @@ def chronicler_history(con, llm, c, year, evs, span, R, clock) -> dict | None:
     # the chronicler writing about themselves by name ("Aldric Severin attempted...") is the third-person slip:
     # they are "I" in their own chronicle
     first = p["name"].split()[0]
+    fam = Family(con)
     self_name = re.compile(rf"\b{re.escape(p['name'])}\b|\b{re.escape(first)}\b(?! of\b)")
     for attempt in range(2):
         clock.calls += 1
@@ -250,8 +263,14 @@ def chronicler_history(con, llm, c, year, evs, span, R, clock) -> dict | None:
         text, cut = drop_ties(text)
         bad = anachronism.find(text)
         third = bool(self_name.search(text))
-        if not bad and cut <= 1 and not third:
+        wrong = wrong_ties(con, text, fam)
+        if not bad and cut <= 1 and not third and not wrong:
             break
+        if wrong:
+            user += rewrite_note(wrong)
+            TIE_FIXES.append((p["name"], [w["claim"] for w in wrong]))
+            if not (bad or cut > 1 or third):
+                continue
         fixes = []
         if bad:
             fixes.append(", ".join(bad) + " (Corva has no such things or places)")
@@ -261,6 +280,10 @@ def chronicler_history(con, llm, c, year, evs, span, R, clock) -> dict | None:
             fixes.append(f"naming yourself: you are {p['name']}, so write \"I\" for what you did, never \"{first}\"")
         user += "\n(Write it again without " + "; and without ".join(fixes) + ".)"
     text = anachronism.strip(text) if anachronism.find(text) else text
+    left = wrong_ties(con, text, fam)
+    if left:   # wrong family ties that survived the rewrite are cut
+        text = drop_wrong(text, left)
+        TIE_FIXES.append((p["name"], ["(cut) " + w["claim"] for w in left]))
     # still there after the retry: "Aldric Severin attempted" -> "I attempted"; "Aldric's" -> "my"
     text = re.sub(rf"\b{re.escape(p['name'])}'s\b|\b{re.escape(first)}'s\b", "my", text)
     text = re.sub(rf"\b{re.escape(p['name'])}\b|\b{re.escape(first)}\b(?! of\b)", "I", text)
@@ -287,6 +310,7 @@ def write_year_chronicle(con, llm, year, upto_season, clock, complete: bool, R=N
              "its loyalties, its grudges, its beliefs about the Flight. These are their claims, not facts, and they disagree. "
              "What actually happened is the engine's record, in the season logs.*", ""]
     ACCOUNT_CUTS.clear()
+    TIE_FIXES.clear()
     for c in R.get("chroniclers", []):
         h = chronicler_history(con, llm, c, year, evs, span, R, clock)
         if h:
@@ -419,6 +443,8 @@ def write_log(con, year, season, tick, stats, interp, raw_failures, budget_secon
         lines += ["", "### Model calls (profile)", "", "| Step | Calls | Prompt tokens (mean / max) | Output tokens (mean / max) | Seconds (mean / max) |",
                   "|---|---:|---:|---:|---:|"]
         lines += [f"| {r['step']} | {r['n']} | {r['pin']:.0f} / {r['pmax']} | {r['pout']:.0f} / {r['omax']} | {r['s']:.1f} / {r['smax']:.1f} |" for r in prof]
+    if TIE_FIXES:
+        lines += ["", "Wrong family ties caught in the chronicles and rewritten: " + "; ".join(f"{a}: {', '.join(c)}" for a, c in TIE_FIXES) + "."]
     if ACCOUNT_CUTS:
         lines += ["", "Background ties cut from the chronicles (sentences): " + ", ".join(f"{a} {n}" for a, n in ACCOUNT_CUTS) + "."]
     lines += ["", "## Vital signs", "", "```json", json.dumps({k: v for k, v in stats.items() if k != "runtime"}, indent=1), "```", ""]

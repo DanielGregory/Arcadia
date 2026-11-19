@@ -121,6 +121,41 @@ def move_actors(con, person_ids, place):
         con.execute("update people set place_id = ? where id = ? and absent = 0 and alive = 1", (place["id"], pid))
 
 
+STOP = {"with", "that", "this", "they", "their", "them", "from", "what", "whether", "about", "house", "the", "and", "for",
+        "find", "make", "keep", "out", "where", "went", "answer", "taking", "part", "back"}
+
+
+def drive_behind(drives, p, target, place, R) -> str | None:
+    """The actor's drive this action serves, if any: a drive's own names and nouns (Livia, Theren, honour, score...)
+    appear in what the storyteller proposed (the action, its reason, its target, its place)."""
+    said = " ".join(str((p or {}).get(k) or "") for k in ("kind", "why")).lower()
+    said += " " + (target["name"].lower() if target else "") + " " + (place["name"].lower() if place else "")
+    for d in drives:
+        words = {w.strip(".,;:'").lower() for w in d.split()} - STOP
+        if any(len(w) > 3 and w in said for w in words):
+            return d
+    return None
+
+
+def resolve_talks(con, R, year, season, r):
+    """Marriage talks opened last season (a partial marriage proposal) end now: in a betrothal, or broken off."""
+    out = []
+    for t in rows(con, "select * from relationships where kind = 'talks'"):
+        a, b = one(con, "select name from people where id = ?", t["person_a"]), one(con, "select name from people where id = ?", t["person_b"])
+        if not a or not b:
+            continue
+        houses = [x["house_id"] for x in rows(con, "select house_id from house_members where person_id in (?, ?)", t["person_a"], t["person_b"])]
+        if r.random() < R["validation"].get("talks_confirm", 0.5):
+            con.execute("update relationships set kind = 'betrothed', strength = 0.6 where id = ?", (t["id"],))
+            text, outcome = f"The marriage talks between {a['name']} and {b['name']} ended in a betrothal.", "success"
+        else:
+            con.execute("delete from relationships where id = ?", (t["id"],))
+            text, outcome = f"The marriage talks between {a['name']} and {b['name']} were broken off.", "failure"
+        out.append(insert(con, "events", year=year, season=season, kind="marriage", actors=[t["person_a"], t["person_b"]],
+                          houses=houses, outcome=outcome, facts={"talks_from": t["formed_event"]}, text=text))
+    return out
+
+
 def latest_clients(con, house_id):
     if house_id is None:
         return one(con, "select * from house_clients where house_id is null order by id desc limit 1")
@@ -646,7 +681,8 @@ TRAIT_FOR = {"search": "openness", "investigate": "caution", "accuse": "pride", 
              "build": "caution", "work_land": "caution", "insult": "pride", "flee": "openness", "confess": "warmth",
              "withdraw": "caution", "other": "openness"}
 HOSTILE = {"accuse", "threaten", "demand", "rumor", "insult"}    # never turned on one's own house
-NEEDS_TARGET = {"accuse", "threaten", "demand", "rumor", "bribe", "gift", "marriage", "alliance", "insult", "confess"}
+NEEDS_TARGET = {"accuse", "threaten", "demand", "rumor", "bribe", "gift", "marriage", "alliance", "insult"}
+# (confess needs no one: without a target it is a confession before the city, since season 4)
 NEEDS_PLACE = {"search", "trade", "guard", "build"}
 
 
@@ -693,6 +729,16 @@ def validate_and_record(con, R, items, year, season, tick, r):
     places = {p["name"].lower(): p for p in rows(con, "select * from places")}
     sealed = json.loads(one(con, "select value from sealed_facts where key = 'lovers_location'")["value"])
     acted, fam_count, results = set(), Counter(), []
+    # dramatic acts first within each house (houses keep their order): if anyone must yield to a stand-in, it is the routine act
+    dramatic = set(V.get("dramatic_first", []))
+    order = {}
+    for i, it in enumerate(items):
+        order.setdefault(it["house"]["id"], len(order))
+    fam = lambda it: family_of(R, str((it["proposal"] or {}).get("kind") or ""))
+    items = sorted(items, key=lambda it: (order[it["house"]["id"]], fam(it) not in dramatic))
+    drives_now = defaultdict(list)
+    for d in rows(con, "select person_id, text from drives where year = ? and season = ?", year, season):
+        drives_now[d["person_id"]].append(d["text"])
     for it in items:
         h, p = it["house"], it["proposal"]
         status = reason = rule = ev = None
@@ -773,15 +819,25 @@ def validate_and_record(con, R, items, year, season, tick, r):
                     chance += (actor[TRAIT_FOR[family]] - 0.5) * 2 * V["trait_weight"] * spec["base"]
                     thouse = target if tkind == "house" else (one(con, "select h.* from houses h join house_members m on m.house_id = h.id "
                                                                       "where m.person_id = ?", target["id"]) if target else None)
-                    if family in ("alliance", "marriage") and thouse:
-                        chance += 0.3 * feeling(con, thouse["id"], h["id"])
-                    chance *= V["repeat_penalty"] ** fam_count[family]          # the same move again this season is weaker
+                    if family in V.get("feeling_weight", {}) and thouse:
+                        chance += V["feeling_weight"][family] * feeling(con, thouse["id"], h["id"])
+                    # the same move again this season is weaker: much weaker if this house repeats itself, a little if others did
+                    own = fam_count[(h["id"], family)]
+                    others = fam_count[family] - own
+                    chance *= V["repeat_penalty"] ** own * V.get("repeat_penalty_city", V["repeat_penalty"]) ** others
+                    fam_count[(h["id"], family)] += 1
                     fam_count[family] += 1
+                    # a principal acting on one of their own drives pushes harder
+                    drive = drive_behind(drives_now.get(actor["id"] or -1, []), p, target, place, R)
+                    if drive:
+                        chance += V.get("drive_bonus", 0)
                     roll = r.random()
                     outcome = "success" if roll < chance else "partial" if roll < chance + spec["partial"] else "failure"
                     acted.add(group_key or actor["id"])
                     facts = {"kind_named": kind, "family": family, "chance": round(chance, 2), "roll": round(roll, 2),
                              "why_given": str(p.get("why") or "")[:200]}
+                    if drive:
+                        facts["drive"] = drive
                     sealed_hit = False
                     if family == "search":
                         right = place["id"] == sealed["place_id"]
@@ -790,7 +846,8 @@ def validate_and_record(con, R, items, year, season, tick, r):
                         facts["found"] = "a trace" if found else "no trace"
                         if not found and outcome == "success":
                             outcome = "failure"
-                    target_name = (f"House {target['name']}" if tkind == "house" else target["name"]) if target else "Corva"
+                    target_name = (f"House {target['name']}" if tkind == "house" else target["name"]) if target else (
+                        "the city" if family == "confess" else "Corva")
                     verb = re.sub(r"[^a-z ]", "", kind.lower()).strip()[:40] or "act"
                     about = f" about {target_name}" if target else (f" at {place['name']}" if place else "")
                     text = TEMPLATES[family].format(actor=actor["name"], house=h["name"], target=target_name, about=about,
@@ -883,8 +940,29 @@ def effects(con, R, family, outcome, h, thouse, actor, tperson, ev, year, season
         add_loyalty(con, h["id"], 0.02 * weight)
     if family in ("gift", "bribe") and thouse and outcome != "failure":
         con.execute("update houses set goods = goods + ? where id = ?", (2 if family == "gift" else 3, thouse["id"]))
+    if family == "marriage" and thouse:
+        if outcome == "partial":
+            # talks: a tie that next season becomes a betrothal or is broken off (resolve_talks)
+            other = tperson or one(con, "select * from people where id = ?", thouse["head_id"])
+            first = actor if actor["id"] else one(con, "select * from people where id = ?", h["head_id"])
+            if other and first:
+                insert(con, "relationships", year=year, season=season, person_a=first["id"], person_b=other["id"], kind="talks",
+                       strength=0.3, formed_event=ev)
+        elif outcome == "failure":
+            # a refusal is a story too: the proposing house cools toward the house that refused
+            for m in rows(con, "select p.id from people p join house_members m on m.person_id = p.id where m.house_id = ? "
+                               "and p.alive = 1 and p.absent = 0 and ? - p.born_year >= 10", h["id"], year):
+                insert(con, "beliefs", year=year, season=season, holder_id=m["id"], subject_type="event", subject_id=str(ev),
+                       interpretation=f"House {thouse['name']} refused our offer of marriage.", confidence=0.5,
+                       source_type="witnessed", about_house=thouse["id"], stance=R["validation"].get("refusal_stance", -0.2))
     if not actor["id"]:
         return                           # what follows only a person can do (leave, confess, learn a secret)
+    if family == "confess" and not tperson and outcome != "failure":
+        # a confession before the city: everyone hears that it happened; what was confessed stays with the engine
+        for m in rows(con, "select id from people where alive = 1 and absent = 0 and ? - born_year >= 14 and id != ?", year, actor["id"]):
+            insert(con, "beliefs", year=year, season=season, holder_id=m["id"], subject_type="event", subject_id=str(ev),
+                   interpretation=f"{actor['name']} has confessed something before the city.", confidence=0.4,
+                   source_type="told_by", about_house=h["id"], stance=0.0)
     if family == "flee" and outcome == "success":
         # they leave Corva; where they go is not recorded (nobody saw)
         con.execute("update people set absent = 1, place_id = null where id = ?", (actor["id"],))

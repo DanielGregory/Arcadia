@@ -90,7 +90,7 @@ validation:
     rite:        {base: 0.75, partial: 0.2, cost: {goods: 1}, words: [pray, rite, sacrific, offering, ritual, ceremon, bless]}
     feast:       {base: 0.8, partial: 0.15, cost: {food: 4}, words: [feast, banquet, celebrat, festival, dinner]}
     gift:        {base: 0.75, partial: 0.15, cost: {goods: 2}, words: [gift, give, donat, present]}
-    marriage:    {base: 0.4, partial: 0.3, words: [marri, marry, betroth, wed]}
+    marriage:    {base: 0.5, partial: 0.3, words: [marri, marry, betroth, wed]}     # 0.4 before season 4
     alliance:    {base: 0.4, partial: 0.3, words: [allian, ally, pact, oath, swear, treaty]}
     trade:       {base: 0.65, partial: 0.25, cost: {goods: 1}, words: [trade, sell, merchant, venture, cargo]}
     guard:       {base: 0.75, partial: 0.2, words: [guard, patrol, fortif, protect, defend, secure]}
@@ -101,7 +101,15 @@ validation:
     confess:     {base: 0.7, partial: 0.2, words: [confess, admit, reveal, tell the truth]}
     withdraw:    {base: 0.9, partial: 0.05, words: [withdraw, wait, mourn, hide, retreat, stay]}
     other:       {base: 0.5, partial: 0.3, words: []}
-  repeat_penalty: 0.6         # each earlier use of the same family this season multiplies the chance by this
+  # Looser rules for drama (Danny's choice after docs/rejections_s2_s3.md, from season 4):
+  repeat_penalty: 0.6         # each earlier use of the same family BY THE SAME HOUSE this season multiplies the chance by this
+  repeat_penalty_city: 0.9    # ... and each use by another house by this (it was 0.6 city-wide)
+  dramatic_first: [marriage, accuse, confess, alliance, flee, bribe, insult]   # a house's dramatic acts are resolved before
+                              # its routine ones, so if someone must yield to a stand-in it is the routine act
+  feeling_weight: {marriage: 0.25, alliance: 0.3}   # chance += weight x the target house's feeling toward the proposer
+  talks_confirm: 0.5          # a partial marriage proposal opens talks; next season they end in a betrothal with this chance
+  refusal_stance: -0.2        # a refused marriage cools the proposing house toward the one that refused
+  drive_bonus: 0.1            # a principal acting on one of their own drives this season
   # the season makes some kinds harder (multiplies the base chance)
   season_factor:
     winter: {search: 0.7, trade: 0.6, build: 0.7, work_land: 0.6, flee: 0.7}
