@@ -4,7 +4,6 @@
 # natural_hair: their hair colour before any grey (their children are drafted with it).
 # Change anything; then: python -m world.appearance load
 # scene: (optional) what their character card shows them doing, with the prop of their role; it leads the card's prompt.
-
 Ismene:
   status: proposed
   born_year: -74
@@ -46,6 +45,7 @@ Iola Aurelian:
   clothing: 'white priestly robes with a sea-blue stole and a shell pendant (House Aurelian: white and sea blue)'
   natural_hair: auburn
   skin: warm brown
+  scene: at a writing desk in the sea temple, copying the temple's records onto a scroll with a reed pen
 Rufus Cassian:
   status: proposed
   born_year: -51
@@ -60,6 +60,7 @@ Rufus Cassian:
   clothing: 'a grey tunic with a rust-red border, dusted with stone (House Cassian: stone grey and rust)'
   natural_hair: light brown
   skin: olive
+  scene: in a quarry under the ridge, striking a wedge into a block of pale stone with an iron mallet
 Brenna Cassian:
   status: proposed
   born_year: -26
@@ -101,6 +102,7 @@ Decimus Corvane:
   clothing: 'a long black robe banded in gold, a gold signet ring (House Corvane: black and deep gold)'
   natural_hair: dark, tightly curled
   skin: deep brown
+  scene: on the citadel terrace above the city, reading a sealed letter by candlelight
 Livia Corvane:
   status: danny
   born_year: -20
@@ -127,6 +129,7 @@ Hesione Damaris:
   clothing: 'teal healer''s robes with a white headcloth, a satchel of herbs (House Damaris: teal and white)'
   natural_hair: chestnut
   skin: sun-darkened bronze
+  scene: at a cluttered table of herbs and clay jars, grinding leaves in a stone mortar
 Neria:
   status: danny
   born_year: -34
@@ -153,6 +156,7 @@ Octavia Marcellan:
   clothing: 'rich saffron-orange robes, rings on several fingers (House Marcellan: saffron orange and brown)'
   natural_hair: dark brown
   skin: pale, quick to burn
+  scene: at a counting table heaped with coins and wax tablets in a lamplit counting house, weighing silver on bronze scales
 Nikias Marcellan:
   status: proposed
   born_year: -28
@@ -198,6 +202,7 @@ Quintus Severin:
   clothing: 'a violet judge''s mantle over pale linen (House Severin: violet and pale linen)'
   natural_hair: dark brown
   skin: sun-darkened bronze
+  scene: standing at a lectern in the hall of judgment, reading out a ruling from a scroll
 Seraphine Solenne:
   status: proposed
   born_year: -71
@@ -212,6 +217,7 @@ Seraphine Solenne:
   clothing: 'faded rose silk, once very fine, now worn at the seams, an old silver brooch (House Solenne: faded rose and silver)'
   natural_hair: black
   skin: ruddy
+  scene: seated in a faded hall among old heirlooms, an old silver brooch in her hands, shutters half closed
 Silvan Solenne:
   status: proposed
   born_year: -19
@@ -226,6 +232,7 @@ Silvan Solenne:
   clothing: 'faded rose silk, once very fine, now worn at the seams, an old silver brooch (House Solenne: faded rose and silver)'
   natural_hair: dark brown
   skin: deep olive
+  scene: in an overgrown courtyard of an old house, practising with a borrowed sword
 Galen Theren:
   status: danny
   born_year: -58
@@ -264,6 +271,7 @@ Corin Theren:
   clothing: 'an olive-green wool mantle over undyed linen (House Theren: olive green and undyed linen)'
   natural_hair: dark, tightly curled
   skin: pale, quick to burn
+  scene: among olive trees at harvest, lifting a full basket of olives onto his shoulder
 Soren of the Harbor:
   status: danny
   born_year: -22
@@ -290,6 +298,7 @@ Gaius Valerius:
   clothing: 'a sea-blue cloak pinned with a bronze clasp over a white tunic (House Valerius: sea blue and bronze)'
   natural_hair: light brown
   skin: deep olive
+  scene: on the stern deck of a war galley in the harbour, one hand gripping the rail, giving orders to the oarsmen
 Lucan Valerius:
   status: danny
   born_year: -26
@@ -316,6 +325,7 @@ Drusilla Valerius:
   clothing: 'a sea-blue cloak pinned with a bronze clasp over a white tunic (House Valerius: sea blue and bronze)'
   natural_hair: light brown
   skin: golden brown
+  scene: on a harbour wall in the wind, watching the ships, a bronze-clasped cloak blowing behind her
 Kael Veyra:
   status: proposed
   born_year: -45
@@ -330,6 +340,7 @@ Kael Veyra:
   clothing: 'rust-red hunter''s leathers with a fur collar (House Veyra: rust red and fur)'
   natural_hair: black
   skin: sun-darkened bronze
+  scene: on a windy mountain pasture, leaning on a shepherd's crook, sheep and mist behind him
 Ysolde Veyra:
   status: proposed
   born_year: -23
